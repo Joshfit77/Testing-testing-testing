@@ -9851,14 +9851,21 @@ $$;
 -- Bytes: a reservation counts as the bucket's largest allowed file (8 MB) until its file exists, so concurrent uploads
 -- can't jointly pass the byte limit either. With nothing pending, the rule is exactly the old one.
 --
+-- Signed upload URLs: the storage service checks the insert policy (and so the reservation) when it SIGNS an upload
+-- URL, then accepts the upload with that token for up to SIGNED_UPLOAD_URL_EXPIRATION_TIME (2 hours by default) without
+-- checking again. So a reservation keeps counting as pending until its file exists or 2 hours after it stopped being
+-- usable, whichever comes first; otherwise tokens signed with expired reservations could be saved up and used at once.
+-- If a project raises SIGNED_UPLOAD_URL_EXPIRATION_TIME, raise PENDING_AFTER_EXPIRY below to match.
+--
 -- Overwriting: progress photos had an UPDATE policy on storage.objects (own folder). The limit only looked at NEW
 -- files, so a member could upload small files and then replace them with large ones, past the 1 GiB limit. The app
 -- never replaces a file (every upload uses a new name with upsert off), so the policy is removed. Body Scan photos
 -- never had one. Nothing stored is changed.
 --
 -- Deploy order: the web app first (it reserves before uploading and carries on without a reservation while this
--- function doesn't exist yet), then this migration. Applied first, uploads from a page loaded before the web deploy
--- are refused with the usual "couldn't upload" message until the page reloads.
+-- function doesn't exist yet), then this migration. Applied the other way round, a page loaded before the web deploy
+-- has its uploads refused, and that older page shows its photo-LIMIT message (it can't tell the refusals apart)
+-- until it is reloaded. Keep the order.
 --
 -- Rollback: restore the two insert policies from migrations 086 and 088 and the update policy from 017, then
 -- drop function public.reserve_storage_upload(text, text), public.has_upload_reservation(text, text),
@@ -9939,10 +9946,12 @@ begin
     case when p_bucket = 'progress-photos' then 'ngf.progress_photos:' else 'ngf.body_scan_photos:' end || v_user::text, 0));
 
   -- Expired reservations and ones whose file now exists no longer hold room.
+  -- Reservations whose file now exists, or that stopped being usable more than PENDING_AFTER_EXPIRY ago (no URL
+  -- signed with them can still be used), no longer hold room.
   delete from public.storage_upload_reservations r
   where r.user_id = v_user and r.bucket_id = p_bucket
     and r.name <> p_name
-    and (r.expires_at <= now()
+    and (r.expires_at <= now() - interval '2 hours'
          or exists (select 1 from storage.objects o where o.bucket_id = r.bucket_id and o.name = r.name));
 
   if exists (select 1 from public.storage_upload_reservations r
@@ -9952,9 +9961,16 @@ begin
     return 'ok';
   end if;
 
-  select * into v_usage from public.storage_folder_usage(p_bucket, v_user);
-  select count(*) into v_pending from public.storage_upload_reservations r
-  where r.user_id = v_user and r.bucket_id = p_bucket and r.expires_at > now() and r.name <> p_name;
+  -- Stored files and pending reservations in ONE statement, so both come from the same snapshot: counted separately,
+  -- an upload committing in between would be in neither count. Pending: not uploaded yet, and usable now or within
+  -- PENDING_AFTER_EXPIRY (2 hours) of expiring (signed URLs).
+  select u.files, u.today, u.bytes,
+         (select count(*) from public.storage_upload_reservations r
+          where r.user_id = v_user and r.bucket_id = p_bucket and r.expires_at > now() - interval '2 hours' and r.name <> p_name
+            and not exists (select 1 from storage.objects o where o.bucket_id = r.bucket_id and o.name = r.name)) as pending
+    into v_usage
+    from public.storage_folder_usage(p_bucket, v_user) u;
+  v_pending := v_usage.pending;
   select coalesce(b.file_size_limit, 8388608) into v_file_bytes from storage.buckets b where b.id = p_bucket;
   v_file_bytes := coalesce(v_file_bytes, 8388608);
 

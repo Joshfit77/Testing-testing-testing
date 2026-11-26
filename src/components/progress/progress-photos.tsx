@@ -26,7 +26,7 @@ import {
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, formatWeight, weightUnit } from "@/lib/domain/units";
 import { getBrowserSupabase } from "@/lib/supabase/client";
-import { reserveUpload } from "@/lib/storage-reservation";
+import { alreadyUploaded, reserveUpload, UPLOAD_RETRY_MESSAGE } from "@/lib/storage-reservation";
 import { cn, titleCase } from "@/lib/utils";
 import { deleteProgressPhotoAction, saveProgressPhotoAction } from "@/server/actions/progress-photos";
 
@@ -113,14 +113,17 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
     const path = pending.current?.path ?? reserved.current.path;
     if (!pending.current) {
       const reservation = await reserveUpload(supabase, PROGRESS_PHOTO_BUCKET, path);
-      if (reservation !== "ok") {
+      if (reservation === "limit" || reservation === "error") {
         setStage("idle");
         return setError(reservation === "limit" ? PHOTO_LIMIT_MESSAGE : photoUploadErrorMessage(null));
       }
       const { error: upErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "3600" });
-      if (upErr) {
+      // Already there: an earlier attempt uploaded it and only the reply was lost.
+      if (upErr && !alreadyUploaded(upErr)) {
         setStage("idle");
-        return setError(photoUploadErrorMessage(upErr));
+        // The reservation said there was room, so a refusal now isn't the limit (the upload took too long, or was cut).
+        const message = photoUploadErrorMessage(upErr);
+        return setError(message === PHOTO_LIMIT_MESSAGE && reservation === "ok" ? UPLOAD_RETRY_MESSAGE : message);
       }
       pending.current = { file, path, unconfirmed: false };
     }

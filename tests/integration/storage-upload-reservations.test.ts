@@ -147,9 +147,17 @@ describe.skipIf(!available)("photo upload limits without storage triggers (uploa
   it("near the byte limit, a pending upload counts as a full-size file, so a burst can't jointly pass it", async () => {
     const m = await make("resv-bytes");
     const MB8 = 8 * 1024 * 1024;
-    // 20 MB below 1 GiB: room for two more 8 MB files pending at once (0 + 8 + 16 MB < 20 MB), not a fourth.
+    // 20 MB below 1 GiB: 10 reservations at once get exactly 3 (0 + 8 + 16 MB pending < 20 MB; a fourth would make 24).
+    // (In a burst that also uploads, a file landing at its real, small size gives room back, so more may follow: that
+    // is correct, the limit is on bytes stored plus bytes that could still arrive.)
     seed("progress-photos", m.id, 1, { bytes: PHOTO_LIMITS.totalBytes - 20 * 1024 * 1024 });
-    expect(await burst(m, "progress-photos", 10, photoName(m))).toBe(3);
+    const names = Array.from({ length: 10 }, photoName(m));
+    const answers = await Promise.all(names.map((n) => reserveUpload(m.client, "progress-photos", n)));
+    expect(answers.filter((a) => a === "ok")).toHaveLength(3);
+    for (const [i, n] of names.entries()) {
+      const up = await m.client.storage.from("progress-photos").upload(n, JPEG, { contentType: "image/jpeg" });
+      expect(!up.error).toBe(answers[i] === "ok");
+    }
     // Once those files exist at their real (small) size, room comes back.
     expect(await appUpload(m, "progress-photos", `${m.id}/${crypto.randomUUID()}.jpg`)).toBe(true);
     expect(MB8).toBe(Number(sql(`select file_size_limit from storage.buckets where id = 'progress-photos'`)[0]![0]));
@@ -178,14 +186,55 @@ describe.skipIf(!available)("photo upload limits without storage triggers (uploa
     expect((await m.client.storage.from("progress-photos").upload(name, JPEG, { contentType: "image/jpeg" })).error).toBeNull();
   });
 
-  it("an expired reservation neither counts nor lets a file in", async () => {
+  it("an expired reservation lets no file in, counts for 2 more hours (signed upload URLs), then stops counting", async () => {
     const m = await make("resv-expired");
     seed("progress-photos", m.id, PHOTO_LIMITS.perDay - 1, { ageHours: 1 });
     const stale = `${m.id}/${crypto.randomUUID()}.jpg`;
     expect(await reserveUpload(m.client, "progress-photos", stale)).toBe("ok");
     sql(`update public.storage_upload_reservations set expires_at = now() - interval '1 minute' where name = '${stale}'`);
     expect((await m.client.storage.from("progress-photos").upload(stale, JPEG, { contentType: "image/jpeg" })).error).not.toBeNull();
+    // A URL signed while it was live could still be used, so it still holds its place.
+    expect(await reserveUpload(m.client, "progress-photos", `${m.id}/${crypto.randomUUID()}.jpg`)).toBe("limit");
+    sql(`update public.storage_upload_reservations set expires_at = now() - interval '2 hours 1 minute' where name = '${stale}'`);
     expect(await appUpload(m, "progress-photos", `${m.id}/${crypto.randomUUID()}.jpg`)).toBe(true);
+  });
+
+  it("signed upload URLs can't be saved up past the limit (the URL outlives the reservation; security review 1)", async () => {
+    const m = await make("resv-signed");
+    seed("progress-photos", m.id, PHOTO_LIMITS.perDay - 2, { ageHours: 1 });
+    const store = m.client.storage.from("progress-photos");
+    // Two reservations, each used to sign an upload URL, then left to expire (the URLs stay valid for 2 hours).
+    const signed: { path: string; token: string }[] = [];
+    for (let i = 0; i < 2; i++) {
+      const name = `${m.id}/${crypto.randomUUID()}.jpg`;
+      expect(await reserveUpload(m.client, "progress-photos", name)).toBe("ok");
+      const { data, error } = await store.createSignedUploadUrl(name);
+      expect(error).toBeNull();
+      signed.push({ path: data!.path, token: data!.token });
+    }
+    sql(`update public.storage_upload_reservations set expires_at = now() - interval '1 minute' where user_id = '${m.id}'`);
+    // Before the fix, expired reservations stopped counting and more could be taken (and more URLs signed).
+    expect(await reserveUpload(m.client, "progress-photos", `${m.id}/${crypto.randomUUID()}.jpg`)).toBe("limit");
+    // The saved URLs still work (they were legitimately reserved), and the member ends exactly at the limit.
+    for (const u of signed) expect((await anonClient().storage.from("progress-photos").uploadToSignedUrl(u.path, u.token, JPEG, { contentType: "image/jpeg" })).error).toBeNull();
+    expect(stored("progress-photos", m.id)).toBe(PHOTO_LIMITS.perDay);
+    expect(await reserveUpload(m.client, "progress-photos", `${m.id}/${crypto.randomUUID()}.jpg`)).toBe("limit");
+  });
+
+  it("a retry after a lost upload reply gets the 'already exists' answer the screens treat as uploaded (security review 2)", async () => {
+    const { alreadyUploaded } = await import("@/lib/storage-reservation");
+    const m = await make("resv-retry-lost");
+    const name = `${m.id}/${crypto.randomUUID()}.jpg`;
+    expect(await appUpload(m, "progress-photos", name)).toBe(true);
+    // The same screen retries the same name: reservation refreshed, upload answered "already exists".
+    expect(await reserveUpload(m.client, "progress-photos", name)).toBe("ok");
+    const again = await m.client.storage.from("progress-photos").upload(name, JPEG, { contentType: "image/jpeg", upsert: false });
+    expect(again.error).not.toBeNull();
+    expect(alreadyUploaded(again.error as never)).toBe(true);
+    // A refusal for another reason is not mistaken for it.
+    const other = await m.client.storage.from("progress-photos").upload(`${m.id}/${crypto.randomUUID()}.jpg`, JPEG, { contentType: "image/jpeg" });
+    expect(other.error).not.toBeNull();
+    expect(alreadyUploaded(other.error as never)).toBe(false);
   });
 
   it("a stored photo can't be replaced with another file (the overwrite path past the byte limit is closed)", async () => {

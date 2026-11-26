@@ -28,7 +28,7 @@ import { PHOTO_MAX_BYTES } from "@/lib/domain/progress-photos";
 import type { UnitSystem } from "@/lib/domain/types";
 import { compressImage } from "@/lib/image-compress";
 import { getBrowserSupabase } from "@/lib/supabase/client";
-import { reserveUpload } from "@/lib/storage-reservation";
+import { alreadyUploaded, reserveUpload, UPLOAD_RETRY_MESSAGE } from "@/lib/storage-reservation";
 import { cn } from "@/lib/utils";
 import { saveBodyScanAction } from "@/server/actions/body-scan";
 import { PoseOutline } from "./pose-outline";
@@ -90,14 +90,17 @@ export function ScanCapture({ userId, units, previous, lastWeight }: { userId: s
         // A retry of the same shot keeps its file name, so it reuses its reservation instead of holding another.
         const path = (reservedPaths.current[pose] ??= scanPhotoPath(userId, scanId, pose, crypto.randomUUID()));
         const reservation = await reserveUpload(supabase, BODY_SCAN_BUCKET, path);
-        if (reservation !== "ok") {
+        if (reservation === "limit" || reservation === "error") {
           setSaving(null);
           return setError(reservation === "limit" ? SCAN_PHOTO_LIMIT_MESSAGE : scanUploadErrorMessage(null, navigator.onLine));
         }
         const { error: upErr } = await supabase.storage.from(BODY_SCAN_BUCKET).upload(path, shots[pose]!.blob, { contentType: "image/jpeg", upsert: false, cacheControl: "60" });
-        if (upErr) {
+        // Already there: an earlier attempt uploaded it and only the reply was lost.
+        if (upErr && !alreadyUploaded(upErr)) {
           setSaving(null);
-          return setError(scanUploadErrorMessage(upErr, navigator.onLine));
+          // The reservation said there was room, so a refusal now isn't the limit (the upload took too long, or was cut).
+          const message = scanUploadErrorMessage(upErr, navigator.onLine);
+          return setError(message === SCAN_PHOTO_LIMIT_MESSAGE && reservation === "ok" ? UPLOAD_RETRY_MESSAGE : message);
         }
         uploaded.current[pose] = path;
       }
