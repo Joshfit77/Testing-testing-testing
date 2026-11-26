@@ -18,7 +18,7 @@ flowchart LR
   end
   subgraph Supabase["Supabase"]
     Auth["GoTrue auth<br/>(MFA for admins)"]
-    DB["Postgres + RLS<br/>93 migrations"]
+    DB["Postgres + RLS<br/>83 migrations"]
     Storage["Storage<br/>(photos, quotas by trigger)"]
   end
   Anthropic["Anthropic API<br/>(coach, food photo; budget-capped,<br/>kill switches)"]

@@ -25,15 +25,20 @@ Read this first in any new session. It records what has been done, with evidence
 | Pre-launch audit (10 documents) | Done 2026-11-25 | Delivered privately to the owner, not in the repo (security detail); summarised in MASTER_ENGINEERING_REPORT.md |
 | Branch inventory | Done | BRANCH_CONSOLIDATION_REPORT.md. 45 branches:<br>• 34 fully contained in the release candidate;<br>• 1 superseded fix;<br>• 2 superseded older work;<br>• 6 not part of the app;<br>• `claude/friends-challenges` the only unmerged app work.<br>10 open pull requests (#3–#12), all older than the release candidate |
 | Pricing across branches | Done | `main` $30.00 Pro (Plus $9.99); `production-readiness` $19.99; `rc-verification` $19.99 / $149.99; the release candidate and this branch **$17.99 / $119.99** (approved). Not changed |
-| Fixes 1–6 (config docs, Node pin, body-scan quota, AI retention option, admin AI-budget warning, privacy manifest) | Done, committed | `e84b14d3`, `f9305d6f`, `bb5d2337`, `bc8cf2d5`, `f0c44da4` |
-| Independent reviews: database, security | Done; findings verified, then fixed | Migrations 089 and 090; commits `7a6ab043`, `9f6d8866` |
-| Independent reviews: billing, mobile, architecture | Restarted after a usage-limit stop | Results go to BUG_FIX_REGISTER.md |
-| Database: upgrade from `main` with synthetic data | Done: **all data preserved** | DATABASE_MIGRATION_REPORT.md |
-| Database: fresh install of all migrations | In the full run | TEST_RESULTS.md |
-| Friends feature (flag off) | Not started | Needs migrations renumbered from 076–078 |
-| Load test (local) | Not started | PERFORMANCE_REPORT.md |
-| Deliverables in this folder | In progress | — |
-| Pull request into `main` (not merged) | Not started | — |
+| Fixes: config docs, Node pin, body-scan quota, AI retention option, admin AI-budget warning, privacy manifest | Done | `e84b14d3`, `f9305d6f`, `bb5d2337`, `bc8cf2d5`, `f0c44da4` |
+| Independent reviews (security, database, billing, mobile, architecture) | Done; findings verified, fixed or logged | `7a6ab043`, `9f6d8866`, `ecdca7d8`, `56717544`, `29d80ca9`; BUG_FIX_REGISTER.md |
+| Database: upgrade from `main` with synthetic data; fresh install | Done: all data preserved; 83 migration files install | DATABASE_MIGRATION_REPORT.md |
+| Friends feature (flag off) | Merged, migrations renumbered 091–093 | `8fa7c3b5` |
+| Full regression on `8fa7c3b5` | Done: CI passed; unit 4,919/1 skip; integration 640/1 skip; browser 167/0 failed/101 opt-in skips; Android APK and iOS workflows passed | TEST_RESULTS.md |
+| Load test (local) | Done | PERFORMANCE_REPORT.md |
+| Deliverables in this folder | Done (16 files) | — |
+| Pull request into `main` (not merged) | Opened after the final push | See the PR on GitHub |
+
+## Next steps if continuing
+
+1. Watch the PR checks.
+2. Optional fixes, smallest first: O-18, O-19, O-20, O-11, O-13, O-15, O-14.
+3. After owner approval only: merge, staging deploy, store setup.
 
 ## How to run things here (lessons learned)
 

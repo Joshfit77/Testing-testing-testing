@@ -2,7 +2,7 @@
 
 **Branch:** `release/narrow-gate-production-consolidation`.
 
-- **93 migration files**, `20261016000001` to `20261126000093`, applied in filename order.
+- **83 migration files**, `20261016000001` to `20261126000093` (numbers 014–019, 071–074 and 076–078 unused), applied in filename order.
 - `supabase/setup-all.sql` is the generated concatenation for pasting into a new project. It is regenerated with
   `bash scripts/bundle-sql.sh`; an independent check found it identical to the migrations plus the seed.
 - **Nothing was run against any hosted or production database.** All tests used a local Supabase stack with synthetic
@@ -12,7 +12,7 @@
 
 | Test | Result |
 |---|---|
-| **Fresh install** (`supabase db reset`: all migrations plus seed on an empty database) | Passed with 90 migrations before the Friends merge, then with 93 after it |
+| **Fresh install** (`supabase db reset`: all migrations plus seed on an empty database) | Passed with 80 migration files before the Friends merge, then with 83 after it |
 | **Upgrade from `main`** | **All data preserved** (details below) |
 | Integration suites against the migrated schema | See TEST_RESULTS.md |
 
@@ -32,7 +32,8 @@ Results:
 - the only unvalidated constraint was the intentional `profiles_avatar_path_check` (`NOT VALID` since migration 040).
 
 Friends migrations 091–093 were added after this test. They only create new tables and functions, and the fresh
-install with all 93 passed.
+install of all 83 migration files (numbered up to 093; the numbers 014–019, 071–074 and 076–078 are unused) passed.
+(The Friends merge commit `8fa7c3b5` says "all 93 migrations"; the correct count is 83 files.)
 
 ## Migrations added by this consolidation
 
