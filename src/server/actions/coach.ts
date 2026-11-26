@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getServerSupabase } from "@/lib/supabase/server";
+import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
 import { aiPlanStrictSchema, aiPlanToProgramSeed, validateAiPlan } from "@/lib/validation/ai";
 import { getUserPlan, requireUser } from "@/server/auth";
 import { activateProgram, createPrivateProgram } from "@/server/services/programs";
@@ -24,6 +24,21 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { memoryEncryptionReady, openMemories, sealMemory } from "@/server/crypto/memory-crypto";
 
 type Result = { ok: true; message: string; programSlug?: string } | { ok: false; error: string };
+
+/**
+ * After a failed save, put the member's claimed proposal back to "proposed" so they can try again. Members can't move a
+ * proposal back themselves (migration 089: only proposed -> applied/dismissed), so this one step runs on the server's
+ * own connection, limited to this message of this member that is currently "applied".
+ */
+async function reopenProposal(messageId: string, userId: string): Promise<void> {
+  const { error } = await getServiceSupabase()
+    .from("ai_messages")
+    .update({ proposal_status: "proposed" })
+    .eq("id", messageId)
+    .eq("user_id", userId)
+    .eq("proposal_status", "applied");
+  if (error) logError("coach.reopen_proposal", error);
+}
 
 /** Save an AI proposal as a private program — only after the user explicitly approves it. */
 export async function applyProposalAction(messageId: string, activate: boolean): Promise<Result> {
@@ -71,7 +86,7 @@ export async function applyProposalAction(messageId: string, activate: boolean):
   } catch (err) {
     logError("coach.apply", err);
     // Let them try again.
-    await supabase.from("ai_messages").update({ proposal_status: "proposed" }).eq("id", msg.id).eq("user_id", user.id);
+    await reopenProposal(msg.id as string, user.id);
     return { ok: false, error: "Couldn't save the plan. Please try again." };
   }
 }
@@ -253,7 +268,7 @@ export async function applyCoachProposalAction(messageId: string, edited?: Recor
     }
   })();
   // Nothing was applied: let the member try again.
-  if (!outcome.ok) await supabase.from("ai_messages").update({ proposal_status: "proposed" }).eq("id", msg.id).eq("user_id", user.id);
+  if (!outcome.ok) await reopenProposal(msg.id as string, user.id);
   return outcome;
 }
 

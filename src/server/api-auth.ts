@@ -5,6 +5,7 @@ import { getServerSupabase, getTokenSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
 import { planFromEntitlement } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
+import { sessionMaxAgeDays, sessionTooOld } from "@/lib/auth/session-age";
 
 export interface ApiAuth {
   user: User;
@@ -24,6 +25,8 @@ export async function authenticateRequest(request: NextRequest): Promise<ApiAuth
     const supabase = getTokenSupabase(token);
     const { data, error } = await supabase.auth.getUser(token);
     if (error || !data.user) return { error: "unauthorized" };
+    // The same maximum sign-in age as the website (a copied token can't be used past it here either).
+    if (sessionTooOld(token, Date.now(), sessionMaxAgeDays(process.env.SESSION_MAX_AGE_DAYS))) return { error: "unauthorized" };
     return { user: data.user, supabase, via: "bearer" };
   }
   if (!["GET", "HEAD", "OPTIONS"].includes(request.method) && !isSameOrigin(request)) return { error: "forbidden_origin" };

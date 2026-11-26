@@ -8161,6 +8161,171 @@ create trigger body_scan_photos_quota
   when (new.bucket_id = 'body-scans')
   execute function public.enforce_body_scan_photo_quota();
 
+-- ===== supabase/migrations/20261126000089_consent_enforcement_and_fk_indexes.sql =====
+-- Consents enforced by the database itself, and indexes for foreign keys that deletions follow.
+-- (Independent database review, 2026-11-25: findings F1, F2, F3.)
+--
+-- ROLLBACK (in reverse order):
+--   drop policy if exists recovery_checkins_need_consent on public.recovery_checkins;
+--   drop policy if exists faith_journal_share_needs_consent on public.faith_journal_entries;
+--   drop trigger if exists profiles_ai_subconsents on public.profiles;
+--   drop function if exists public.enforce_ai_subconsents();
+--   drop index if exists <each index below>;
+-- The cleared "share with AI Coach" marks are not restored (they were inert: see 080).
+--
+-- 1. AI sub-permissions follow the general AI consent, whatever writes the profile.
+--    Until now only the app's own actions (src/server/actions/profile.ts) switched the health-data and prayer-journal
+--    permissions and coaching memory off with the AI consent, and only setJournalAiShareAction cleared old journal
+--    marks when the journal permission changed. A member can update these columns directly with their own session
+--    (column grants, migrations 079 and 080), so the rule now lives in a trigger:
+--      * AI consent withdrawn  -> health sharing, journal sharing and coaching memory off;
+--      * faith features off    -> journal sharing off;
+--      * journal permission changed (either way) -> every entry's "share with AI Coach" mark cleared, so nothing marked
+--        before the permission existed, or while it was off, is ever sent.
+create or replace function public.enforce_ai_subconsents()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.ai_data_consent_at is null then
+    new.health_ai_share_consent_at := null;
+    new.journal_ai_consent_at := null;
+    new.coach_memory_enabled := false;
+  end if;
+  if not coalesce(new.faith_enabled, false) then
+    new.journal_ai_consent_at := null;
+  end if;
+  if new.journal_ai_consent_at is distinct from old.journal_ai_consent_at then
+    update public.faith_journal_entries set share_with_coach = false where user_id = new.id and share_with_coach;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.enforce_ai_subconsents() from public, anon, authenticated;
+
+drop trigger if exists profiles_ai_subconsents on public.profiles;
+create trigger profiles_ai_subconsents
+  before update on public.profiles
+  for each row execute function public.enforce_ai_subconsents();
+
+-- Marks set before the journal permission existed (migration 080) and never cleared, for members without the
+-- permission: inert today (the coach also checks the permission), cleared so they can never come back to life.
+update public.faith_journal_entries e set share_with_coach = false
+from public.profiles p
+where p.id = e.user_id and e.share_with_coach and p.journal_ai_consent_at is null;
+
+-- An entry can be marked for the AI Coach only while the member has all three permissions on.
+drop policy if exists faith_journal_share_needs_consent on public.faith_journal_entries;
+create policy faith_journal_share_needs_consent on public.faith_journal_entries
+  as restrictive
+  for all to authenticated
+  using (true)
+  with check (
+    not share_with_coach
+    or exists (
+      select 1 from public.profiles p
+      where p.id = (select auth.uid())
+        and p.journal_ai_consent_at is not null and p.ai_data_consent_at is not null and p.faith_enabled
+    )
+  );
+
+-- 2. Recovery check-ins (readiness, sleep quality, soreness, stress) need the wellness consent, as sleep entries
+--    already do (can_log_sleep, migration 034). The app asked for it before saving; the database now requires it.
+--    Reading and deleting stay allowed, so a member who withdraws consent can still see and remove what they stored.
+drop policy if exists recovery_checkins_need_consent on public.recovery_checkins;
+create policy recovery_checkins_need_consent on public.recovery_checkins
+  as restrictive
+  for insert to authenticated
+  with check ((select public.can_log_sleep()));
+drop policy if exists recovery_checkins_update_need_consent on public.recovery_checkins;
+create policy recovery_checkins_update_need_consent on public.recovery_checkins
+  as restrictive
+  for update to authenticated
+  using (true)
+  with check ((select public.can_log_sleep()));
+
+-- 3. Indexes for foreign keys that deletes follow (ON DELETE SET NULL / CASCADE). Without them, deleting an account
+--    (its cached foods), a conversation (its messages) or a program scans whole tables once per deleted row.
+create index if not exists meal_items_food_idx on public.meal_items (food_id) where food_id is not null;
+create index if not exists coach_memories_source_msg_idx on public.coach_memories (source_message_id) where source_message_id is not null;
+create index if not exists training_adjustments_source_msg_idx on public.training_adjustments (source_message_id) where source_message_id is not null;
+create index if not exists ai_message_feedback_message_idx on public.ai_message_feedback (message_id);
+create index if not exists personal_records_session_idx on public.personal_records (session_id) where session_id is not null;
+create index if not exists workout_sessions_user_program_idx on public.workout_sessions (user_program_id) where user_program_id is not null;
+create index if not exists workout_sessions_program_day_idx on public.workout_sessions (program_day_id) where program_day_id is not null;
+create index if not exists body_scans_measurement_idx on public.body_scans (measurement_id) where measurement_id is not null;
+
+-- ===== supabase/migrations/20261126000090_security_review_hardening.sql =====
+-- Independent security review, 2026-11-25 (findings N-1, N-2, N-4, N-5). All small, all reversible.
+--
+-- ROLLBACK:
+--   drop function if exists public.expire_old_sessions(integer);
+--   drop trigger if exists ai_messages_proposal_status_guard on public.ai_messages;
+--   drop function if exists public.guard_proposal_status();
+--   alter table public.profiles drop constraint if exists profiles_layout_prefs_size_check;
+--   recreate avatars_owner_insert / avatars_owner_update as in migration 003.
+
+-- N-2. The avatars bucket isn't used by the app (no screen uploads or shows an avatar), but signed-in members could
+-- upload to it without any limit. New uploads and overwrites are no longer allowed; members can still see and delete
+-- anything already stored there (and account deletion empties it, src/server/services/account.ts).
+drop policy if exists avatars_owner_insert on storage.objects;
+drop policy if exists avatars_owner_update on storage.objects;
+
+-- N-4. A coach proposal is confirmed once: members may only move it from "proposed" to "applied" or "dismissed".
+-- Moving it back (which would let an already-applied plan be applied again) is reserved to the server, which does it
+-- only after a failed save (src/server/actions/coach.ts, reopenProposal).
+create or replace function public.guard_proposal_status()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.proposal_status is distinct from old.proposal_status
+     and current_user = 'authenticated'
+     and not (old.proposal_status = 'proposed' and new.proposal_status in ('applied', 'dismissed')) then
+    raise exception 'proposal already handled' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.guard_proposal_status() from public, anon, authenticated;
+drop trigger if exists ai_messages_proposal_status_guard on public.ai_messages;
+create trigger ai_messages_proposal_status_guard
+  before update of proposal_status on public.ai_messages
+  for each row execute function public.guard_proposal_status();
+
+-- N-5. Screen-layout preferences are small; cap them like the other member-written JSON columns (033, 039).
+alter table public.profiles drop constraint if exists profiles_layout_prefs_size_check;
+alter table public.profiles
+  add constraint profiles_layout_prefs_size_check check (layout_prefs is null or octet_length(layout_prefs::text) <= 4000) not valid;
+alter table public.profiles validate constraint profiles_layout_prefs_size_check;
+
+-- N-1. The 30-day maximum sign-in age (SESSION_MAX_AGE_DAYS) was enforced by the website and the API, but the
+-- sessions themselves stayed valid at the authentication server, so a copied refresh token could keep reaching the
+-- database directly. This ends (deletes) sessions older than the limit, which also revokes their refresh tokens.
+-- Server only (service_role): run daily by /api/maintenance/sessions.
+create or replace function public.expire_old_sessions(p_max_age_days integer)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_count integer;
+begin
+  if p_max_age_days is null or p_max_age_days < 1 or p_max_age_days > 365 then
+    raise exception 'max age must be between 1 and 365 days';
+  end if;
+  delete from auth.sessions where created_at < now() - make_interval(days => p_max_age_days);
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+revoke all on function public.expire_old_sessions(integer) from public, anon, authenticated;
+grant execute on function public.expire_old_sessions(integer) to service_role;
+
 -- ===== supabase/seed.sql =====
 -- AUTO-GENERATED by scripts/generate-seed.ts — do not edit by hand.
 -- Exercise descriptions are general fitness education, not medical advice.

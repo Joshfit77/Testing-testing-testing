@@ -9,6 +9,7 @@ import { analyzeTraining, type ReviewInput, type ReviewProgram, type ReviewWorko
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, weightUnit } from "@/lib/domain/units";
 import { getActiveProgramRef } from "@/server/coach/snapshot";
+import { logError } from "@/server/log";
 
 /**
  * Loads the member's own logs for the training review (their session and RLS, plus an explicit user filter) and
@@ -181,15 +182,35 @@ async function requireEditableActiveProgram(supabase: SupabaseClient, userId: st
   return ref;
 }
 
-/** Put the recorded rows back as they were (best effort, used when a multi-row change fails part-way). */
+/** The only tables and columns a recorded training change may touch (the stored JSON is never trusted beyond this). */
+const CHANGE_COLUMNS: Record<ChangeRecord["table"], readonly string[]> = {
+  exercise_targets: ["weight_kg", "reps", "note", "source"],
+  program_exercises: ["sets", "rpe"],
+  program_weeks: ["is_deload", "focus"],
+};
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** True when a stored change record names only the tables and columns training changes write. */
+export function isValidChangeRecord(r: unknown): r is ChangeRecord {
+  if (!r || typeof r !== "object") return false;
+  const rec = r as Partial<ChangeRecord>;
+  const cols = typeof rec.table === "string" ? CHANGE_COLUMNS[rec.table as ChangeRecord["table"]] : undefined;
+  if (!cols || typeof rec.id !== "string" || !UUID_RE.test(rec.id)) return false;
+  const ok = (v: unknown) => v === null || (typeof v === "object" && !Array.isArray(v) && Object.keys(v as object).every((k) => cols.includes(k)));
+  return ok(rec.before ?? null) && ok(rec.after ?? null);
+}
+
+/** Put the recorded rows back as they were (used when a multi-row change fails part-way, and by Undo). Throws on a failed write. */
 async function restore(supabase: SupabaseClient, records: ChangeRecord[]) {
   for (const r of [...records].reverse()) {
+    if (!isValidChangeRecord(r)) throw new TrainingChangeError("This change can't be undone automatically.");
+    let error: unknown = null;
     if (r.table === "exercise_targets") {
-      if (r.before) await supabase.from("exercise_targets").update(r.before).eq("id", r.id);
-      else await supabase.from("exercise_targets").delete().eq("id", r.id);
+      ({ error } = r.before ? await supabase.from("exercise_targets").update(r.before).eq("id", r.id) : await supabase.from("exercise_targets").delete().eq("id", r.id));
     } else if (r.before) {
-      await supabase.from(r.table).update(r.before).eq("id", r.id);
+      ({ error } = await supabase.from(r.table).update(r.before).eq("id", r.id));
     }
+    if (error) throw error;
   }
 }
 
@@ -290,7 +311,8 @@ export async function applyTrainingChange(
     if (aErr || !adj) throw aErr ?? new Error("Adjustment insert failed");
     return { adjustmentId: adj.id as string, summary };
   } catch (err) {
-    await restore(supabase, records);
+    // Put back what was written; if that fails too, keep the original error (the member sees it) and log the other.
+    await restore(supabase, records).catch((restoreErr) => logError("training.restore", restoreErr));
     throw err;
   }
 }
@@ -301,6 +323,7 @@ export async function undoTrainingAdjustment(supabase: SupabaseClient, userId: s
   if (!adj) throw new TrainingChangeError("That change wasn't found.");
   if (adj.reverted_at) throw new TrainingChangeError("That change was already undone.");
   const records = (adj.changes ?? []) as ChangeRecord[];
+  if (!Array.isArray(records) || !records.every(isValidChangeRecord)) throw new TrainingChangeError("This change can't be undone automatically.");
   // Check first: only undo when every row still has the values this change set.
   for (const r of records) {
     const cols = Object.keys(r.after ?? {});
