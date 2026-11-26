@@ -1,6 +1,7 @@
 "use client";
 
 import { addFix, suspendAwareTicker, trackTotals, type GpsFix, type TrackState } from "@/lib/domain/gps-track";
+import { journalFix } from "@/lib/run/fix-journal";
 
 /**
  * Keeps a run or walk recording while the member uses the rest of the app.
@@ -36,6 +37,8 @@ interface Kept {
 let kept: Kept | null = null;
 /** The open recorder screen's handlers, while it is mounted. */
 let screen: { fix: (f: GpsFix) => void; error: (e: unknown) => void } | null = null;
+/** The open screen's storage key: its fixes are journalled on the device as they arrive (fix-journal.ts, O-01). */
+let screenKey: string | null = null;
 
 function announce() {
   try {
@@ -66,6 +69,8 @@ export function routeFix(fix: GpsFix): void {
     save(kept);
     return;
   }
+  // The screen saves its track from React, which may not run while the phone is locked: journal the fix first.
+  if (screen && screenKey) journalFix(screenKey, fix);
   screen?.fix(fix);
 }
 
@@ -75,10 +80,14 @@ export function routeError(e: unknown): void {
 }
 
 /** The recorder screen registers itself while mounted. Returns the unregister function. */
-export function attachScreen(handlers: { fix: (f: GpsFix) => void; error: (e: unknown) => void }): () => void {
+export function attachScreen(handlers: { fix: (f: GpsFix) => void; error: (e: unknown) => void }, key: string | null = null): () => void {
   screen = handlers;
+  screenKey = key;
   return () => {
-    if (screen === handlers) screen = null;
+    if (screen === handlers) {
+      screen = null;
+      screenKey = null;
+    }
   };
 }
 

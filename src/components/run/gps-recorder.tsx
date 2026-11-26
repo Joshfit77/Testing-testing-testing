@@ -32,6 +32,7 @@ import {
   type TrackState,
 } from "@/lib/domain/gps-track";
 import { buildScript, completedSets, phaseAt, scriptSeconds, type RunPrescription } from "@/lib/domain/run-session";
+import { clearJournal, pruneJournal, replayJournal } from "@/lib/run/fix-journal";
 import { canOpenLocationSettings, hasNativeBackgroundLocation, keepScreenOn, locationSourceLabel, openLocationSettings, watchLocation, type LocationError } from "@/lib/native/location";
 import { attachScreen, keepRecording, routeError, routeFix, shouldKeep, takeBack } from "@/lib/run/live-recording";
 import { saveGpsActivityAction } from "@/server/actions/gps-activities";
@@ -177,8 +178,8 @@ export function GpsRecorder({
           });
         },
         error: (e) => setError(e as LocationError),
-      }),
-    [],
+      }, storageKey),
+    [storageKey],
   );
 
   // A recording that kept going while the member was elsewhere in the app comes straight back (watcher and all).
@@ -199,7 +200,9 @@ export function GpsRecorder({
     try {
       const raw = localStorage.getItem(storageKey);
       if (!raw) return;
-      const saved = JSON.parse(raw) as Saved;
+      const parsed = JSON.parse(raw) as Saved;
+      // Fixes that arrived after the last save (the phone was locked and the app was ended) are on the device too.
+      const saved: Saved = { ...parsed, track: replayJournal(storageKey, parsed.track) };
       if (isRecoverable(saved.track, Date.now()) && (saved.guidedDayId ?? null) === (guided?.programDayId ?? null)) setRecoverable(saved);
       else if (isFinishedTooOldToSave(saved.track, Date.now())) setTooOld(saved.track);
       else if (!isRecoverable(saved.track, Date.now())) localStorage.removeItem(storageKey);
@@ -213,11 +216,13 @@ export function GpsRecorder({
       try {
         if (!t) {
           localStorage.removeItem(storageKey);
+          clearJournal();
           return;
         }
         if (!force && Date.now() - lastSaveRef.current < 5000) return;
         lastSaveRef.current = Date.now();
         localStorage.setItem(storageKey, JSON.stringify({ track: t, guidedDayId: guided?.programDayId ?? null } satisfies Saved));
+        pruneJournal(storageKey, t.lastFixAt);
       } catch {
         /* storage full or blocked: the recording continues in memory */
       }
@@ -318,6 +323,7 @@ export function GpsRecorder({
 
   const start = async () => {
     const t = startTrack({ id: crypto.randomUUID(), kind, unit, now: Date.now() });
+    clearJournal(); // a new recording never inherits fixes journalled for an earlier one
     lastPhaseRef.current = -1;
     setTrack(t);
     setNow(Date.now());

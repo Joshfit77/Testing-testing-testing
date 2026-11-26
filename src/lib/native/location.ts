@@ -85,10 +85,53 @@ async function ensureAndroidNotificationPermission(): Promise<void> {
   }
 }
 
+/**
+ * Native watchers live in the plugin, outside the web page: a reload of the web view (or the page crashing) loses the
+ * page's handle on a running watcher, which then keeps the GPS on with nothing able to stop it (O-03). Each watcher id
+ * is therefore written to the device while it runs; any id there that this page didn't start is an orphan and is
+ * removed before a new watcher starts, and at app start (removeOrphanedWatchers).
+ */
+const WATCHERS_KEY = "native.gps.watchers";
+const liveWatchers = new Set<string>();
+
+function storedWatcherIds(): string[] {
+  try {
+    const ids = JSON.parse(localStorage.getItem(WATCHERS_KEY) ?? "[]") as unknown;
+    return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function storeWatcherIds(ids: string[]): void {
+  try {
+    if (ids.length) localStorage.setItem(WATCHERS_KEY, JSON.stringify(ids));
+    else localStorage.removeItem(WATCHERS_KEY);
+  } catch {
+    /* storage blocked: orphans can't be tracked, the watcher itself still works */
+  }
+}
+
+/** Stop native watchers left by an earlier page (reload or crash). Safe to call any time; no-op in a browser. */
+export async function removeOrphanedWatchers(): Promise<number> {
+  if (!hasNativeBackgroundLocation()) return 0;
+  const orphans = storedWatcherIds().filter((id) => !liveWatchers.has(id));
+  for (const id of orphans) {
+    try {
+      await BackgroundGeolocation.removeWatcher({ id });
+    } catch {
+      /* already gone */
+    }
+  }
+  storeWatcherIds([...liveWatchers]);
+  return orphans.length;
+}
+
 /** Start delivering fixes. Returns a stop function. */
 export async function watchLocation(onFix: (fix: GpsFix) => void, onError: (e: LocationError) => void): Promise<() => void> {
   if (hasNativeBackgroundLocation()) {
     await ensureAndroidNotificationPermission();
+    await removeOrphanedWatchers();
     const id = await BackgroundGeolocation.addWatcher(
       { backgroundTitle: "Recording your run", backgroundMessage: "Narrow Gate Fitness is recording your route. Tap to return.", requestPermissions: true, stale: false, distanceFilter: 0 },
       (location, error) => {
@@ -100,7 +143,11 @@ export async function watchLocation(onFix: (fix: GpsFix) => void, onError: (e: L
         onFix({ lat: location.latitude, lng: location.longitude, accuracy: location.accuracy, t: location.time ?? Date.now() });
       },
     );
+    liveWatchers.add(id);
+    storeWatcherIds([...new Set([...storedWatcherIds(), id])]);
     return () => {
+      liveWatchers.delete(id);
+      storeWatcherIds(storedWatcherIds().filter((x) => x !== id));
       void BackgroundGeolocation.removeWatcher({ id });
     };
   }
