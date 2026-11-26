@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { anonKey, createTestUser, deleteTestUser, exerciseIds, grantPlan, serviceClient, stackAvailable, url, type TestUser } from "./helpers";
+import { anonKey, createTestUser, deleteTestUser, exerciseIds, grantPlan, serviceClient, stackAvailable, url, type TestUser, reserveUpload } from "./helpers";
 
 /**
  * Subscription security closure (2026-11-17). Fills the gaps left by entitlements, billing-integrity, store-billing,
@@ -537,7 +537,10 @@ describe.skipIf(!available)("subscription security closure", async () => {
       const scan = await rest(free, "POST", "body_scans", { id: scanId, user_id: free.id, taken_on: "2026-11-17" });
       expect(scan.status).toBe(403);
       const jpeg = new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0xff, 0xd9])], { type: "image/jpeg" });
-      const up = await free.client.storage.from("body-scans").upload(`${free.id}/${scanId}/front-${crypto.randomUUID()}.jpg`, jpeg, { contentType: "image/jpeg" });
+      // Reserved like the app does, so the refusal below is the plan and consent rule, not a missing reservation.
+      const freePath = `${free.id}/${scanId}/front-${crypto.randomUUID()}.jpg`;
+      expect(await reserveUpload(free.client, "body-scans", freePath)).toBe("ok");
+      const up = await free.client.storage.from("body-scans").upload(freePath, jpeg, { contentType: "image/jpeg" });
       expect(up.error).not.toBeNull();
       // Control: a Pro member with the same consent stores a scan.
       await rest(pro, "PATCH", `profiles?id=eq.${pro.id}`, { body_scan_consent_at: new Date().toISOString() });

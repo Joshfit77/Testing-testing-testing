@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser, reserveUpload } from "./helpers";
 
 const available = await stackAvailable();
 const BUCKET = "body-scans";
@@ -27,10 +27,15 @@ describe.skipIf(!available)("body scans: consent, plan and isolation", async () 
   });
 
   it("refuses uploads and scans before consent, and on Plus even with consent", async () => {
-    expect((await pro.client.storage.from(BUCKET).upload(path(pro, scanId, "front"), jpeg(), { contentType: "image/jpeg" })).error).not.toBeNull();
+    // Each upload is reserved like the app does, so these refusals are the consent and plan rules.
+    const before = path(pro, scanId, "front");
+    expect(await reserveUpload(pro.client, BUCKET, before)).toBe("ok");
+    expect((await pro.client.storage.from(BUCKET).upload(before, jpeg(), { contentType: "image/jpeg" })).error).not.toBeNull();
     expect((await pro.client.from("body_scans").insert({ id: scanId, user_id: pro.id, taken_on: "2026-10-20" })).error).not.toBeNull();
     await consent(plus);
-    expect((await plus.client.storage.from(BUCKET).upload(path(plus, crypto.randomUUID(), "front"), jpeg(), { contentType: "image/jpeg" })).error).not.toBeNull();
+    const plusPath = path(plus, crypto.randomUUID(), "front");
+    expect(await reserveUpload(plus.client, BUCKET, plusPath)).toBe("ok");
+    expect((await plus.client.storage.from(BUCKET).upload(plusPath, jpeg(), { contentType: "image/jpeg" })).error).not.toBeNull();
     expect((await plus.client.from("body_scans").insert({ id: crypto.randomUUID(), user_id: plus.id, taken_on: "2026-10-20" })).error).not.toBeNull();
   });
 
@@ -38,7 +43,10 @@ describe.skipIf(!available)("body scans: consent, plan and isolation", async () 
     await consent(pro);
     const front = path(pro, scanId, "front");
     const side = path(pro, scanId, "side");
-    for (const p of [front, side]) expect((await pro.client.storage.from(BUCKET).upload(p, jpeg(), { contentType: "image/jpeg" })).error).toBeNull();
+    for (const p of [front, side]) {
+      expect(await reserveUpload(pro.client, BUCKET, p)).toBe("ok");
+      expect((await pro.client.storage.from(BUCKET).upload(p, jpeg(), { contentType: "image/jpeg" })).error).toBeNull();
+    }
     // Not into someone else's folder.
     expect((await pro.client.storage.from(BUCKET).upload(path(other, scanId, "front"), jpeg(), { contentType: "image/jpeg" })).error).not.toBeNull();
     expect((await pro.client.from("body_scans").insert({ id: scanId, user_id: pro.id, taken_on: "2026-10-20", weight_kg: 82 })).error).toBeNull();
@@ -85,7 +93,8 @@ describe.skipIf(!available)("body scans: consent, plan and isolation", async () 
     await consent(victim);
     const id = crypto.randomUUID();
     const p = path(victim, id, "front");
-    await victim.client.storage.from(BUCKET).upload(p, jpeg(), { contentType: "image/jpeg" });
+    expect(await reserveUpload(victim.client, BUCKET, p)).toBe("ok");
+    expect((await victim.client.storage.from(BUCKET).upload(p, jpeg(), { contentType: "image/jpeg" })).error).toBeNull();
     await victim.client.from("body_scans").insert({ id, user_id: victim.id, taken_on: "2026-10-20" });
     expect(await removeUserFolder(serviceClient(), BUCKET, victim.id)).toBe(1);
     await deleteTestUser(victim);

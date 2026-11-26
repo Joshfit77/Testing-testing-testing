@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   BODY_SCAN_BUCKET,
+  SCAN_PHOTO_LIMIT_MESSAGE,
   REQUIRED_POSES,
   SCAN_GUIDANCE,
   SCAN_MAX_DIMENSION,
@@ -27,6 +28,7 @@ import { PHOTO_MAX_BYTES } from "@/lib/domain/progress-photos";
 import type { UnitSystem } from "@/lib/domain/types";
 import { compressImage } from "@/lib/image-compress";
 import { getBrowserSupabase } from "@/lib/supabase/client";
+import { reserveUpload } from "@/lib/storage-reservation";
 import { cn } from "@/lib/utils";
 import { saveBodyScanAction } from "@/server/actions/body-scan";
 import { PoseOutline } from "./pose-outline";
@@ -48,6 +50,7 @@ export function ScanCapture({ userId, units, previous, lastWeight }: { userId: s
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const uploaded = useRef<Partial<Record<ScanPose, string>>>({});
+  const reservedPaths = useRef<Partial<Record<ScanPose, string>>>({});
 
   // Don't lose captured photos to an accidental close before they're saved.
   const unsaved = Object.keys(shots).length > 0 && saving !== "done";
@@ -68,6 +71,7 @@ export function ScanCapture({ userId, units, previous, lastWeight }: { userId: s
       const old = cur[pose];
       if (old) URL.revokeObjectURL(old.url);
       delete uploaded.current[pose];
+      delete reservedPaths.current[pose];
       const out = { ...cur };
       if (shot) out[pose] = shot;
       else delete out[pose];
@@ -83,7 +87,13 @@ export function ScanCapture({ userId, units, previous, lastWeight }: { userId: s
       for (const [i, pose] of poses.entries()) {
         if (uploaded.current[pose]) continue;
         setSaving(`Uploading photo ${i + 1} of ${poses.length}…`);
-        const path = scanPhotoPath(userId, scanId, pose, crypto.randomUUID());
+        // A retry of the same shot keeps its file name, so it reuses its reservation instead of holding another.
+        const path = (reservedPaths.current[pose] ??= scanPhotoPath(userId, scanId, pose, crypto.randomUUID()));
+        const reservation = await reserveUpload(supabase, BODY_SCAN_BUCKET, path);
+        if (reservation !== "ok") {
+          setSaving(null);
+          return setError(reservation === "limit" ? SCAN_PHOTO_LIMIT_MESSAGE : scanUploadErrorMessage(null, navigator.onLine));
+        }
         const { error: upErr } = await supabase.storage.from(BODY_SCAN_BUCKET).upload(path, shots[pose]!.blob, { contentType: "image/jpeg", upsert: false, cacheControl: "60" });
         if (upErr) {
           setSaving(null);

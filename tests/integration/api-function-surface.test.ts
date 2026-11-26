@@ -72,12 +72,17 @@ const MEMBER_CALLABLE = [
   "friends_can_invite",
   "friends_enabled",
   "friends_overview",
+  // Migration 097: used by the photo storage rules (which run as the member); answers only whether auth.uid() holds a
+  // live reservation for that file name.
+  "has_upload_reservation",
   "has_ai_coach",
   "is_member_starter_program",
   "member_references_exercise",
   "remove_friend",
   "report_user",
   "respond_friend_request",
+  // Migration 097: reserves one upload in auth.uid()'s own folder of a photo bucket, under the photo limits.
+  "reserve_storage_upload",
   "search_users",
   "send_accountability_nudge",
   "send_friend_request",

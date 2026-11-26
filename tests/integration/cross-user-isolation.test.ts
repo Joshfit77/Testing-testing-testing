@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LEGAL_PAGES } from "@/lib/legal/versions";
-import { anonClient, createTestUser, deleteTestUser, exerciseIds, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { anonClient, createTestUser, deleteTestUser, exerciseIds, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser, reserveUpload } from "./helpers";
 import { removeUserStorage, USER_STORAGE_BUCKETS, USER_TABLES } from "@/server/services/account";
 import { generateInviteCode } from "@/lib/domain/accountability";
 
@@ -236,12 +236,14 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
 
     // Photos: the uploads use Alice's own session, like the app does; the rows are written by the server.
     const photoPath = `${u}/${crypto.randomUUID()}.jpg`;
+    await reserveUpload(alice.client, "progress-photos", photoPath);
     const { error: upErr } = await alice.client.storage.from("progress-photos").upload(photoPath, jpeg(), { contentType: "image/jpeg" });
     if (upErr) throw new Error(`progress-photos upload: ${upErr.message}`);
     objects["progress-photos"] = photoPath;
     await seed("progress_photos", { user_id: u, storage_path: photoPath, taken_on: "2026-10-01", pose: "front", note: "Week 1" });
     const scanId = crypto.randomUUID();
     const scanPath = `${u}/${scanId}/front-${crypto.randomUUID()}.jpg`;
+    await reserveUpload(alice.client, "body-scans", scanPath);
     const { error: scanUpErr } = await alice.client.storage.from("body-scans").upload(scanPath, jpeg(), { contentType: "image/jpeg" });
     if (scanUpErr) throw new Error(`body-scans upload: ${scanUpErr.message}`);
     objects["body-scans"] = scanPath;
@@ -487,11 +489,13 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
     };
     for (const bucket of USER_STORAGE_BUCKETS) {
       const folder = bucket === "body-scans" ? `${alice.id}/${parents.body_scans}` : alice.id;
-      const up = (body: Blob, contentType: string, label: string) =>
-        alice.client.storage
-          .from(bucket)
-          .upload(`${folder}/${crypto.randomUUID()}.bin`, body, { contentType })
-          .then(({ error }) => void (!error && problems.push(`${bucket}: accepted ${label}`)));
+      // Reserved like the app does, so a refusal here is the type and size rule, not a missing reservation.
+      const up = async (body: Blob, contentType: string, label: string) => {
+        const name = `${folder}/${crypto.randomUUID()}.bin`;
+        await reserveUpload(alice.client, bucket, name);
+        const { error } = await alice.client.storage.from(bucket).upload(name, body, { contentType });
+        if (!error) problems.push(`${bucket}: accepted ${label}`);
+      };
       await up(new Blob(["<script>alert(1)</script>"], { type: "text/html" }), "text/html", "an HTML file");
       await up(new Blob(['<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>'], { type: "image/svg+xml" }), "image/svg+xml", "an SVG");
       await up(new Blob([new Uint8Array(9 * 1024 * 1024)], { type: "image/jpeg" }), "image/jpeg", "a 9 MB image");

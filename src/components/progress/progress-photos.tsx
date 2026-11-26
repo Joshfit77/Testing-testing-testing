@@ -18,6 +18,7 @@ import {
   PHOTO_NOTE_MAX,
   PHOTO_POSES,
   photoPathFor,
+  PHOTO_LIMIT_MESSAGE,
   PROGRESS_PHOTO_BUCKET,
   type PhotoPose,
   type ProgressPhotoView,
@@ -25,6 +26,7 @@ import {
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, formatWeight, weightUnit } from "@/lib/domain/units";
 import { getBrowserSupabase } from "@/lib/supabase/client";
+import { reserveUpload } from "@/lib/storage-reservation";
 import { cn, titleCase } from "@/lib/utils";
 import { deleteProgressPhotoAction, saveProgressPhotoAction } from "@/server/actions/progress-photos";
 
@@ -86,6 +88,7 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
   // `unconfirmed` marks a file whose earlier save may have succeeded on the server: it is never deleted from here, since
   // a saved photo may already point at it (the server only removes a file that no saved photo uses).
   const pending = useRef<{ file: File; path: string; unconfirmed: boolean } | null>(null);
+  const reserved = useRef<{ file: File; path: string } | null>(null);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return setError("Choose a photo first.");
@@ -105,8 +108,15 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
     }
     setStage("uploading");
     const supabase = getBrowserSupabase();
-    const path = pending.current?.path ?? photoPathFor(userId, crypto.randomUUID());
+    // A retry of the same photo keeps its file name, so it reuses its reservation instead of holding a second one.
+    if (reserved.current?.file !== file) reserved.current = { file, path: photoPathFor(userId, crypto.randomUUID()) };
+    const path = pending.current?.path ?? reserved.current.path;
     if (!pending.current) {
+      const reservation = await reserveUpload(supabase, PROGRESS_PHOTO_BUCKET, path);
+      if (reservation !== "ok") {
+        setStage("idle");
+        return setError(reservation === "limit" ? PHOTO_LIMIT_MESSAGE : photoUploadErrorMessage(null));
+      }
       const { error: upErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "3600" });
       if (upErr) {
         setStage("idle");
@@ -134,6 +144,7 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
       return setError(res.error);
     }
     pending.current = null;
+    reserved.current = null;
     setStage("idle");
     reset(true);
     onOpenChange(false);

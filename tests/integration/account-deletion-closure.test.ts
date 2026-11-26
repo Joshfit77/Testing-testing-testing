@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LEGAL_PAGES } from "@/lib/legal/versions";
-import { createTestUser, exerciseIds, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, exerciseIds, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser, reserveUpload } from "./helpers";
 import { NOT_EXPORTED, removeUserFolder, removeUserStorage, USER_STORAGE_BUCKETS, USER_TABLES } from "@/server/services/account";
 import { generateInviteCode } from "@/lib/domain/accountability";
 
@@ -64,6 +64,7 @@ const PUBLIC_TABLES_WITHOUT_MEMBER_FK: Record<string, string> = {
   ai_budget_day_alerts: "service-wide daily AI spend alerts (day, amounts; migration 081)",
   ai_budget_days: "service-wide daily AI spend totals (migration 081)",
   ai_budget_months: "service-wide monthly AI spend totals",
+  billing_reconcile_state: "one row: how far the billing check has replayed Stripe events (a timestamp; migration 096)",
   content_items: "editorial catalog",
   exercise_alternatives: "exercise catalog",
   exercise_media: "exercise catalog media",
@@ -310,6 +311,7 @@ describe.skipIf(!available)("account deletion closure: nothing that names the me
       // Avatars: members can't upload any more (migration 090), but a file stored there earlier must still go with the
       // account, so it is placed with the server key.
       const client = bucket === "avatars" ? serviceClient() : member.client;
+      if (bucket !== "avatars") await reserveUpload(client, bucket, path);
       const { error } = await client.storage.from(bucket).upload(path, jpeg(), { contentType: "image/jpeg" });
       if (error) throw new Error(`${bucket} upload: ${error.message}`);
       objects[bucket] = path;

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { deleteUserAccount } from "@/server/services/account-deletion";
 import { USER_TABLES } from "@/server/services/account";
-import { anonClient, createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { anonClient, createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser, reserveUpload } from "./helpers";
 
 const available = await stackAvailable();
 const BUCKET = "progress-photos";
@@ -17,6 +17,7 @@ describe.skipIf(!available)("account deletion removes the account, its rows and 
   beforeAll(async () => {
     [carol, dave] = await Promise.all([createTestUser("carol"), createTestUser("dave")]);
     carolPhoto = photoPath();
+    await reserveUpload(carol.client, BUCKET, carolPhoto);
     const { error: up } = await carol.client.storage.from(BUCKET).upload(carolPhoto, jpeg(), { contentType: "image/jpeg" });
     if (up) throw up;
     const inserts = await Promise.all([

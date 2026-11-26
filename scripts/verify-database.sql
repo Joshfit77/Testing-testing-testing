@@ -5,8 +5,8 @@
 select check_name, case when passed then 'ok' else 'FAILED: ' || detail end as result
 from (
   select 'migrations applied' as check_name,
-         (select count(*) from supabase_migrations.schema_migrations) >= 86 as passed,
-         (select count(*)::text || ' applied; expected at least 86 (through 096)' from supabase_migrations.schema_migrations) as detail
+         (select count(*) from supabase_migrations.schema_migrations) >= 87 as passed,
+         (select count(*)::text || ' applied; expected at least 87 (through 097)' from supabase_migrations.schema_migrations) as detail
   union all
   select 'row-level security on every public table',
          not exists (select 1 from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and not c.relrowsecurity),
@@ -23,6 +23,18 @@ from (
   select 'storage insert policies call the quota checks',
          (select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname in ('progress_photos_owner_insert', 'body_scans_owner_insert')) = 2,
          'one of the storage insert policies is missing'
+  union all
+  -- With reservations (097) the limits hold under simultaneous uploads even where the triggers above are missing.
+  select 'photo uploads need a reservation (097)',
+         (select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects'
+            and policyname in ('progress_photos_owner_insert', 'body_scans_owner_insert')
+            and with_check like '%has_upload_reservation(bucket_id, name)%') = 2,
+         'a photo insert policy does not require a reservation: re-run migration 097'
+  union all
+  select 'stored photos cannot be replaced (097)',
+         not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and cmd in ('UPDATE', 'ALL')
+            and (coalesce(qual, '') || coalesce(with_check, '')) ~ '(progress-photos|body-scans)'),
+         'an UPDATE policy on a photo bucket lets members replace files past the byte limit'
   union all
   select 'policies evaluate helpers once per statement (094)',
          not exists (

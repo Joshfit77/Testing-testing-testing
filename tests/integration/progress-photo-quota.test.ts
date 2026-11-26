@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, reserveUpload, serviceClient, stackAvailable, type TestUser } from "./helpers";
 import { PHOTO_LIMIT_MESSAGE, PHOTO_LIMITS, photoUploadErrorMessage } from "@/lib/domain/progress-photos";
 
 /**
@@ -31,8 +31,12 @@ function seed(userId: string, count: number, opts: { bytes?: number; ageHours?: 
 const stored = (userId: string) => Number(sql(`select count(*) from storage.objects where bucket_id = '${BUCKET}' and name like '${userId}/%'`)[0]![0]);
 // A tiny JPEG: the rule looks at the member's folder, not the picture.
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0xff, 0xd9]);
-const upload = (user: TestUser, name = `${crypto.randomUUID()}.jpg`) =>
-  user.client.storage.from(BUCKET).upload(`${user.id}/${name}`, JPEG, { contentType: "image/jpeg", upsert: false });
+// Like the app: reserve the file, then upload it. When the reservation is refused (a limit) the upload is still sent,
+// to show the storage rule refuses it too.
+const upload = async (user: TestUser, name = `${crypto.randomUUID()}.jpg`) => {
+  await reserveUpload(user.client, BUCKET, `${user.id}/${name}`);
+  return user.client.storage.from(BUCKET).upload(`${user.id}/${name}`, JPEG, { contentType: "image/jpeg", upsert: false });
+};
 
 describe.skipIf(!available)("progress photo upload limits", () => {
   const users: TestUser[] = [];
