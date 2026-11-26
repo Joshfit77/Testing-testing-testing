@@ -111,7 +111,10 @@ export async function initNativeShell(): Promise<() => void> {
   }
   try {
     const { App } = await import("@capacitor/app");
+    const { closeTopOverlay } = await import("@/lib/native-back");
     const handle = await App.addListener("backButton", ({ canGoBack }) => {
+      // An open sheet or dialog closes first, as Escape closes it (O-07); otherwise back, or leave the app.
+      if (closeTopOverlay()) return;
       if (canGoBack) window.history.back();
       else void App.minimizeApp();
     });

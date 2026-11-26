@@ -6,7 +6,7 @@
  * Every function is a safe no-op outside the iOS/Android shells. Not yet verified on a physical phone.
  */
 import { NOTIFICATION_SOUND, isNativeApp } from "@/lib/native";
-import { ALARM_ACTION_TYPE, ALL_ALARM_IDS, alarmNotifications, SNOOZE_NOTIFICATION_ID, type AlarmConfig } from "@/lib/domain/sleep-alarm";
+import { ALARM_ACTION_TYPE, ALL_ALARM_IDS, alarmNotifications, FOLLOW_UP_IDS, followUpRings, SNOOZE_NOTIFICATION_ID, type AlarmConfig } from "@/lib/domain/sleep-alarm";
 
 export type AlarmScheduleResult =
   | { ok: true; scheduled: number; exact: boolean }
@@ -14,6 +14,19 @@ export type AlarmScheduleResult =
 
 const TITLE = "Time to get up";
 const BODY = "Your Narrow Gate alarm. Snooze, or tap I'm up and tell the app how you slept.";
+const FOLLOW_UP_TITLE = "Still time to get up";
+
+/** Cancel the follow-up ring due within the next few hours (this morning's): the member is up, or snoozed. */
+async function cancelTodaysFollowUp(LocalNotifications: Awaited<ReturnType<typeof plugin>>["LocalNotifications"]): Promise<void> {
+  try {
+    const { notifications } = await LocalNotifications.getPending();
+    const soon = Date.now() + 3 * 3600_000;
+    const due = notifications.filter((n) => FOLLOW_UP_IDS.includes(n.id) && n.schedule?.at && new Date(n.schedule.at).getTime() <= soon);
+    if (due.length) await LocalNotifications.cancel({ notifications: due.map((n) => ({ id: n.id })) });
+  } catch {
+    /* the follow-up rings once; nothing is lost */
+  }
+}
 
 /**
  * The plugin's module, not the plugin itself: a Capacitor plugin is a Proxy that answers every property, `then`
@@ -88,6 +101,22 @@ export async function scheduleSleepAlarm(config: AlarmConfig): Promise<AlarmSche
         isExactNotification: exact,
       })),
     });
+    // Follow-up rings for the next 7 days (they don't depend on the app running to handle Snooze).
+    const rings = followUpRings(config, new Date());
+    if (rings.length) {
+      await LocalNotifications.schedule({
+        notifications: rings.map((r) => ({
+          id: r.id,
+          title: FOLLOW_UP_TITLE,
+          body: BODY,
+          actionTypeId: ALARM_ACTION_TYPE,
+          sound: NOTIFICATION_SOUND,
+          extra: { snoozeMinutes: config.snoozeMinutes, followUp: true },
+          schedule: { at: r.at, allowWhileIdle: true },
+          isExactNotification: exact,
+        })),
+      });
+    }
     return { ok: true, scheduled: res.notifications.length, exact };
   } catch {
     return { ok: false, reason: "error" };
@@ -141,6 +170,7 @@ export async function installSleepAlarmActions(): Promise<() => void> {
     const handle = await LocalNotifications.addListener("localNotificationActionPerformed", (event) => {
       const n = event.notification;
       if (!ALL_ALARM_IDS.includes(n.id)) return;
+      void cancelTodaysFollowUp(LocalNotifications);
       if (event.actionId === "snooze") {
         const minutes = Math.min(30, Math.max(1, Math.round(Number((n.extra as { snoozeMinutes?: unknown } | undefined)?.snoozeMinutes) || 9)));
         void LocalNotifications.schedule({

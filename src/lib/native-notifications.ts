@@ -201,8 +201,13 @@ export async function syncReminders(
       if ((await LocalNotifications.requestPermissions()).display !== "granted") return { ok: false, reason: "permission-denied" };
     }
     await ensureChannels();
-    await LocalNotifications.cancel({ notifications: ALL_REMINDER_IDS.map((id) => ({ id })) });
-    const res = plan.length ? await LocalNotifications.schedule({ notifications: toCapacitor(plan, os) }) : { notifications: [] };
+    // Schedule first, then cancel only what is no longer planned (O-07): scheduling with an existing id replaces that
+    // notification on iOS and Android, so a failure or the app closing in between never leaves the phone with none.
+    const next = toCapacitor(plan, os);
+    const res = next.length ? await LocalNotifications.schedule({ notifications: next }) : { notifications: [] };
+    const planned = new Set(next.map((n) => n.id));
+    const stale = ALL_REMINDER_IDS.filter((id) => !planned.has(id));
+    if (stale.length) await LocalNotifications.cancel({ notifications: stale.map((id) => ({ id })) });
     store.set(LAST_SYNC_KEY, JSON.stringify({ at: now.getTime(), scheduled: res.notifications.length, timezone: deviceTimeZone(), date: sync.context.today } satisfies LastSync));
     return { ok: true, scheduled: res.notifications.length, delivers: sync.delivers, paused: sync.prefs.paused };
   } catch {

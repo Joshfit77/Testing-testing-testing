@@ -115,6 +115,9 @@ export function SleepAlarmForm({ config }: { config: AlarmConfig }) {
       )}
       {device === "phone" && (
         <div className="space-y-2 text-sm">
+          <p className="text-muted-foreground" data-testid="alarm-limits">
+            This alarm is a notification: Silent mode and Focus can mute it, and it rings once, then again after your snooze time if you haven&apos;t tapped I&apos;m up. For a morning you can&apos;t miss, set your phone&apos;s Clock alarm too.
+          </p>
           {deviceStatus && (
             <p role={deviceStatus.tone === "error" ? "alert" : "status"} className={deviceStatus.tone === "ok" ? "text-success" : deviceStatus.tone === "warn" ? "text-gold-highlight" : "text-destructive-foreground"}>
               {deviceStatus.text}

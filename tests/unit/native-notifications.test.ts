@@ -31,6 +31,9 @@ vi.mock("@capacitor/local-notifications", () => ({
     }),
     schedule: vi.fn(async ({ notifications }: { notifications: Record<string, unknown>[] }) => {
       state.scheduled = notifications;
+      // As on iOS and Android, scheduling an id that is already pending replaces it.
+      const ids = new Set(notifications.map((n) => n.id as number));
+      state.pending = state.pending.filter((p) => !ids.has(p.id));
       state.pending.push(...notifications.map((n) => ({ id: n.id as number, extra: n.extra as Pending["extra"] })));
       return { notifications: notifications.map((n) => ({ id: n.id })) };
     }),
@@ -89,6 +92,16 @@ describe("scheduling on the phone", () => {
     expect(state.channels.map((c) => c.id)).toEqual(["ngf-faith", "ngf-workouts", "ngf-nutrition", "ngf-recovery"]);
     expect(state.channels.every((c) => c.visibility === 0)).toBe(true); // private on a secure lock screen
     expect(state.scheduled.every((n) => typeof n.channelId === "string")).toBe(true);
+  });
+
+  it("a rebuild schedules the new set before removing anything, so a failure never leaves the phone with none (O-07)", async () => {
+    const { LocalNotifications } = await import("@capacitor/local-notifications");
+    await syncReminders(async () => sync());
+    const before = state.pending.length;
+    expect(before).toBeGreaterThan(0);
+    vi.mocked(LocalNotifications.schedule).mockRejectedValueOnce(new Error("scheduling failed"));
+    expect(await syncReminders(async () => sync())).toMatchObject({ ok: false });
+    expect(state.pending.length).toBe(before);
   });
 
   it("rebuilding twice leaves one copy of each reminder (no duplicates)", async () => {
