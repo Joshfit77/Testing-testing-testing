@@ -18,7 +18,7 @@ flowchart LR
   end
   subgraph Supabase["Supabase"]
     Auth["GoTrue auth<br/>(MFA for admins)"]
-    DB["Postgres + RLS<br/>83 migrations"]
+    DB["Postgres + RLS<br/>85 migrations"]
     Storage["Storage<br/>(photos, quotas by trigger)"]
   end
   Anthropic["Anthropic API<br/>(coach, food photo; budget-capped,<br/>kill switches)"]
@@ -48,7 +48,7 @@ Key directories: `src/app` (routes), `src/components`, `src/server` (actions, se
 ```bash
 nvm use            # Node 22 (.nvmrc; package.json engines)
 npm ci
-cp .env.example .env.local   # 19 variables documented; local Supabase values come from `npx supabase status`
+npm run setup                # or by hand: cp .env.example .env.local (every variable documented); local keys from `npx supabase status`
 npx supabase start           # needs Docker
 npx supabase db reset        # applies all migrations + seed
 npm run dev                  # http://localhost:3000
@@ -73,20 +73,20 @@ test enforces it).
 
 ## Scoped work and estimates
 
-Hours add up the per-item estimates in BUG_FIX_REGISTER.md, for an experienced engineer familiar with the stack; ranges reflect device-testing uncertainty.
+All code work in the original scope (O-01 to O-20) is done, with tests (BUG_FIX_REGISTER.md). What remains needs a
+phone, an account or a hosted service. It is run as an AI-assisted engagement: Claude implements, the consultants
+direct, verify on real hardware and accounts, and review.
 
-| Package | Items | Skill | Hours | Blocks |
-|---|---|---|---|---|
-| A. Native GPS reliability | O-01 persist locked-screen fixes to disk; O-03 orphaned watcher; O-02 wording after tests | iOS/Capacitor | 16–31 | Launch (App Review risk) |
-| B. Notifications and alarms | O-04 wake-reminder wording, Android exact alarm, snooze; O-07 back button, reminder sync order | Mobile | 7–15 | No |
-| C. Universal / app links | O-05 associated domains, `.well-known` files, auth-link routing | Mobile + web | 6–10 | No |
-| D. Android polish | O-06 edge-to-edge insets; Play policy forms support | Android | 4–8 | Android launch |
-| E. Billing robustness | O-08 grant-expiry recompute; O-09 replay lost refund/dispute events; O-10 one transaction per account | Payments | 12–23 | Paid subscriptions (recommended) |
-| F. Deploy migrations to hosted Supabase | O-16 verify `storage.objects` triggers on a staging project; fallback if refused | Supabase/DB | 3–6 | TestFlight if hosted Supabase refuses the triggers; otherwise launch |
-| G. Performance | O-12 parallelise workout finish reads; O-17 budget lock, policy helpers; production load test | Backend/DB | 9–18 | No (before ~1k actives) |
-| H. Small reliability items | O-11, O-13, O-14, O-15, O-18, O-19, O-20 | Full-stack | 11–17 | No |
-| I. Device test support | Fix whatever IPHONE/ANDROID_DEVICE_TESTING finds | Mobile | 8–20 (contingency) | TestFlight→launch |
-| J. Release engineering | Signing, TestFlight upload pipeline, production env setup with the owner | iOS + DevOps | 6–10 | TestFlight |
-| **Total** | | | **82–158** | |
+- **Agenda, parallel tracks and hours:** `docs/engagement/ENGAGEMENT_AGENDA.md`:
+  - iOS launch with paid subscriptions: **24–41 h** ($9,240–$15,785 at $385/h);
+  - with Android: 27–46 h.
+- **Ready-to-paste prompts** for every remaining item: `docs/engagement/ISSUE_PROMPTS.md`.
+- **Specialist agents:** `.claude/agents/`: native-mobile, security, backend, database, payments, qa-testing.
+- **Repository rules for Claude:** `CLAUDE.md`.
+- **One-command setup and checks:**
+  - `npm run setup`;
+  - `npm run verify` (add `-- --browser` for the browser suite);
+  - `npm run db:verify`.
 
-Minimum to launch on iOS with paid subscriptions: A, E, F, I, J ≈ **45–90 hours**.
+The earlier estimate (82–158 h, including 45–90 h for a launch minimum) assumed consultants wrote these fixes
+themselves; that work is now complete.

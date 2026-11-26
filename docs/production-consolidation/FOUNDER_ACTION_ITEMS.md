@@ -26,7 +26,12 @@ EXTERNAL_DEVELOPER_SCOPE.md. Ordered by what unblocks the most.
    enable until you approve paid AI.
 8. **Scheduled jobs** (cron) for `/api/maintenance/*` with a `CRON_SECRET`.
 9. **Email sending** (Supabase SMTP with your domain) so confirmation emails don't land in spam.
-10. Domain for universal links later (O-05).
+10. **Universal links (O-05, built and switched off):** in the Apple Developer account, enable *Associated Domains*
+    for the App ID; set `APPLE_TEAM_ID` and (Android) `ANDROID_APP_CERT_SHA256` on the hosting; then a consultant runs
+    prompt P-07 in docs/engagement/ISSUE_PROMPTS.md.
+11. **RevenueCat:** set the restore behaviour to *Transfer to new App User ID* (the app also protects against one
+    purchase granting two accounts, O-10).
+12. **Book the engagement:** docs/engagement/ENGAGEMENT_AGENDA.md lists who you need, in what order, and the hours.
 
 Enter every key directly into the hosting provider, GitHub secrets or the secure form — never into chat.
 

@@ -3,7 +3,21 @@
 Every figure below comes from an actual run. Nothing was skipped, disabled or weakened to get a pass. Where a test was
 changed, the reason is given (see also BUG_FIX_REGISTER.md).
 
-## Final head: `8fa7c3b5` (all code; later commits are documentation only)
+## Round 2 head: `100502d5` and the engagement-package commit after it (O-01..O-20 implemented)
+
+| Suite | Where | Result |
+|---|---|---|
+| `npm run verify` (typecheck, lint, unit, integration with `REQUIRE_TEST_STACK=1`, production build) | This sandbox | **Passed.** Unit: 296 files, **4,947 passed, 1 skipped**, 0 failed. Integration: as below. Lint: 0 warnings |
+| `npm run setup` (with `SKIP_NPM_CI=1`) | This sandbox | **Passed**: 85 migrations, 8/8 database checks ok, `.env.local` written |
+| Integration tests, `REQUIRE_TEST_STACK=1`, after a fresh `supabase db reset` | This sandbox | **102 files; 646 passed, 1 skipped**, 0 failed (the skip is the opt-in live Open Food Facts test) |
+| Fresh install of all 85 migrations + `scripts/verify-database.sql` | This sandbox | **Passed; 8 of 8 checks ok** |
+| Production build | This sandbox | **Passed**; `/.well-known/apple-app-site-association` 200 `application/json` when configured; `assetlinks.json` 404 when not |
+| Browser suite (mocked AI and food, phone size) | This sandbox | First run: **166 passed, 2 failed, 101 skipped**. Both failures were in this round's new tests, not the app: an ambiguous locator (the reply text is also in a screen-reader announcement), and a step that didn't reselect the verse after Escape cleared the selection. Both tests corrected; `bible-reader` and `coach` specs re-run through `scripts/e2e-mocked.sh`: **14 passed, 1 skipped (opt-in), 0 failed** |
+| Tap every control (`E2E_BUTTON_SWEEP=1`) | This sandbox | **Passed**: 49 screens, 280 controls tapped, 0 findings (the previous run tapped 282; the sweep doesn't log per-screen counts, so the difference isn't identified, though some screens show date-dependent buttons) |
+| AI budget reservation benchmark (pgbench, 20 clients, 100,000 synthetic events) | This sandbox | 600–690 reserve+finalize per second, 0 failures (O-17) |
+| GitHub CI / iOS / Android APK on the pushed head | GitHub | See the PR checks |
+
+
 
 | Suite | Where | Result |
 |---|---|---|

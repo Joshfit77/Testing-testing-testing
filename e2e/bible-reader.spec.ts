@@ -102,6 +102,8 @@ test.describe("Bible reader", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toBeHidden();
     await page.context().setOffline(false);
+    // Closing also cleared the verse selection (Escape does): tap the verse again, as a member would.
+    await page.locator("#v18").getByRole("button").click();
     await page.getByRole("toolbar").getByRole("button", { name: "Note", exact: true }).click();
     await expect(page.getByRole("dialog").getByLabel("Note")).toHaveValue("Not condemned.");
     await expect(page.getByTestId("draft-restored")).toBeVisible();

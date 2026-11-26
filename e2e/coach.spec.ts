@@ -316,8 +316,8 @@ test.describe("AI coach", () => {
       prefer: "return=minimal",
     });
     await page.goto(`/coach?c=${oldId}`);
-    await expect(page.getByText("Start with an empty bar and add weight over three sets.")).toBeVisible();
-    await expect(page.getByText("How should I warm up for squats?")).toBeVisible();
+    await expect(page.getByTestId("coach-reply").getByText("Start with an empty bar and add weight over three sets.")).toBeVisible();
+    await expect(page.getByText("How should I warm up for squats?", { exact: true }).first()).toBeVisible();
   });
 
   test("streams a tool-using answer, persists history and applies a confirmed swap", async ({ page, context }) => {

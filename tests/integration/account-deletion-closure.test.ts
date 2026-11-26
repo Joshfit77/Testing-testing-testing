@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LEGAL_PAGES } from "@/lib/legal/versions";
-import { createTestUser, deleteTestUser, exerciseIds, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, exerciseIds, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
 import { NOT_EXPORTED, removeUserFolder, removeUserStorage, USER_STORAGE_BUCKETS, USER_TABLES } from "@/server/services/account";
 import { generateInviteCode } from "@/lib/domain/accountability";
 

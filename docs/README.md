@@ -13,6 +13,19 @@ Older reports that mention $19.99 / $149.99 or $24.99 describe earlier proposals
 **Environment variables:** every variable the app reads is listed, with its default, in `../.env.example`. A unit test
 (`tests/unit/env-example.test.ts`) keeps that list complete.
 
+## Start with these (current source of truth, 2026-11-26)
+
+- `production-consolidation/MASTER_ENGINEERING_REPORT.md`: state, evidence and readiness scores.
+- `production-consolidation/BUG_FIX_REGISTER.md`: everything fixed (B-01..B-22, O-01..O-20) and what remains (R-01..R-07).
+- `engagement/ENGAGEMENT_AGENDA.md` and `engagement/ISSUE_PROMPTS.md`: how the remaining work is run with Claude Code.
+- `engagement/BIBLICAL_AI_BASELINE.md`: the baseline for the Biblical AI work.
+- `../CLAUDE.md`: rules and commands for anyone (or any agent) changing the code.
+
+**Don't repeat earlier audits.** The dated audit and readiness folders (`audit-2026-11-07/`, `audit-2026-11-14/`,
+`audit/`, `launch-audit/`, `launch-readiness/`, `quality/`, `legal-audit-2026-11-16/` and the dated `*_REPORT.md` /
+`*_AUDIT*.md` files here) are history. Their findings were re-verified and either fixed or carried into the register
+above. New review work starts from the register and adds to it.
+
 ## Current
 
 **Release and TestFlight:**

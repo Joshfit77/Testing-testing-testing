@@ -10,11 +10,20 @@
   (BRANCH_CONSOLIDATION_REPORT.md). No branch was deleted and nothing was force-pushed.
 - **22 verified defects were fixed**, each with a regression test where testable (BUG_FIX_REGISTER.md B-01..B-22). Two
   were High: Manage billing disappeared after the past-due grace period, and the privacy page bundled in the app
-  understated the health data read. Six new migrations (088–093) enforce consents, quotas and session limits in the
+  understated the health data read. New migrations (088–095) enforce consents, quotas and session limits in the
   database itself.
-- **No Critical or High security findings remain** after an independent review. 20 open items are documented with
-  files, repro steps, fixes and hours (O-01..O-20).
-- **The database upgrades from `main` with all synthetic data preserved**, and a fresh install of all 83 migration
+- **No Critical or High security findings remain** after an independent review.
+- **All 20 open items (O-01..O-20) were then implemented by Claude** in a second round (2026-11-26), each with a
+  regression test that fails on the old code where one is possible. Highlights:
+  - GPS fixes recorded with the screen locked are journalled on the device;
+  - billing repairs lost refunds and ended admin grants by itself;
+  - one store purchase can grant only one account;
+  - 61 server-action calls no longer send a network blip to the error page;
+  - migrations 094–095 make row security cheaper and index the new billing lookups.
+
+  What remains needs a phone, an account or a hosted service (R-01..R-07). It is planned as an AI-assisted engagement
+  of **24–41 consultant hours** (docs/engagement/ENGAGEMENT_AGENDA.md).
+- **The database upgrades from `main` with all synthetic data preserved**, and a fresh install of all 85 migration
   files succeeds (DATABASE_MIGRATION_REPORT.md).
 - **Pricing is unchanged at the approved $17.99 / $119.99.** `main` still has older prices ($30 Pro / $9.99 Plus), so
   merging the pull request changes `main`'s pricing to the approved prices (PAYMENT_VERIFICATION.md). Real billing
@@ -58,24 +67,24 @@ Scores measure engineering readiness, not market readiness.
 
 | Area | Score | Why |
 |---|---|---|
-| Architecture | **82** | Clear layering (server actions / services / domain), RLS on every table with a catalog test, offline-first workout storage. Minus: web-shell native app (App Review 4.2 risk), a few sequential heavy reads (O-12) |
-| Security | **80** | No open Critical or High findings. Consents, quotas and session limits are enforced in the database, and admins need MFA. Minus: Low items O-18 and O-10; no external penetration test; hosted-only settings unverified |
-| Database integrity | **75** | Upgrade from `main` preserved all data; fresh install passes; every new migration has rollback notes and tests; 640 integration tests pass. **Capped at 75**: the `storage.objects` triggers are unverified on hosted Supabase (O-16) |
-| UX | **72** | Browser suite at phone size including a tap-every-control sweep; data-loss fixes B-13/B-15. Minus: O-11, O-14; no device tests (keyboard, safe areas, haptics) |
-| Reliability | **70** | Idempotent retries, workout drafts survive reloads, failures are surfaced. Minus: O-01 (High: locked-screen run data in memory), O-08/O-09 billing repair gaps |
-| Performance | **68** | Local load test: 0 errors to 25 concurrent; page p95 under 620 ms at 10 concurrent on one process. The bottleneck is the app process, which scales out, not the database. Minus: write paths and AI not load-tested; O-12, O-17; local only (cap 75) |
-| iOS | **55** | Compiles, archive contents checked, Simulator launch, WebKit tests in CI; privacy manifest complete. **Capped at 60: never run on an iPhone.** Minus: O-01, O-02, O-04 |
-| Android | **40** | APK compiles in CI. Never run on a device; edge-to-edge and back button open (O-06, O-07); secondary platform |
-| Subscriptions | **60** | Server-side entitlements, webhook handling, reconcile, price guard and closure on deletion, all tested with stand-ins. Minus: never run against the App Store sandbox or Stripe test mode end to end; O-08..O-10 |
-| **Overall** | **68** | Weighted mean: (82 + 72 + 68 + 55 + 40 + 1.5 × (80 + 75 + 70 + 60)) ÷ 11 = 67.7 |
+| Architecture | **84** | Clear layering (server actions / services / domain), RLS on every table with catalog tests, offline-first workout storage, one safe pattern for client actions (guard-tested), a device fix journal for GPS. Minus: web-shell native app (App Review 4.2 risk) |
+| Security | **82** | No open Critical or High findings; consents, quotas and session limits enforced in the database; admin MFA; keyed rate-limit hashes; one purchase, one account. Minus: no external penetration test; hosted-only settings unverified |
+| Database integrity | **75** | Upgrade from `main` preserved all data; fresh install of 85 migrations; post-deploy checks script; 646 integration tests. **Capped at 75** until `supabase db push` to a hosted staging project confirms the storage triggers (R-03) |
+| UX | **76** | Browser suite and tap-every-control sweep; notes and photos no longer lost on failure; network blips show a message instead of the error page. Minus: no device check of keyboard, safe areas, haptics |
+| Reliability | **77** | Idempotent retries, drafts survive reloads, saved workouts can't be reported as unsaved, locked-screen GPS journalled, reminders never left empty, billing self-repairs. Minus: the native behaviour is unconfirmed on hardware |
+| Performance | **70** | Local load test: 0 errors to 25 concurrent; app process is the bottleneck and scales out; RLS helpers once per statement; AI budget lock measured at about 100x need. Minus: write paths and real network untested (cap 75) |
+| iOS | **58** | Compiles, archive checked, Simulator launch and WebKit tests in CI; GPS, alarm and watcher fixes in code. **Capped at 60: never run on an iPhone** |
+| Android | **45** | APK compiles; back button, reminders and edge-to-edge handled in code and guard-tested. Capped at 60; never run on a device |
+| Subscriptions | **68** | Entitlements, webhooks, reconciliation that repairs lost events and ended grants, refund and transfer handling, price guard, closure on deletion, all tested with stand-ins. Capped at 75 until App Store sandbox and Stripe test mode are run (R-02) |
+| **Overall** | **71** | Weighted mean: (84 + 76 + 70 + 58 + 45 + 1.5 × (82 + 75 + 77 + 68)) ÷ 11 = 71.45. Was 68 before the second round |
 
 ## What blocks what
 
 | Milestone | Blockers |
 |---|---|
-| **TestFlight (internal testing)** | Owner: Apple account, signing, a deployed staging/production site for `CAP_SERVER_URL`. Engineering: O-16 only if hosted Supabase refuses the triggers |
-| **Public launch** | Device tests passed; O-01 (if GPS runs are advertised), O-02, O-03, O-04; final privacy policy and terms; store forms |
-| **Paid subscriptions** | Sandbox purchase and restore on a device; O-08, O-09, O-10; Stripe live mode (owner approval) |
+| **TestFlight (internal testing)** | Owner: Apple account, signing, a deployed staging site for `CAP_SERVER_URL` (R-04). Engineering: none, unless hosted Supabase refuses the storage triggers (R-03 tells) |
+| **Public launch** | iPhone device tests passed (R-01), then the O-02 wording; staging verified (R-03); independent PR review (R-05); final privacy policy and terms; store forms |
+| **Paid subscriptions** | App Store sandbox and Stripe test mode verified (R-02); RevenueCat transfer setting; Stripe live mode (owner approval) |
 
 ## Deliverables in this folder
 
@@ -95,3 +104,7 @@ Scores measure engineering readiness, not market readiness.
 | EXTERNAL_DEVELOPER_SCOPE.md | Architecture diagram, setup, test commands, scoped hours |
 | REMAINING_COST_ESTIMATE.md | One-time and recurring costs |
 | SESSION_PROGRESS.md | Progress log for continuing in a new session |
+| ../engagement/ENGAGEMENT_AGENDA.md | The AI-assisted consultant engagement: order, parallel tracks, hours at $385/h |
+| ../engagement/ISSUE_PROMPTS.md | Ready-to-paste Claude Code prompts for every remaining item |
+| ../engagement/BIBLICAL_AI_BASELINE.md | The verified baseline and rules for the Biblical AI work |
+| ../../CLAUDE.md, ../../.claude/agents/ | Repository instructions and six specialist agents |

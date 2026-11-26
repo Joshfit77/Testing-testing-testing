@@ -32,18 +32,20 @@ Read this first in any new session. It records what has been done, with evidence
 | Full regression on `8fa7c3b5` | Done: CI passed; unit 4,919/1 skip; integration 640/1 skip; browser 167/0 failed/101 opt-in skips; Android APK and iOS workflows passed | TEST_RESULTS.md |
 | Load test (local) | Done | PERFORMANCE_REPORT.md |
 | Deliverables in this folder | Done (16 files) | — |
-| Pull request into `main` (not merged) | Opened after the final push | See the PR on GitHub |
+| Pull request into `main` (not merged) | Open, draft | Joshfit77/Testing-testing-testing#13 |
+| Round 2: O-01..O-20 implemented | Done 2026-11-26 | `13d7db30`, `b0a11cc0`, `15c52df8`, `8a6babae`, `ee13eff0`, `100502d5`; BUG_FIX_REGISTER.md |
+| Engagement package | Done | CLAUDE.md, `.claude/agents/` (6), `npm run setup / verify / test:e2e:mocked / db:verify`, docs/engagement/ |
 
 ## Next steps if continuing
 
 1. Watch the PR checks.
-2. Optional fixes, smallest first: O-18, O-19, O-20, O-11, O-13, O-15, O-14.
+2. The remaining items need people, devices or accounts (R-01..R-07): run them with docs/engagement/ISSUE_PROMPTS.md.
 3. After owner approval only: merge, staging deploy, store setup.
 
 ## How to run things here (lessons learned)
 
 - **Browser tests must run with the local AI and food mocks**, or AI-related tests fail falsely. Use
-  `scripts`-style harness: start `next start` with `ANTHROPIC_API_KEY=e2e-test-key ANTHROPIC_BASE_URL=http://127.0.0.1:<A>
+  `npm run test:e2e:mocked` (scripts/e2e-mocked.sh), which does this: start `next start` with `ANTHROPIC_API_KEY=e2e-test-key ANTHROPIC_BASE_URL=http://127.0.0.1:<A>
   OFF_API_BASE_URL=http://127.0.0.1:<O>`, then run Playwright with `E2E_BASE_URL`, `E2E_ANTHROPIC_MOCK_PORT=<A>`,
   `E2E_OFF_MOCK_PORT=<O>` and `--project mobile`. Running plain `npx playwright test` without them gives 2 false
   failures (label check, Bible helper).

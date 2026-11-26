@@ -11,8 +11,8 @@ commit `8fa7c3b5`.
 
 ## Method
 
-- **Script:** `node load.mjs <baseUrl> <supabaseUrl> <anonKey> <serviceKey> <members> <concurrency> <seconds>`. It is kept with the session's QA
-  files and can be added to the repo on request.
+- **Script:** `node scripts/perf/load-test.mjs <baseUrl> <supabaseUrl> <anonKey> <serviceKey> <members> <concurrency>
+  <seconds>`. It refuses a non-local Supabase unless `ALLOW_REMOTE_LOAD_TEST=1` (staging only, never production).
 - **Setup:** the script creates N synthetic, onboarded members, signs each in, and sends their real session cookie
   (pages) or Bearer token (API).
 - **Load:** C concurrent workers loop over 7 routes:

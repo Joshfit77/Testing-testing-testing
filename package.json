@@ -35,7 +35,11 @@
     "videos:prompts": "tsx scripts/generate-video-prompts.ts",
     "videos:import": "tsx scripts/import-exercise-videos.ts",
     "postinstall": "node scripts/react-hydration-replay-fix.mjs",
-    "native:app-links": "node scripts/native/app-links.mjs"
+    "native:app-links": "node scripts/native/app-links.mjs",
+    "setup": "bash scripts/dev-setup.sh",
+    "verify": "bash scripts/verify.sh",
+    "test:e2e:mocked": "bash scripts/e2e-mocked.sh",
+    "db:verify": "psql \"${DB_URL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}\" -X -v ON_ERROR_STOP=1 -f scripts/verify-database.sql"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

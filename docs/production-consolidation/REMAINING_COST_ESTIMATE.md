@@ -7,8 +7,8 @@ before buying. Nothing has been purchased.
 
 | Item | Low | High | Notes |
 |---|---|---|---|
-| External engineering (EXTERNAL_DEVELOPER_SCOPE.md), launch minimum 45–90 h | $4,500 | $13,500 | at $100–150/h |
-| External engineering, all packages 82–158 h | $8,200 | $23,700 | at $100–150/h; includes the launch minimum |
+| Consultant engagement, iOS launch with paid subscriptions: 24–41 h (docs/engagement/ENGAGEMENT_AGENDA.md) | $9,240 | $15,785 | at $385/h, AI-assisted: Claude implements, consultants verify and review |
+| Consultant engagement including Android: 27–46 h | $10,395 | $17,710 | at $385/h |
 | Legal review of privacy policy and terms | $1,000 | $3,000 | health + faith + AI data |
 | Trademark search / filing (US, one class) | $350 | $1,500 | filing fee plus optional attorney |
 | Test devices (if you don't own them) | $0 | $600 | one used older iPhone; optional Android |
@@ -33,5 +33,6 @@ kill switches; set a monthly limit in the Anthropic console as a second guard.
 
 ## What this work avoided
 
-Everything in this consolidation (fixes B-01..B-22, migrations 088–093, tests, reports) was done without new
-dependencies, paid services or recurring costs.
+Everything in this consolidation (fixes B-01..B-22 and O-01..O-20, migrations 088–095, tests, scripts, reports) was
+done without new dependencies, paid services or recurring costs. Doing the O-items by hand at $385/h was estimated at
+45–90 hours for the launch minimum ($17,325–$34,650).

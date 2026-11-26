@@ -42,27 +42,42 @@ subscriptions.
   stay until deleted.
 - **Security info item (helper functions callable by the public):** they only answer about the caller. No change.
 
-## Open (not fixed here)
+## Open items O-01 to O-20: resolved in the second round (2026-11-26)
 
-| # | Severity | Description | Files | How to reproduce | Recommended fix | Expertise | Hours | TF | Launch | Paid |
-|---|---|---|---|---|---|---|---|---|---|---|
-| O-01 | High | **Mobile M3:** run data recorded while the screen is locked is kept only in memory until the app resumes; if iOS ends the app, that part of the run is lost | `src/components/run/gps-recorder.tsx`, `src/lib/native/location.ts` | Device: 30-minute locked run, then force-quit the app | Buffer GPS fixes natively (a small Swift/Kotlin plugin writing to a file) and read them back on resume | iOS/Android engineer | 12–24 | No | Yes, if GPS is advertised | No |
-| O-02 | High (App Review) | **Mobile M2:** the run screen says "not yet verified on a phone" | `src/lib/native/location.ts:206` | Open Run in the app | Change the wording after the device tests in IPHONE_DEVICE_TESTING.md pass | Owner + Claude | 0.5 | No | Yes | No |
-| O-03 | Medium | **Mobile M4:** the background GPS watcher can be left running after the web view reloads | `src/lib/native/location.ts` | Device: reload the web view mid-run | Store the watcher id, and remove any old watchers at start-up | Mobile engineer | 3–6 | No | Yes | No |
-| O-04 | Medium | **Mobile M6:** the sleep "alarm" is a normal notification (muted by Silent and Focus); snooze may not work while the app is closed; Android exact-alarm permission isn't declared | `src/lib/native-alarm.ts` | Device | Call it a wake reminder, or implement a real alarm; set snooze to open the app in the foreground; declare the Android permission | Mobile engineer | 4–10 | No | Yes | No |
-| O-05 | Medium | **Mobile M7:** no universal links, so email links open in the browser, not the app | `ios/App/App/App.entitlements`, `android/.../AndroidManifest.xml` | Sign up in the app, then tap the confirmation email | Associated domains, `.well-known` files and an `appUrlOpen` handler | Mobile engineer | 6–10 | No | Recommended | No |
-| O-06 | Medium | **Mobile M8:** Android 15 edge-to-edge insets are unverified | `capacitor.config.ts`, app shell CSS | Device: Pixel on Android 15, 3-button navigation | Configure system-bar insets | Mobile engineer | 3–6 | n/a | Android only | No |
-| O-07 | Low | **Mobile M9/M10:** the Android back button ignores open sheets; reminder sync cancels before scheduling | `src/lib/native.ts`, `native-notifications.ts` | Device | A back event that overlays can consume; schedule first, then cancel the difference | Claude | 3–5 | No | No | No |
-| O-08 | Medium | **Billing F3:** when an admin grant ends, a paying subscriber can show as Free until the next billing event | `billing-reconcile.ts` | Integration: a grant expiring with an active store row | Reconcile also recomputes recently expired entitlements | Claude + review | 3–5 | No | No | Yes |
-| O-09 | Medium | **Billing F4:** a lost refund, dispute or transfer event is never repaired by reconcile | `billing-reconcile.ts` | Integration with stand-ins | Rotate store rows through reconcile; replay failed Stripe events | Claude + payments engineer | 6–12 | No | No | Yes |
-| O-10 | Low–Medium | **Billing F5:** nothing in the database stops one store purchase from granting two accounts (depends on RevenueCat transfer settings) | `apply_store_snapshot` | Stand-in returns the same transaction for two users | Refuse a transaction already held by another user; set RevenueCat "transfer" behaviour (owner) | Claude + owner | 3–6 | No | No | Yes |
-| O-11 | Medium | **Architecture F3:** a Bible verse note is lost on a network error or an accidental swipe | `src/components/bible/chapter-reader.tsx` | Type a note, go offline, tap Save | `useDraft`, catch errors, confirm before closing | Claude | 2–3 | No | No | No |
-| O-12 | Medium (performance) | **Architecture F4:** finishing a workout runs about six full-history reads one after another; long-history members may see a false "couldn't save" after 45 s | `src/server/actions/workouts.ts` | Load test with a long history | `Promise.all` and narrower queries | Claude | 3–6 | No | Recommended | No |
-| O-13 | Low | **Architecture F5:** a retried progress-photo save can delete an already-saved photo's file in rare cases | `progress-photos.tsx` | Lost reply, then an edited retry | Never delete after an unconfirmed attempt | Claude | 1–2 | No | No | No |
-| O-14 | Low | **Architecture F7:** several screens send a network blip to the error page instead of showing a message | various (see report) | Go offline and submit | A shared `safeAction` wrapper | Claude | 3–5 | No | No | No |
-| O-15 | Low | **Architecture F8/F9:** the coach's calorie tool ignores reaching goal weight; links to older conversations open a blank chat | `src/lib/coach/tools.ts`, `coach/page.tsx` | As described | Reuse `rateTowardGoal`; fetch the conversation by id | Claude | 2–3 | No | No | No |
-| O-16 | Medium (deploy) | **Database F4:** migrations 086 and 088 add triggers on `storage.objects`; hosted Supabase may refuse them | migrations 086, 088 | `supabase db push` to a staging project | If refused, keep the policy layer, or move to an RPC before upload | Engineer with Supabase access | 1–4 | Yes, if it fails | — | — |
-| O-17 | Low (performance) | **Database F5/F6:** one global lock for AI budget reservations; per-row policy functions | migrations 081, 034–036 | Load test | Row-level atomic update; wrap helpers in `(select …)` | DB engineer | 4–8 | No | No | No |
-| O-18 | Low | **Security N-6:** rate-limit keys use an unsalted hash of the email | `src/server/rate-limit.ts` | Read the database | HMAC with a server secret | Claude | 1 | No | No | No |
-| O-19 | Low | **Test quality:** billing suites skip silently when the local stack isn't up | `tests/integration/helpers.ts` | Run without Docker | Fail in CI when the stack is missing | Claude | 1–2 | No | No | No |
-| O-20 | Low | `e2e/sleep.spec.ts` can fail when it runs across midnight UTC | `e2e/sleep.spec.ts` | Run at 23:59 UTC | Pin the clock in the test | Claude | 1 | No | No | No |
+Every item below was implemented by Claude, with a regression test that fails on the old code where one is possible,
+then run in the full suite. "Device" means the code is done but its behaviour on a phone still has to be confirmed.
+
+| # | Was | Resolution | Commit | Proof | Still needs |
+|---|---|---|---|---|---|
+| O-01 | High: locked-screen run fixes only in memory | Every fix the open recorder receives is journalled on the device outside React (at most every 2 s and when the page hides); recovery replays newer fixes | `8a6babae` | `run-fix-journal.test.ts` (60 s saved, 5 locked minutes journalled, app ended, 1,083 m recovered) | Device tests 14–15 |
+| O-02 | High (App Review): "not yet verified on a phone" wording | **Not changed, deliberately.** The wording is true until the device tests pass. Prompt P-01 in docs/engagement/ISSUE_PROMPTS.md makes the change in minutes once they do | — | — | Device tests 14–16 |
+| O-03 | Medium: native GPS watcher orphaned by a web-view reload | Watcher ids recorded on the device; any not owned by the current page removed before a new watcher starts and at app start | `8a6babae` | `native-orphan-watchers.test.ts` | Device: reload mid-run |
+| O-04 | Medium: alarm is a notification; snooze needs the app; exact-alarm permission | Honest wording on the alarm screen; follow-up ring the snooze time after each alarm for the next 7 days, independent of the app running; the exact-alarm finding was wrong (the plugin declares SCHEDULE_EXACT_ALARM) | `ee13eff0` | `sleep-alarm.test.ts` (follow-ups) | Device test 25 |
+| O-05 | Medium: no universal links | `/.well-known/apple-app-site-association` and `assetlinks.json` (off until APPLE_TEAM_ID / ANDROID_APP_CERT_SHA256 are set), in-app link handling, `npm run native:app-links` to claim the domain | `100502d5` | `app-links.test.ts` | Owner: Team ID, Associated Domains capability, Play signing fingerprint; then device test 3 |
+| O-06 | Medium: Android 15 edge-to-edge unverified | No change needed (Capacitor 8 SystemBars + `viewport-fit=cover` + env() padding); guard test added | `ee13eff0` | `android-edge-to-edge.test.ts` | Android device test 3 |
+| O-07 | Low: Back ignores sheets; reminder sync cancels first | Back closes the top sheet or dialog as Escape does; sync schedules first and cancels only stale ids | `ee13eff0` | `native-back.test.tsx`, `native-notifications.test.ts` | Android device test 4 |
+| O-08 | Medium: ended admin grant hides a paid plan | Reconciliation recomputes members whose grant ended in the last week | `15c52df8` | `entitlements.test.ts` | Staging cron |
+| O-09 | Medium: lost refund / dispute / transfer never repaired | Reconciliation re-reads 3 days of Stripe events through the webhook's claim (no double processing) and rotates store members through RevenueCat | `15c52df8` | `entitlements.test.ts`, `store-billing.test.ts` | Stripe test mode on staging |
+| O-10 | Low–Medium: one store purchase on two accounts | The account that confirmed the transaction most recently gets it; the other is recomputed; migration 095 indexes | `15c52df8` | `store-billing.test.ts` | Owner: RevenueCat "Transfer" behaviour (recommended: transfer to new App User ID) |
+| O-11 | Medium: Bible note lost | Note kept as a draft until saved; Cancel discards, a swipe keeps it | `13d7db30` | `e2e/bible-reader.spec.ts` (offline save, close, reopen) | — |
+| O-12 | Medium: workout finish could report a saved workout as unsaved | Post-save extras run in parallel with 8 s limits and can't fail the save | `b0a11cc0` | `workout-finish-extras.test.ts` | — |
+| O-13 | Low: retried photo save could delete a saved photo | Browser never deletes a possibly-saved file; server removes only files no photo uses | `13d7db30` | `progress-photo-save.test.ts` | — |
+| O-14 | Low: network blip sent screens to the error page | `useSafeTransition` on 34 screens (61 calls); a guard test fails on any new unguarded call | `13d7db30` | `use-safe-transition.test.ts` | — |
+| O-15 | Low: coach calorie tool ignored goal weight; old chats opened blank | Saved pace steered toward the goal weight; older conversations fetched by id | `13d7db30` | `coach-tools.test.ts`, `e2e/coach.spec.ts` | — |
+| O-16 | Medium (deploy): storage triggers on hosted Supabase | Trigger creation guarded (warning, policy limit stays, deploy continues); local role grants match hosted; `npm run db:verify` reports the triggers | `b0a11cc0` | Unprivileged-role test; fresh install | One `supabase db push` to staging + `db:verify` |
+| O-17 | Low (performance): global AI lock; per-row policy helpers | Migration 094 wraps 38 policies' helpers as InitPlans; the global lock was measured (600–690 reservations/s, about 100× need at 10k members) and kept for correctness | `b0a11cc0` | `rls-policy-initplans.test.ts`; pgbench | — |
+| O-18 | Low: unsalted email hash in rate-limit keys | HMAC keyed by a secret derived from the service-role key | `13d7db30` | `rate-limit.test.ts` | — |
+| O-19 | Low: integration suites skipped silently | `REQUIRE_TEST_STACK=1` (CI, `npm run verify`) fails instead | `13d7db30` | Verified both ways | — |
+| O-20 | Low: sleep test across midnight UTC | Tests that would start within 4 minutes of midnight wait until after it | `13d7db30` | — | — |
+
+## What remains (each needs a phone, an account or a hosted service)
+
+| # | Severity | Description | Who | Hours (with Claude) | TF | Launch | Paid |
+|---|---|---|---|---|---|---|---|
+| R-01 | High | Physical iPhone run of IPHONE_DEVICE_TESTING.md, especially GPS (14–16), purchases (29–31), HealthKit (17–18), alarm (25); then O-02 wording | Founder + mobile consultant; Claude fixes findings | 6–10 | No | Yes | Yes |
+| R-02 | High | App Store sandbox purchase, restore, transfer; Stripe test-mode checkout, portal, refund on staging | Payments consultant + founder accounts | 3–5 | No | No | Yes |
+| R-03 | Medium | Staging: `supabase db push` (085 → 095), `npm run db:verify`, cron jobs, staging load test including writes | Backend/DevOps consultant | 3–5 | Yes, if O-16 trips | Yes | No |
+| R-04 | Medium | Release engineering: signing, TestFlight upload, App Store Connect record, Associated Domains, privacy label | iOS consultant + founder | 3–5 | Yes | Yes | No |
+| R-05 | Medium | Independent review of the consolidation PR (security and payments focus) | Security + payments consultants | 4–6 | No | Yes | Yes |
+| R-06 | Low | Android device pass, Play Console, Health Connect declaration | Mobile consultant | 3–5 | n/a | Android only | Android only |
+| R-07 | — | Contingency: defects found by R-01..R-06 (Claude implements, consultant reviews) | Claude + consultant | 4–8 | — | — | — |
