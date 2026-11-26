@@ -66,9 +66,15 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       // Invoice payments of a PaymentIntent (how Stripe links a charge to its invoice since API 2025-03-31).
       if (url.pathname === "/v1/events") {
         const gte = Number(url.searchParams.get("created[gte]") ?? 0);
+        const lt = Number(url.searchParams.get("created[lt]") ?? Number.MAX_SAFE_INTEGER);
         const types = url.searchParams.getAll("types[]");
-        const data = stripeEventLog.filter((e) => (e.created as number) >= gte && (!types.length || types.includes(e.type as string)));
+        const data = stripeEventLog.filter((e) => (e.created as number) >= gte && (e.created as number) < lt && (!types.length || types.includes(e.type as string)));
         return json(200, { object: "list", has_more: false, url: "/v1/events", data });
+      }
+      if (url.pathname === "/v1/subscriptions" && req.method === "GET") {
+        // Listing (reconciliation's sweep for subscriptions never stored): only those the test marks as listed.
+        const data = [...stripeSubs.values()].filter((sub) => (sub as unknown as { listed?: boolean }).listed);
+        return json(200, { object: "list", has_more: false, url: "/v1/subscriptions", data });
       }
       if (url.pathname === "/v1/invoice_payments") {
         const pi = url.searchParams.get("payment[payment_intent]");
@@ -388,6 +394,97 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       const report = await reconcileBilling();
       expect(report.endedGrants.checked).toBeGreaterThanOrEqual(1);
       expect(await ent()).toMatchObject({ plan: "plus", source: "app_store" });
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
+
+  it("a lost dispute.created replayed after the dispute was won doesn't take access away (payments review 1)", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    const u = await createTestUser("dispute-won-replay");
+    const ent = async () => (await serviceClient().from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si_1", price: { id: "price_test_pro" }, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400 }] } });
+      const pay = fakePayment(sub.id);
+      stripeSubs.set(sub.id, { ...sub, latest_invoice: pay.invoice.id } as Stripe.Subscription);
+      await syncSubscription(stripeSubs.get(sub.id)!);
+      expect(await ent()).toBe("pro");
+      // The member disputed the charge and the dispute was won; both webhooks were lost.
+      const dispute = { id: `dp_${crypto.randomUUID().slice(0, 8)}`, object: "dispute", charge: pay.charge.id, status: "won" };
+      stripeDisputes.set(dispute.id, dispute);
+      const t = Math.floor(Date.now() / 1000);
+      stripeEventLog.unshift(
+        { id: `evt_${crypto.randomUUID()}`, object: "event", type: "charge.dispute.closed", created: t, data: { object: dispute } },
+        { id: `evt_${crypto.randomUUID()}`, object: "event", type: "charge.dispute.created", created: t - 60, data: { object: { ...dispute, status: "needs_response" } } },
+      );
+      const report = await reconcileBilling();
+      expect(report.stripeEvents.applied).toBeGreaterThanOrEqual(2);
+      expect(await ent()).toBe("pro");
+    } finally {
+      stripeEventLog.length = 0;
+      await deleteTestUser(u);
+    }
+  });
+
+  it("a webhook outage longer than 3 days is still repaired: replay starts where the last complete run got to (payments review 2)", async () => {
+    const { reconcileBilling, replaySince } = await import("@/server/services/billing-reconcile");
+    const now = new Date();
+    // Unit check of the window: at least 3 days back, at most 30, otherwise from the last complete run.
+    expect(replaySince(now, null).getTime()).toBe(now.getTime() - 3 * 86400_000);
+    expect(replaySince(now, new Date(now.getTime() - 10 * 86400_000)).getTime()).toBe(now.getTime() - 10 * 86400_000);
+    expect(replaySince(now, new Date(now.getTime() - 90 * 86400_000)).getTime()).toBe(now.getTime() - 30 * 86400_000);
+    const u = await createTestUser("refund-outage");
+    const svc = serviceClient();
+    const ent = async () => (await svc.from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si_1", price: { id: "price_test_pro" }, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400 }] } });
+      const pay = fakePayment(sub.id);
+      stripeSubs.set(sub.id, { ...sub, latest_invoice: pay.invoice.id } as Stripe.Subscription);
+      await syncSubscription(stripeSubs.get(sub.id)!);
+      // Reconciliation last completed 10 days ago; a full refund 8 days ago was never delivered.
+      await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(Date.now() - 10 * 86400_000).toISOString() });
+      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 1799, refunded: true });
+      stripeEventLog.unshift({ id: `evt_${crypto.randomUUID()}`, object: "event", type: "charge.refunded", created: Math.floor(Date.now() / 1000) - 8 * 86400, data: { object: stripeCharges.get(pay.charge.id) } });
+      const report = await reconcileBilling();
+      expect(report.stripeEvents.complete).toBe(true);
+      expect(await ent()).toBe("free");
+      // A complete pass moves the starting point to (about) now.
+      const state = (await svc.from("billing_reconcile_state").select("stripe_events_through").eq("id", 1).single()).data!;
+      expect(Date.now() - Date.parse(state.stripe_events_through as string)).toBeLessThan(60_000);
+    } finally {
+      stripeEventLog.length = 0;
+      await deleteTestUser(u);
+    }
+  });
+
+  it("a subscription whose creation webhooks were all lost is found and stored (payments review 2)", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    const u = await createTestUser("sub-never-stored");
+    const ent = async () => (await serviceClient().from("user_entitlements").select("plan, source").eq("user_id", u.id).maybeSingle()).data;
+    try {
+      const sub = { ...fakeSubscription({ metadata: { user_id: u.id } }), listed: true } as unknown as Stripe.Subscription;
+      stripeSubs.set(sub.id, sub);
+      expect((await ent())?.plan ?? "free").toBe("free");
+      const report = await reconcileBilling();
+      expect(report.missingSubscriptions.stored).toBeGreaterThanOrEqual(1);
+      expect(await ent()).toMatchObject({ plan: "plus", source: "stripe" });
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
+
+  it("an admin grant that ended weeks ago (reconciliation wasn't running) is caught too (payments review 7)", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    const { recomputeEntitlement } = await import("@/server/services/billing");
+    const u = await createTestUser("grant-ended-long-ago");
+    const svc = serviceClient();
+    try {
+      await svc.from("user_entitlements").upsert({ user_id: u.id, plan: "pro", source: "admin", valid_until: new Date(Date.now() + 3600_000).toISOString() }, { onConflict: "user_id" });
+      await svc.from("store_subscriptions").insert({ user_id: u.id, store: "app_store", product_id: "ngf_plus_monthly", plan: "plus", period_type: "normal", is_sandbox: false, purchased_at: new Date(Date.now() - 86400_000).toISOString(), expires_at: new Date(Date.now() + 30 * 86400_000).toISOString() });
+      await recomputeEntitlement(u.id);
+      await svc.from("user_entitlements").update({ valid_until: new Date(Date.now() - 20 * 86400_000).toISOString() }).eq("user_id", u.id);
+      await reconcileBilling();
+      expect((await svc.from("user_entitlements").select("plan, source").eq("user_id", u.id).single()).data).toMatchObject({ plan: "plus", source: "app_store" });
     } finally {
       await deleteTestUser(u);
     }

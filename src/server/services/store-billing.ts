@@ -80,7 +80,7 @@ export async function syncStoreSubscriber(userId: string): Promise<Plan | null> 
   if (!profile) return null;
   const fetchedAt = new Date();
   const subscriber = await fetchRevenueCatSubscriber(userId);
-  const { data: existing, error: readErr } = await admin.from("store_subscriptions").select("product_id, plan").eq("user_id", userId);
+  const { data: existing, error: readErr } = await admin.from("store_subscriptions").select("product_id, plan, store_transaction_id").eq("user_id", userId);
   if (readErr) throw readErr;
   const previousPlans = new Map((existing ?? []).filter((r) => r.plan).map((r) => [r.product_id as string, r.plan as PaidPlan]));
   const rows = storeRowsFromSubscriber(
@@ -95,7 +95,10 @@ export async function syncStoreSubscriber(userId: string): Promise<Plan | null> 
   if (result === "stale") logInfo("revenuecat.sync_stale", {});
   const plan = await recomputeEntitlement(userId);
   // Another account holding one of these purchases loses it now that this account confirmed it more recently (O-10).
-  const txIds = rows.map((r) => r.store_transaction_id).filter((t): t is string => Boolean(t));
+  // Holders of the transactions held before (released now) or after this snapshot are re-evaluated.
+  const txIds = [...new Set([...rows.map((r) => r.store_transaction_id), ...(existing ?? []).map((r) => r.store_transaction_id as string | null)])].filter(
+    (t): t is string => Boolean(t),
+  );
   if (txIds.length) {
     const { data: others, error: othersErr } = await admin.from("store_subscriptions").select("user_id").in("store_transaction_id", txIds).neq("user_id", userId);
     if (othersErr) throw othersErr;

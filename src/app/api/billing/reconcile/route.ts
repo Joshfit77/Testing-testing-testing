@@ -4,6 +4,8 @@ import { logError } from "@/server/log";
 import { cronAuthorized, reconcileBilling } from "@/server/services/billing-reconcile";
 
 export const dynamic = "force-dynamic";
+/** Reconciliation budgets itself to 240 s (billing-reconcile.ts); the platform must allow at least that. */
+export const maxDuration = 300;
 
 /**
  * Scheduled billing reconciliation (see src/server/services/billing-reconcile.ts). Only a caller presenting

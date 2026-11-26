@@ -259,6 +259,43 @@ describe.skipIf(!available)("App Store / Google Play subscriptions via RevenueCa
     await syncStoreSubscriber(user.id);
   });
 
+  it("two accounts restoring the same purchase at the same moment end with exactly one Pro (payments review 5)", async () => {
+    for (let round = 0; round < 6; round++) {
+      const tx = `tx-race-${round}-${crypto.randomUUID().slice(0, 6)}`;
+      setCustomer(user.id, { ngf_pro_monthly: sub({ store_transaction_id: tx }) }, { pro: "ngf_pro_monthly" });
+      setCustomer(other.id, { ngf_pro_monthly: sub({ store_transaction_id: tx }) }, { pro: "ngf_pro_monthly" });
+      await Promise.all([syncStoreSubscriber(user.id), syncStoreSubscriber(other.id)]);
+      const plans = [(await ent())?.plan, (await ent(other))?.plan];
+      expect(plans.filter((p) => p === "pro"), `round ${round}: ${plans.join(", ")}`).toHaveLength(1);
+    }
+    setCustomer(user.id, {});
+    setCustomer(other.id, {});
+    await syncStoreSubscriber(user.id);
+    await syncStoreSubscriber(other.id);
+  });
+
+  it("the store rotation reaches current subscribers however many lapsed members were read longer ago (payments review 3)", async () => {
+    const svc = serviceClient();
+    const lapsed = await Promise.all([createTestUser("lapsed-a"), createTestUser("lapsed-b"), createTestUser("lapsed-c")]);
+    try {
+      const longAgo = new Date(Date.now() - 400 * day).toISOString();
+      for (const l of lapsed) {
+        await svc.from("store_subscriptions").insert({ user_id: l.id, store: "app_store", product_id: "ngf_pro_monthly", plan: "pro", period_type: "normal", is_sandbox: false, purchased_at: longAgo, expires_at: new Date(Date.now() - 300 * day).toISOString() });
+        await svc.from("store_sync_state").upsert({ user_id: l.id, fetched_at: longAgo });
+      }
+      setCustomer(user.id, { ngf_pro_monthly: sub({ expires_date: iso(25 * day) }) }, { pro: "ngf_pro_monthly" });
+      await syncStoreSubscriber(user.id);
+      await svc.from("store_sync_state").update({ fetched_at: new Date(Date.now() - 20 * day).toISOString() }).eq("user_id", user.id);
+      const { data, error } = await svc.rpc("store_reconcile_candidates", { p_limit: 1 });
+      expect(error).toBeNull();
+      expect(data).toEqual([{ user_id: user.id }]);
+    } finally {
+      await Promise.all(lapsed.map((l) => deleteTestUser(l)));
+      setCustomer(user.id, {});
+      await syncStoreSubscriber(user.id);
+    }
+  });
+
   it("a member paying on the web and in the app gets the higher plan", async () => {
     setCustomer(user.id, { ngf_plus_monthly: sub() }, { plus: "ngf_plus_monthly" });
     await syncStoreSubscriber(user.id);

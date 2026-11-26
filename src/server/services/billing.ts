@@ -330,12 +330,13 @@ export async function recomputeEntitlement(userId: string): Promise<Plan> {
       candidates.push({ ...s, period_started_at, source: "stripe" });
     }
     const storeRows = (storeRes.data ?? []) as (Parameters<typeof storeRowAsSubscription>[0] & { store: string; is_sandbox: boolean; store_transaction_id: string | null })[];
-    // One store purchase grants one account (O-10): if another account confirmed the same transaction with RevenueCat
-    // more recently (a restore or transfer to it), that account has it and this one doesn't.
-    const heldElsewhere = await transactionsHeldMoreRecentlyElsewhere(userId, storeRows);
     // A stored sandbox purchase grants only while the member is still allowed sandbox purchases: removing a tester
     // from the allow-list (or the entry expiring) ends it at the next recompute, without waiting for RevenueCat.
     const sandboxOk = storeRows.some((r) => r.is_sandbox) ? await sandboxPurchasesAllowed(userId) : false;
+    // One store purchase grants one account (O-10): if another account confirmed the same transaction with RevenueCat
+    // more recently (a restore or transfer to it), that account has it and this one doesn't. Only rows this account
+    // may use take part.
+    const heldElsewhere = await transactionsHeldMoreRecentlyElsewhere(userId, storeRows.filter((r) => !r.is_sandbox || sandboxOk));
     for (const row of storeRows) {
       if (row.is_sandbox && !sandboxOk) continue;
       if (row.store_transaction_id && heldElsewhere.has(`${row.store}:${row.store_transaction_id}`)) continue;
@@ -373,9 +374,12 @@ export async function transactionsHeldMoreRecentlyElsewhere(userId: string, rows
   const held = new Set<string>();
   if (!txIds.length) return held;
   const admin = getServiceSupabase();
-  const { data: others, error } = await admin.from("store_subscriptions").select("user_id, store, store_transaction_id").in("store_transaction_id", txIds).neq("user_id", userId);
+  const { data: found, error } = await admin.from("store_subscriptions").select("user_id, store, store_transaction_id, is_sandbox").in("store_transaction_id", txIds).neq("user_id", userId);
   if (error) throw error;
-  if (!others?.length) return held;
+  // A sandbox copy on an account no longer allowed sandbox purchases grants that account nothing, so it can't win.
+  const others: typeof found = [];
+  for (const o of found ?? []) if (!o.is_sandbox || (await sandboxPurchasesAllowed(o.user_id as string))) others.push(o);
+  if (!others.length) return held;
   const ids = [...new Set([userId, ...others.map((o) => o.user_id as string)])];
   const { data: syncs, error: syncErr } = await admin.from("store_sync_state").select("user_id, fetched_at").in("user_id", ids);
   if (syncErr) throw syncErr;
@@ -499,7 +503,13 @@ async function applyStripeEvent(event: Stripe.Event): Promise<void> {
       break;
     }
     case "charge.dispute.created": {
-      const dispute = event.data.object as Stripe.Dispute;
+      // Read the dispute as it is now: when this event arrives late (a retry, or reconciliation replaying a lost one)
+      // the dispute may already be won, and revoking then would take away a period the bank confirmed was paid for.
+      const dispute = await stripe.disputes.retrieve((event.data.object as Stripe.Dispute).id);
+      if (dispute.status === "won" || dispute.status === "warning_closed") {
+        logInfo("billing.dispute_already_resolved", { status: dispute.status });
+        break;
+      }
       const chargeId = typeof dispute.charge === "string" ? dispute.charge : dispute.charge.id;
       await revokeForCharge(stripe, await stripe.charges.retrieve(chargeId), "dispute");
       break;
