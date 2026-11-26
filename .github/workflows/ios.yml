@@ -77,6 +77,18 @@ permissions:
   contents: read
 
 jobs:
+  native-tests:
+    name: Native unit tests (Swift run journal)
+    if: github.event_name == 'push' || inputs.job == 'checks'
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: swift test (ios/RunJournalCore)
+        run: swift test --package-path ios/RunJournalCore
+
   compile:
     name: Compile check (offline edition, unsigned)
     if: github.event_name == 'push' || inputs.job == 'checks'

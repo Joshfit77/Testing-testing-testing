@@ -61,6 +61,9 @@ jobs:
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - name: Copy the offline edition into the Android project
         run: CAP_MODE=standalone npx cap sync android
+      - name: Native unit tests (run journal, JVM)
+        working-directory: android
+        run: ./gradlew testDebugUnitTest --no-daemon
       - name: Build APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon

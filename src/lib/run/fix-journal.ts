@@ -1,6 +1,7 @@
 "use client";
 
 import { addFix, type GpsFix, type TrackState } from "@/lib/domain/gps-track";
+import { GPS_RECORDING_PREFIX as RECORDING_PREFIX } from "@/lib/opening";
 
 /**
  * A write-ahead journal of GPS fixes for the recording on the open recorder screen (O-01).
@@ -116,14 +117,37 @@ export function clearJournal(): void {
  */
 export function replayJournal(key: string, track: TrackState): TrackState {
   const j = mem && mem.key === key ? mem : read();
-  if (!j || j.key !== key || !j.fixes.length || track.status === "finished") return track;
+  if (!j || j.key !== key || !j.fixes.length) return track;
+  return replayFixes(track, j.fixes.map(([lat, lng, accuracy, t]) => ({ lat, lng, accuracy, t })));
+}
+
+/**
+ * Apply fixes from any journal (this device's web journal, or the native one written while the web view was
+ * suspended) that are newer than the track's last accepted fix, oldest first, through the live rules. Fixes already
+ * in the track are never counted twice; a finished track is left alone.
+ */
+export function replayFixes(track: TrackState, fixes: GpsFix[]): TrackState {
+  if (!fixes.length || track.status === "finished") return track;
   const after = track.lastFixAt ?? -Infinity;
   let t = track;
-  for (const [lat, lng, accuracy, time] of [...j.fixes].sort((a, b) => a[3] - b[3])) {
-    if (time <= after) continue;
-    t = addFix(t, { lat, lng, accuracy, t: time }).state;
+  for (const f of [...fixes].sort((a, b) => a.t - b.t)) {
+    if (!(f.t > after) || !Number.isFinite(f.lat) || !Number.isFinite(f.lng)) continue;
+    t = addFix(t, f).state;
   }
   return t;
+}
+
+/**
+ * Remove recorded routes from this device (sign-out, account deletion): the web journal and the native journal of
+ * `userId`'s recording, or all of them without a user.
+ */
+export function clearRunJournalData(userId?: string): void {
+  const stored = mem ?? read();
+  if (!userId || !stored || stored.key === `${RECORDING_PREFIX}${userId}`) clearJournal();
+  // Signing out removes only that member's native journal (another member's unrecovered run on a shared phone isn't
+  // theirs to delete); without a user (account deletion, forgetting the device) every native journal goes.
+  const key = userId ? `${RECORDING_PREFIX}${userId}` : undefined;
+  void import("@/lib/native/run-journal").then((m) => m.clearNativeRunJournal(key)).catch(() => undefined);
 }
 
 /** For tests: reset module state. */

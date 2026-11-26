@@ -13,6 +13,7 @@
  */
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import type { GpsFix } from "@/lib/domain/gps-track";
+import { startNativeRunJournal, stopNativeRunJournal } from "@/lib/native/run-journal";
 
 export type LocationError = "denied" | "unavailable" | "unsupported" | "timeout";
 
@@ -127,8 +128,11 @@ export async function removeOrphanedWatchers(): Promise<number> {
   return orphans.length;
 }
 
-/** Start delivering fixes. Returns a stop function. */
-export async function watchLocation(onFix: (fix: GpsFix) => void, onError: (e: LocationError) => void): Promise<() => void> {
+/**
+ * Start delivering fixes. Returns a stop function. With `journalKey` (the recording's storage key), the phone app also
+ * writes every fix natively (src/lib/native/run-journal.ts) until the stop function runs.
+ */
+export async function watchLocation(onFix: (fix: GpsFix) => void, onError: (e: LocationError) => void, journalKey?: string): Promise<() => void> {
   if (hasNativeBackgroundLocation()) {
     await ensureAndroidNotificationPermission();
     await removeOrphanedWatchers();
@@ -145,7 +149,9 @@ export async function watchLocation(onFix: (fix: GpsFix) => void, onError: (e: L
     );
     liveWatchers.add(id);
     storeWatcherIds([...new Set([...storedWatcherIds(), id])]);
+    if (journalKey) void startNativeRunJournal(journalKey);
     return () => {
+      if (journalKey) void stopNativeRunJournal();
       liveWatchers.delete(id);
       storeWatcherIds(storedWatcherIds().filter((x) => x !== id));
       void BackgroundGeolocation.removeWatcher({ id });

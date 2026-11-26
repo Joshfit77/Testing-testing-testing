@@ -32,7 +32,8 @@ import {
   type TrackState,
 } from "@/lib/domain/gps-track";
 import { buildScript, completedSets, phaseAt, scriptSeconds, type RunPrescription } from "@/lib/domain/run-session";
-import { clearJournal, pruneJournal, replayJournal } from "@/lib/run/fix-journal";
+import { clearJournal, pruneJournal, replayFixes, replayJournal } from "@/lib/run/fix-journal";
+import { clearNativeRunJournal, readNativeRunJournal } from "@/lib/native/run-journal";
 import { canOpenLocationSettings, hasNativeBackgroundLocation, keepScreenOn, locationSourceLabel, openLocationSettings, watchLocation, type LocationError } from "@/lib/native/location";
 import { attachScreen, keepRecording, routeError, routeFix, shouldKeep, takeBack } from "@/lib/run/live-recording";
 import { saveGpsActivityAction } from "@/server/actions/gps-activities";
@@ -203,7 +204,14 @@ export function GpsRecorder({
       const parsed = JSON.parse(raw) as Saved;
       // Fixes that arrived after the last save (the phone was locked and the app was ended) are on the device too.
       const saved: Saved = { ...parsed, track: replayJournal(storageKey, parsed.track) };
-      if (isRecoverable(saved.track, Date.now()) && (saved.guidedDayId ?? null) === (guided?.programDayId ?? null)) setRecoverable(saved);
+      if (isRecoverable(saved.track, Date.now()) && (saved.guidedDayId ?? null) === (guided?.programDayId ?? null)) {
+        setRecoverable(saved);
+        // In the phone app, fixes written natively while the web view was suspended or the app had been ended.
+        void readNativeRunJournal(storageKey).then((fixes) => {
+          if (!fixes.length) return;
+          setRecoverable((cur) => (cur && cur.track.id === saved.track.id ? { ...cur, track: replayFixes(cur.track, fixes) } : cur));
+        });
+      }
       else if (isFinishedTooOldToSave(saved.track, Date.now())) setTooOld(saved.track);
       else if (!isRecoverable(saved.track, Date.now())) localStorage.removeItem(storageKey);
     } catch {
@@ -217,6 +225,7 @@ export function GpsRecorder({
         if (!t) {
           localStorage.removeItem(storageKey);
           clearJournal();
+          void clearNativeRunJournal(storageKey);
           return;
         }
         if (!force && Date.now() - lastSaveRef.current < 5000) return;
@@ -246,7 +255,7 @@ export function GpsRecorder({
     setError(null);
     stopWatching();
     const gen = watchGen.current;
-    const stop = await watchLocation(routeFix, routeError);
+    const stop = await watchLocation(routeFix, routeError, storageKey);
     if (gen !== watchGen.current) {
       stop();
       return;
@@ -257,7 +266,7 @@ export function GpsRecorder({
       if (gen !== watchGen.current) wake?.();
       else wakeRef.current = wake;
     }
-  }, [stopWatching]);
+  }, [stopWatching, storageKey]);
 
   // Leaving the screen mid-recording (another tab, the workout, the Bible) doesn't stop the recording: the watcher
   // and the track are handed to the keeper, and a "Recording" pill leads back. Anything else stops the GPS.
@@ -324,6 +333,7 @@ export function GpsRecorder({
   const start = async () => {
     const t = startTrack({ id: crypto.randomUUID(), kind, unit, now: Date.now() });
     clearJournal(); // a new recording never inherits fixes journalled for an earlier one
+    await clearNativeRunJournal(storageKey);
     lastPhaseRef.current = -1;
     setTrack(t);
     setNow(Date.now());
