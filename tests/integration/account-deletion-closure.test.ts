@@ -281,6 +281,17 @@ describe.skipIf(!available)("account deletion closure: nothing that names the me
     lowerPartner = await createTestUser("closure-partner", { id: `00000000-0000-4000-8000-${tail()}` });
     if (!(partner.id > u && lowerPartner.id < u)) throw new Error("couldn't create partners on both sides of the member's id");
     await seed("accountability_invites", { inviter_id: u, code: generateInviteCode() });
+    // Friends (migration 091; switched off, but the tables exist): every column that can name the member.
+    await seed("social_profiles", { user_id: u, username: `closure_${u.slice(0, 8)}` });
+    await seed("friend_invites", { inviter_id: u, code: "ABCDEFGHJK" });
+    await seed("friend_requests", { sender_id: u, recipient_id: partner.id });
+    await seed("friend_requests", { sender_id: lowerPartner.id, recipient_id: u });
+    await seed("friendships", { user_a: u, user_b: partner.id });
+    await seed("friendships", { user_a: lowerPartner.id, user_b: u });
+    await seed("user_blocks", { blocker_id: u, blocked_id: partner.id });
+    await seed("user_blocks", { blocker_id: lowerPartner.id, blocked_id: u });
+    await seed("user_reports", { reporter_id: u, reported_id: partner.id, reason: "spam" });
+    await seed("user_reports", { reporter_id: lowerPartner.id, reported_id: u, reason: "other" });
     const partnership = await seed("accountability_partnerships", { user_a: u, user_b: partner.id });
     await seed("accountability_shares", { partnership_id: partnership.id, user_id: u });
     await seed("accountability_shares", { partnership_id: partnership.id, user_id: partner.id });

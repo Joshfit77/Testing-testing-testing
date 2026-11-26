@@ -11,7 +11,7 @@ export interface NavItem {
 
 /**
  * The five main tabs, in this exact order, on every screen size: Home, Train, Nutrition, Faith, You.
- * Running and walking belong to Train (they are training); My Progress, the AI Coach's screen and settings belong
+ * Running and walking belong to Train (they are training); My Progress, the AI Coach's screen, Friends and settings belong
  * to You. The calendar and the plan screen belong to Home (they are about the member's week). Search belongs to no
  * tab: it is opened from every header, so lighting up Home there was wrong.
  */
@@ -20,7 +20,7 @@ export const MAIN_TABS: NavItem[] = [
   { href: "/train", label: "Train", icon: BicepsFlexed, alsoMatches: ["/run"] },
   { href: "/nutrition", label: "Nutrition", icon: Utensils },
   { href: "/faith", label: "Faith", icon: Cross },
-  { href: "/profile", label: "You", icon: UserRound, alsoMatches: ["/progress", "/coach"] },
+  { href: "/profile", label: "You", icon: UserRound, alsoMatches: ["/progress", "/coach", "/friends"] },
 ];
 
 /** Secondary destinations shown only in the desktop sidebar (phones reach them from the tabs and headers). */

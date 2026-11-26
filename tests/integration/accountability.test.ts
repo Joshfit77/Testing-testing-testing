@@ -173,6 +173,24 @@ describe.skipIf(!available)("accountability partners", () => {
     expect((await anonClient().rpc("accountability_summary", { p_partnership_id: ab })).data ?? null).toBeNull();
   });
 
+  it("a block holds for invite codes: neither member can become the other's partner with a code", async () => {
+    // Blocking always works, whatever the Friends flag says. The stranger blocks A.
+    expect((await stranger.client.rpc("block_user", { p_user_id: a.id })).error).toBeNull();
+    try {
+      const fromA = await newCode(a);
+      const fromStranger = await newCode(stranger);
+      // Refused the same way as a code that doesn't exist, in both directions; the codes stay unused.
+      expect((await stranger.client.rpc("accept_accountability_invite", { p_code: fromA })).error?.message).toBe("invite_not_found");
+      expect((await a.client.rpc("accept_accountability_invite", { p_code: fromStranger })).error?.message).toBe("invite_not_found");
+      const [lo, hi] = [a.id, stranger.id].sort();
+      expect((await svc.from("accountability_partnerships").select("id", { count: "exact", head: true }).eq("user_a", lo).eq("user_b", hi)).count).toBe(0);
+      expect((await svc.from("accountability_invites").select("used_at").in("code", [fromA, fromStranger])).data).toEqual([{ used_at: null }, { used_at: null }]);
+      await svc.from("accountability_invites").delete().in("code", [fromA, fromStranger]);
+    } finally {
+      await stranger.client.rpc("unblock_user", { p_user_id: a.id });
+    }
+  });
+
   it("a member can't edit the partner's share switches, create rows directly, or partner with themself", async () => {
     // A tries to switch B's sharing on: no row changes.
     await svc.from("accountability_shares").update({ share_program_progress: false }).eq("partnership_id", ab).eq("user_id", b.id);

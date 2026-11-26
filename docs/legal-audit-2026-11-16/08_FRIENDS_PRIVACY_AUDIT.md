@@ -523,3 +523,34 @@ without also needing the tests updated.
 - Who holds the admin role, the service-role key and Supabase dashboard access in production.
 - Backup and log retention at the hosting providers.
 - F-13 is reasoned from the code and was not demonstrated.
+
+## Status after remediation (2026-11-16)
+
+Friends and accountability partners remain switched off. Changes are in migrations 077 and 078 on
+`claude/friends-challenges`; tests: `tests/integration/friends.test.ts`, `accountability.test.ts`,
+`tests/unit/friends.test.ts`, `friends-privacy-switches.test.tsx`, `e2e/friends.spec.ts`.
+
+| Finding | Status | Where |
+|---|---|---|
+| F-01 Legal documents don't cover sharing between members | OPEN: counsel. A draft section exists in the Privacy Policy and Terms drafts on `claude/legal-remediation` | — |
+| F-02 Search rate-limited in the app only | FIXED: the database function limits itself (60 a minute) | M077; test "the database itself limits searches…" |
+| F-03 A blocked member can infer the block | UNCHANGED BY DESIGN: inherent. Wording corrected so nothing claims concealment ("They aren't told") | M078 comment; `docs/friends/FRIENDS_CHALLENGES.md` |
+| F-04 A sender can infer a decline | UNCHANGED BY DESIGN: as F-03 | same |
+| F-05 Reporter could read the administrators' note | FIXED: column removed | M077; friends test |
+| F-06 Reports: free text, retention, moderation procedure | OPEN: owner and counsel. Draft moderation policy prepared on `claude/legal-remediation` (`docs/legal/MODERATION_AND_USER_CONTENT_POLICY_DRAFT.md`) | — |
+| F-07 Sharing on by default | FIXED (conservative): `show_workouts` now defaults to off; a new friend sees only username and display name. Whether sharing may ever default on is OPEN for owner and counsel | M078; test "a brand-new friend with defaults sees only…" |
+| F-08 Invite links befriend at once; invite code guessing | FIXED in part: guessing limited in the database (20 per 10 minutes). Showing the invitee who invited them is OPEN (product decision) | M077 |
+| F-09 Five switches shown that do nothing | FIXED: hidden until a feature reads them; the screen says weight, measurements, nutrition and Faith activity are never shared with friends | `src/lib/domain/friends.ts` (`active: false`); `friends-privacy-switches.test.tsx` |
+| F-10 Can't leave Friends without deleting the account | OPEN: owner decision | — |
+| F-11 Export leaves out some Friends rows | OPEN: low; counsel to say whether rows written by others about the member must be exported | — |
+| F-12 Account id reachable; members who turned search off could still be sent requests by id | FIXED in part: such a member now receives requests only from people they have themselves asked. The id itself is still returned by search | M078 |
+| F-13 Time zone inference | OPEN: low, suspected | — |
+| F-14 `search_path` | FIXED: all 24 functions now `public, pg_temp` | M078 |
+| F-15 Unneeded table grants to the signed-out role | FIXED: revoked | M078 |
+| F-16 Dead branch in `respond_friend_request` | FIXED | M078 |
+| F-17 Test fails on Mondays | FIXED | `tests/integration/friends.test.ts` |
+| F-18 Withdraw and re-send repeatedly | OPEN: low; the 20-a-day limit bounds it | — |
+| F-19 Any admin can switch the feature on | OPEN: operational | — |
+| F-20 No username screening; minors | OPEN: owner and counsel; required before Friends is switched on | — |
+| F-21 Accountability partners | FIXED in part: a blocked member can no longer become the blocker's partner through an old code. Display name, retention and limits OPEN | M078; `accountability.test.ts` |
+| F-22 What administrators can read | OPEN: documented for counsel | — |

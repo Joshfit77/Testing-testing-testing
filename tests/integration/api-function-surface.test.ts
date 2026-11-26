@@ -41,12 +41,15 @@ const ANON_CALLABLE = [
 const MEMBER_CALLABLE = [
   ...ANON_CALLABLE,
   "accept_accountability_invite",
+  "accept_friend_invite",
   "accountability_can_invite",
   "accountability_enabled",
   "accountability_summary",
   "admin_activation_metrics",
   "admin_ai_cost_report",
   "admin_usage_metrics",
+  "admin_user_reports",
+  "block_user",
   "can_add_body_scan",
   // Migration 088: used by the body-scans storage rule (which runs as the member); no arguments, answers only whether
   // auth.uid() may upload another Body Scan photo.
@@ -55,6 +58,8 @@ const MEMBER_CALLABLE = [
   // whether auth.uid() may upload another photo.
   "can_add_progress_photo",
   "can_log_sleep",
+  "cancel_friend_request",
+  "claim_username",
   "end_accountability_partnership",
   "faith_journey_check_in",
   "faith_journey_end",
@@ -63,10 +68,20 @@ const MEMBER_CALLABLE = [
   "faith_journey_settle_mine",
   "faith_journey_undo",
   "faith_journey_zone_at",
+  "friend_profile",
+  "friends_can_invite",
+  "friends_enabled",
+  "friends_overview",
   "has_ai_coach",
   "is_member_starter_program",
   "member_references_exercise",
+  "remove_friend",
+  "report_user",
+  "respond_friend_request",
+  "search_users",
   "send_accountability_nudge",
+  "send_friend_request",
+  "unblock_user",
 ].sort();
 
 describe.skipIf(!available)("database functions reachable through the public API", () => {
@@ -124,6 +139,11 @@ describe.skipIf(!available)("database functions reachable through the public API
       ["faith_journey_set_timezone_at", { p_user: other.id, p_tz: "UTC", p_now: now }],
       ["faith_journey_settle_at", { p_journey_id: id, p_now: now, p_force_through: null }],
       ["faith_journeys_settle_due", { p_now: now }],
+      // Friends (migration 091): internal helpers. Callable directly, they would make any two members friends, reveal
+      // who blocked whom, or return a stranger's training numbers.
+      ["friends_make_friends", { p_one: member.id, p_two: other.id }],
+      ["friends_blocked", { p_a: member.id, p_b: other.id }],
+      ["friends_workout_stats", { p_user_id: other.id }],
     ];
     const problems: string[] = [];
     for (const [name, args] of calls) {
@@ -137,6 +157,7 @@ describe.skipIf(!available)("database functions reachable through the public API
     // Nothing the calls asked for exists.
     const { data: ent } = await svc.from("user_entitlements").select("plan, source").eq("user_id", member.id).single();
     expect(ent).toEqual({ plan: "free", source: "default" });
+    expect((await svc.from("friendships").select("user_a", { count: "exact", head: true }).or(`user_a.eq.${member.id},user_b.eq.${member.id}`)).count).toBe(0);
     expect((await svc.from("subscriptions").select("id", { count: "exact", head: true }).eq("user_id", member.id)).count).toBe(0);
     expect((await svc.from("store_subscriptions").select("id", { count: "exact", head: true }).eq("user_id", member.id)).count).toBe(0);
     expect((await svc.from("stripe_events").select("id", { count: "exact", head: true }).eq("id", `evt_${id}`)).count).toBe(0);

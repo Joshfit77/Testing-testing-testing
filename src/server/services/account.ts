@@ -69,6 +69,14 @@ export const USER_TABLES: UserTable[] = [
   { table: "accountability_partnerships", column: "user_a", orColumn: "user_b" },
   { table: "accountability_shares", column: "user_id" },
   { table: "accountability_nudges", column: "sender_id", orColumn: "recipient_id" },
+  // Friends (migration 091): my username and privacy switches, requests I sent or received, my friendships, members
+  // I blocked, reports I sent and my invite links. Never who blocked or reported me.
+  { table: "social_profiles", column: "user_id" },
+  { table: "friend_requests", column: "sender_id", orColumn: "recipient_id" },
+  { table: "friendships", column: "user_a", orColumn: "user_b" },
+  { table: "user_blocks", column: "blocker_id" },
+  { table: "user_reports", column: "reporter_id" },
+  { table: "friend_invites", column: "inviter_id" },
   { table: "exercise_targets", column: "user_id" },
   { table: "training_adjustments", column: "user_id" },
   { table: "training_recommendation_decisions", column: "user_id" },

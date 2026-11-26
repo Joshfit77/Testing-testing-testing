@@ -73,7 +73,8 @@ describe.skipIf(!available)("database security invariants (live catalog)", () =>
   it("admin rights reach only the shared library and admin tables, never members' own rows", () => {
     // Every policy that grants anything to admins, by table. Member data must never appear here; where a table mixes
     // library rows and members' own rows (foods, programs), the admin part is limited to rows with no owner.
-    const ADMIN_SCOPE = ["admin_audit_logs", "content_items", "exercise_alternatives", "exercise_media", "exercises", "feature_flags", "foods", "objects", "program_categories", "training_programs"];
+    // user_reports: administrators review the reports members send about each other (Friends, migration 091).
+    const ADMIN_SCOPE = ["admin_audit_logs", "content_items", "exercise_alternatives", "exercise_media", "exercises", "feature_flags", "foods", "objects", "program_categories", "training_programs", "user_reports"];
     const rows = sql(`
       select tablename, coalesce(qual, '') || ' ' || coalesce(with_check, '') from pg_policies
       where schemaname in ('public', 'storage') and (qual ilike '%is_admin%' or with_check ilike '%is_admin%')`);
