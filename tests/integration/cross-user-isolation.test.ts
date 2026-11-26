@@ -239,7 +239,10 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
     parents.body_scans = scanId;
     await seed("body_scan_photos", { scan_id: scanId, user_id: u, pose: "front", storage_path: scanPath });
     const avatarPath = `${u}/avatar.jpg`;
-    const { error: avErr } = await alice.client.storage.from("avatars").upload(avatarPath, jpeg(), { contentType: "image/jpeg" });
+    // The app never uploads avatars, and members no longer can (migration 090); a file stored there earlier (placed
+    // here with the server key) must still be private to its owner.
+    expect((await alice.client.storage.from("avatars").upload(`${u}/new.jpg`, jpeg(), { contentType: "image/jpeg" })).error).not.toBeNull();
+    const { error: avErr } = await svc.storage.from("avatars").upload(avatarPath, jpeg(), { contentType: "image/jpeg" });
     if (avErr) throw new Error(`avatars upload: ${avErr.message}`);
     objects.avatars = avatarPath;
   });

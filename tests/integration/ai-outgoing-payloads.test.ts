@@ -333,6 +333,9 @@ describe.skipIf(!available)("what reaches the AI provider: captured request bodi
 
   it("coach chat with every read tool (AI + wellness consent, no health permission): no imported data, device name, unshared journal, notes, photos or B's data", async () => {
     await setProfile(A, { ai_data_consent_at: new Date().toISOString(), journal_ai_consent_at: new Date().toISOString() });
+    // Turning the journal permission on clears every mark (migration 089, as the app's own action does); the member
+    // then marks the entry they want shared.
+    await svc.from("faith_journal_entries").update({ share_with_coach: true }).eq("user_id", A.id).like("body", "ZQX-A-SHARED-JOURNAL%");
     const { result, bodies, text } = await sentDuring(() => ask(A, "How am I doing overall? Check my sleep, recovery and bench."));
     expect(result.status).toBe(200);
     expect(bodies).toHaveLength(2); // the request that asked for the tools, and the one carrying their results

@@ -132,6 +132,9 @@ describe.skipIf(!available)("AI consent gates every provider call", () => {
     expect(noJournalSent).not.toContain(privateMarker);
     // With the journal permission too: only the shared entry is sent.
     await setConsent({ journal_ai_consent_at: new Date().toISOString() });
+    // Turning the permission on clears every mark (migration 089, as the app's own action does); the member then marks
+    // the entry they want shared.
+    await svc.from("faith_journal_entries").update({ share_with_coach: true }).eq("user_id", pro.id).like("body", `%${sharedMarker}%`);
     const before = api.requests.length;
     const result = await coachTurn({ supabase: pro.client, userId: pro.id, plan: "pro", conversationId: null, message: "How should I train this week?", mode: "chat" });
     expect(result.assistantMessage.content).toContain("three sets of five");

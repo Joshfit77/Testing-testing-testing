@@ -296,7 +296,10 @@ describe.skipIf(!available)("account deletion closure: nothing that names the me
       "body-scans": `${u}/${crypto.randomUUID()}/front-${crypto.randomUUID()}.jpg`,
     };
     for (const [bucket, path] of Object.entries(uploads)) {
-      const { error } = await member.client.storage.from(bucket).upload(path, jpeg(), { contentType: "image/jpeg" });
+      // Avatars: members can't upload any more (migration 090), but a file stored there earlier must still go with the
+      // account, so it is placed with the server key.
+      const client = bucket === "avatars" ? serviceClient() : member.client;
+      const { error } = await client.storage.from(bucket).upload(path, jpeg(), { contentType: "image/jpeg" });
       if (error) throw new Error(`${bucket} upload: ${error.message}`);
       objects[bucket] = path;
     }
@@ -380,7 +383,7 @@ describe.skipIf(!available)("account deletion closure: nothing that names the me
     expect((await svc.storage.from("avatars").list(member.id)).data ?? []).toEqual([]);
     expect((await svc.storage.from("progress-photos").list(member.id)).data?.length).toBe(1);
     // Put the avatar back so the real deletion below starts with a file in every bucket.
-    const { error } = await member.client.storage.from("avatars").upload(objects.avatars!, jpeg(), { contentType: "image/jpeg" });
+    const { error } = await svc.storage.from("avatars").upload(objects.avatars!, jpeg(), { contentType: "image/jpeg" });
     if (error) throw error;
   });
 

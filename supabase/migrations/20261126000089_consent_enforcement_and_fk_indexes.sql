@@ -14,10 +14,12 @@
 --    permissions and coaching memory off with the AI consent, and only setJournalAiShareAction cleared old journal
 --    marks when the journal permission changed. A member can update these columns directly with their own session
 --    (column grants, migrations 079 and 080), so the rule now lives in a trigger:
---      * AI consent withdrawn  -> health sharing, journal sharing and coaching memory off;
---      * faith features off    -> journal sharing off;
---      * journal permission changed (either way) -> every entry's "share with AI Coach" mark cleared, so nothing marked
+--      * AI consent withdrawn (on -> off)   -> health sharing, journal sharing and coaching memory off;
+--      * faith features turned off (on -> off) -> journal sharing off;
+--      * journal permission turned on or off -> every entry's "share with AI Coach" mark cleared, so nothing marked
 --        before the permission existed, or while it was off, is ever sent.
+--    Only these transitions are acted on, exactly as the app's own actions do: a member who turns coaching memory on
+--    before the AI consent (which the app allows; memory is unused until both are on) keeps that choice.
 create or replace function public.enforce_ai_subconsents()
 returns trigger
 language plpgsql
@@ -25,15 +27,15 @@ security definer
 set search_path = ''
 as $$
 begin
-  if new.ai_data_consent_at is null then
+  if old.ai_data_consent_at is not null and new.ai_data_consent_at is null then
     new.health_ai_share_consent_at := null;
     new.journal_ai_consent_at := null;
     new.coach_memory_enabled := false;
   end if;
-  if not coalesce(new.faith_enabled, false) then
+  if coalesce(old.faith_enabled, false) and not coalesce(new.faith_enabled, false) then
     new.journal_ai_consent_at := null;
   end if;
-  if new.journal_ai_consent_at is distinct from old.journal_ai_consent_at then
+  if (old.journal_ai_consent_at is null) <> (new.journal_ai_consent_at is null) then
     update public.faith_journal_entries set share_with_coach = false where user_id = new.id and share_with_coach;
   end if;
   return new;
