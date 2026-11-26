@@ -302,7 +302,7 @@ export async function recomputeEntitlement(userId: string): Promise<Plan> {
       admin.from("subscriptions").select("plan, status, current_period_end, access_revoked_at, stripe_price_id").eq("user_id", userId),
       admin
         .from("store_subscriptions")
-        .select("store, plan, purchased_at, expires_at, grace_period_expires_at, unsubscribe_detected_at, billing_issue_detected_at, refunded_at, is_sandbox")
+        .select("store, plan, purchased_at, expires_at, grace_period_expires_at, unsubscribe_detected_at, billing_issue_detected_at, refunded_at, is_sandbox, store_transaction_id")
         .eq("user_id", userId),
     ]);
     if (stripeRes.error) throw stripeRes.error;
@@ -329,12 +329,16 @@ export async function recomputeEntitlement(userId: string): Promise<Plan> {
       const period_started_at = s.status === "past_due" ? periodStartFromEnd(s.current_period_end, (await resolvePriceInterval(stripe_price_id)) ?? "month") : null;
       candidates.push({ ...s, period_started_at, source: "stripe" });
     }
-    const storeRows = (storeRes.data ?? []) as (Parameters<typeof storeRowAsSubscription>[0] & { store: string; is_sandbox: boolean })[];
+    const storeRows = (storeRes.data ?? []) as (Parameters<typeof storeRowAsSubscription>[0] & { store: string; is_sandbox: boolean; store_transaction_id: string | null })[];
+    // One store purchase grants one account (O-10): if another account confirmed the same transaction with RevenueCat
+    // more recently (a restore or transfer to it), that account has it and this one doesn't.
+    const heldElsewhere = await transactionsHeldMoreRecentlyElsewhere(userId, storeRows);
     // A stored sandbox purchase grants only while the member is still allowed sandbox purchases: removing a tester
     // from the allow-list (or the entry expiring) ends it at the next recompute, without waiting for RevenueCat.
     const sandboxOk = storeRows.some((r) => r.is_sandbox) ? await sandboxPurchasesAllowed(userId) : false;
     for (const row of storeRows) {
       if (row.is_sandbox && !sandboxOk) continue;
+      if (row.store_transaction_id && heldElsewhere.has(`${row.store}:${row.store_transaction_id}`)) continue;
       const sub = storeRowAsSubscription(row);
       if (sub) candidates.push({ ...sub, source: row.store === "play_store" ? "play_store" : "app_store" });
     }
@@ -356,6 +360,35 @@ export async function recomputeEntitlement(userId: string): Promise<Plan> {
     // "stale": the member's subscription rows changed while we were reading; read them again.
   }
   throw new Error("Entitlement recompute kept racing with concurrent changes");
+}
+
+/**
+ * The store purchases (as "store:transaction") among `rows` that another account holds with a newer RevenueCat read
+ * (store_sync_state.fetched_at; equal reads go to the lower user id, so exactly one account wins). RevenueCat
+ * normally moves a purchase on restore (TRANSFER), but with "share" transfer behaviour, or while the old account's
+ * copy hasn't been re-read yet, the same transaction can sit on two accounts; it must grant only one.
+ */
+export async function transactionsHeldMoreRecentlyElsewhere(userId: string, rows: { store: string; store_transaction_id: string | null }[]): Promise<Set<string>> {
+  const txIds = [...new Set(rows.map((r) => r.store_transaction_id).filter((t): t is string => Boolean(t)))];
+  const held = new Set<string>();
+  if (!txIds.length) return held;
+  const admin = getServiceSupabase();
+  const { data: others, error } = await admin.from("store_subscriptions").select("user_id, store, store_transaction_id").in("store_transaction_id", txIds).neq("user_id", userId);
+  if (error) throw error;
+  if (!others?.length) return held;
+  const ids = [...new Set([userId, ...others.map((o) => o.user_id as string)])];
+  const { data: syncs, error: syncErr } = await admin.from("store_sync_state").select("user_id, fetched_at").in("user_id", ids);
+  if (syncErr) throw syncErr;
+  const readAt = new Map((syncs ?? []).map((r) => [r.user_id as string, Date.parse(r.fetched_at as string)]));
+  const mine = readAt.get(userId) ?? 0;
+  const mineKeys = new Set(rows.filter((r) => r.store_transaction_id).map((r) => `${r.store}:${r.store_transaction_id}`));
+  for (const o of others) {
+    const key = `${o.store}:${o.store_transaction_id}`;
+    if (!mineKeys.has(key)) continue;
+    const theirs = readAt.get(o.user_id as string) ?? 0;
+    if (theirs > mine || (theirs === mine && (o.user_id as string) < userId)) held.add(key);
+  }
+  return held;
 }
 
 /**

@@ -93,7 +93,15 @@ export async function syncStoreSubscriber(userId: string): Promise<Plan | null> 
   const { data: result, error } = await admin.rpc("apply_store_snapshot", { p_user_id: userId, p_fetched_at: fetchedAt.toISOString(), p_rows: rows });
   if (error) throw error;
   if (result === "stale") logInfo("revenuecat.sync_stale", {});
-  return recomputeEntitlement(userId);
+  const plan = await recomputeEntitlement(userId);
+  // Another account holding one of these purchases loses it now that this account confirmed it more recently (O-10).
+  const txIds = rows.map((r) => r.store_transaction_id).filter((t): t is string => Boolean(t));
+  if (txIds.length) {
+    const { data: others, error: othersErr } = await admin.from("store_subscriptions").select("user_id").in("store_transaction_id", txIds).neq("user_id", userId);
+    if (othersErr) throw othersErr;
+    for (const other of new Set((others ?? []).map((o) => o.user_id as string))) await recomputeEntitlement(other);
+  }
+  return plan;
 }
 
 /**

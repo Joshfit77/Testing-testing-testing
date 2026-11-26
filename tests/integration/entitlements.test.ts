@@ -11,6 +11,8 @@ const stripeCharges = new Map<string, unknown>();
 const stripeInvoices = new Map<string, unknown>();
 const stripeDisputes = new Map<string, unknown>();
 const stripeInvoiceByIntent = new Map<string, string>();
+/** Stripe's event log (GET /v1/events), newest first, for reconciliation to re-read. */
+const stripeEventLog: Record<string, unknown>[] = [];
 
 /** A paid invoice for a subscription, its PaymentIntent and charge, as Stripe would hold them. */
 function fakePayment(subscriptionId: string, over: { refunded?: boolean; amount_refunded?: number; created?: number } = {}) {
@@ -62,6 +64,12 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       const json = (status: number, body: unknown) => void res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
       const missing = () => json(404, { error: { type: "invalid_request_error", code: "resource_missing", message: "No such object" } });
       // Invoice payments of a PaymentIntent (how Stripe links a charge to its invoice since API 2025-03-31).
+      if (url.pathname === "/v1/events") {
+        const gte = Number(url.searchParams.get("created[gte]") ?? 0);
+        const types = url.searchParams.getAll("types[]");
+        const data = stripeEventLog.filter((e) => (e.created as number) >= gte && (!types.length || types.includes(e.type as string)));
+        return json(200, { object: "list", has_more: false, url: "/v1/events", data });
+      }
       if (url.pathname === "/v1/invoice_payments") {
         const pi = url.searchParams.get("payment[payment_intent]");
         const invoice = pi ? stripeInvoiceByIntent.get(pi) : undefined;
@@ -323,6 +331,63 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       stripeSubs.set(sub.id, { ...sub, latest_invoice: second.invoice.id } as Stripe.Subscription);
       await send("invoice.paid", second.invoice);
       expect(await ent()).toBe("pro");
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
+
+  it("reconciliation repairs a refund whose webhook never arrived, from Stripe's event log, exactly once (O-09)", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    const u = await createTestUser("refund-lost");
+    const ent = async () => (await serviceClient().from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si_1", price: { id: "price_test_pro" }, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400 }] } });
+      const pay = fakePayment(sub.id);
+      stripeSubs.set(sub.id, { ...sub, latest_invoice: pay.invoice.id } as Stripe.Subscription);
+      await syncSubscription(stripeSubs.get(sub.id)!);
+      expect(await ent()).toBe("pro");
+      // Stripe refunded the payment in full; the subscription is still "active" there, and the webhook was lost.
+      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 1799, refunded: true });
+      const lost = { id: `evt_${crypto.randomUUID()}`, object: "event", type: "charge.refunded", created: Math.floor(Date.now() / 1000), data: { object: stripeCharges.get(pay.charge.id) } };
+      stripeEventLog.unshift(lost);
+      expect(await ent()).toBe("pro");
+      const first = await reconcileBilling();
+      expect(first.stripeEvents.applied).toBeGreaterThanOrEqual(1);
+      expect(await ent()).toBe("free");
+      const stored = (await serviceClient().from("stripe_events").select("status").eq("id", lost.id).single()).data;
+      expect(stored).toEqual({ status: "processed" });
+      // Running again re-reads the same event, which is already processed: nothing is applied twice.
+      const second = await reconcileBilling();
+      expect(second.stripeEvents.failed).toBe(0);
+      const again = (await serviceClient().from("stripe_events").select("attempts").eq("id", lost.id).single()).data as { attempts: number };
+      expect(again.attempts).toBe(1);
+    } finally {
+      stripeEventLog.length = 0;
+      await deleteTestUser(u);
+    }
+  });
+
+  it("when an admin grant ends, the member's own paid subscription takes over at the next reconciliation (O-08)", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    const u = await createTestUser("grant-ends");
+    const svc = serviceClient();
+    const ent = async () => (await svc.from("user_entitlements").select("plan, source").eq("user_id", u.id).single()).data;
+    try {
+      // An admin grant of Pro, live; the member also has an App Store Plus subscription, renewing in a month (so no
+      // other reconciliation step looks at it): the grant (higher) stays.
+      await svc.from("user_entitlements").upsert({ user_id: u.id, plan: "pro", source: "admin", valid_until: new Date(Date.now() + 3600_000).toISOString() }, { onConflict: "user_id" });
+      const { recomputeEntitlement } = await import("@/server/services/billing");
+      await svc.from("store_subscriptions").insert({
+        user_id: u.id, store: "app_store", product_id: "ngf_plus_monthly", plan: "plus", period_type: "normal", is_sandbox: false,
+        purchased_at: new Date(Date.now() - 86400_000).toISOString(), expires_at: new Date(Date.now() + 30 * 86400_000).toISOString(),
+      });
+      await recomputeEntitlement(u.id);
+      expect(await ent()).toMatchObject({ plan: "pro", source: "admin" });
+      // The grant ends. Without a billing event, nothing recomputed the entitlement, so the member read as Free.
+      await svc.from("user_entitlements").update({ valid_until: new Date(Date.now() - 60_000).toISOString() }).eq("user_id", u.id);
+      const report = await reconcileBilling();
+      expect(report.endedGrants.checked).toBeGreaterThanOrEqual(1);
+      expect(await ent()).toMatchObject({ plan: "plus", source: "app_store" });
     } finally {
       await deleteTestUser(u);
     }

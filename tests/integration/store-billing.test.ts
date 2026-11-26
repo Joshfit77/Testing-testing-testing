@@ -217,6 +217,48 @@ describe.skipIf(!available)("App Store / Google Play subscriptions via RevenueCa
     expect(await ent()).toMatchObject({ plan: "free" });
   });
 
+  it("one store purchase on two accounts grants only the account that confirmed it most recently (O-10)", async () => {
+    // RevenueCat's "share" transfer behaviour (or a transfer not yet re-read for the old account) can show the same
+    // App Store transaction on two accounts. Only one may have Pro from it.
+    const tx = `tx-${crypto.randomUUID().slice(0, 8)}`;
+    setCustomer(user.id, { ngf_pro_monthly: sub({ store_transaction_id: tx }) }, { pro: "ngf_pro_monthly" });
+    await syncStoreSubscriber(user.id);
+    expect(await ent()).toMatchObject({ plan: "pro" });
+    setCustomer(other.id, { ngf_pro_monthly: sub({ store_transaction_id: tx }) }, { pro: "ngf_pro_monthly" });
+    await syncStoreSubscriber(other.id);
+    expect(await ent(other)).toMatchObject({ plan: "pro", source: "app_store" });
+    expect(await ent()).toMatchObject({ plan: "free" });
+    // The first account restores again (re-confirmed later): it has the purchase, the other doesn't.
+    await syncStoreSubscriber(user.id);
+    expect(await ent()).toMatchObject({ plan: "pro" });
+    expect(await ent(other)).toMatchObject({ plan: "free" });
+    // Different purchases on two accounts are unaffected.
+    setCustomer(other.id, { ngf_pro_monthly: sub({ store_transaction_id: `${tx}-own` }) }, { pro: "ngf_pro_monthly" });
+    await syncStoreSubscriber(other.id);
+    expect(await ent(other)).toMatchObject({ plan: "pro" });
+    expect(await ent()).toMatchObject({ plan: "pro" });
+    setCustomer(user.id, {});
+    setCustomer(other.id, {});
+    await syncStoreSubscriber(user.id);
+    await syncStoreSubscriber(other.id);
+  });
+
+  it("reconciliation re-reads members with a current store subscription, so a refund whose webhook was lost still ends access (O-09)", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    setCustomer(user.id, { ngf_pro_monthly: sub({ expires_date: iso(25 * day) }) }, { pro: "ngf_pro_monthly" });
+    await syncStoreSubscriber(user.id);
+    expect(await ent()).toMatchObject({ plan: "pro" });
+    // Apple refunds the purchase; RevenueCat knows, but its webhook never reached the server.
+    setCustomer(user.id, { ngf_pro_monthly: sub({ expires_date: iso(25 * day), refunded_at: iso(-60_000) }) }, { pro: "ngf_pro_monthly" });
+    // The member was read longest ago, as a quiet subscription would be after weeks without events.
+    await serviceClient().from("store_sync_state").update({ fetched_at: new Date(Date.now() - 20 * day).toISOString() }).eq("user_id", user.id);
+    const report = await reconcileBilling();
+    expect(report.store.checked).toBeGreaterThanOrEqual(1);
+    expect(await ent()).toMatchObject({ plan: "free" });
+    setCustomer(user.id, {});
+    await syncStoreSubscriber(user.id);
+  });
+
   it("a member paying on the web and in the app gets the higher plan", async () => {
     setCustomer(user.id, { ngf_plus_monthly: sub() }, { plus: "ngf_plus_monthly" });
     await syncStoreSubscriber(user.id);
