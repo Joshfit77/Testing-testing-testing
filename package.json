@@ -34,7 +34,8 @@
     "bible:red-letter-records": "tsx scripts/red-letter-records.ts",
     "videos:prompts": "tsx scripts/generate-video-prompts.ts",
     "videos:import": "tsx scripts/import-exercise-videos.ts",
-    "postinstall": "node scripts/react-hydration-replay-fix.mjs"
+    "postinstall": "node scripts/react-hydration-replay-fix.mjs",
+    "native:app-links": "node scripts/native/app-links.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

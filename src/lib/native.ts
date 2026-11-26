@@ -111,6 +111,13 @@ export async function initNativeShell(): Promise<() => void> {
   }
   try {
     const { App } = await import("@capacitor/app");
+    // A universal link / App Link (sign-up confirmation, password reset: O-05) opens that page inside the app.
+    const { appLinkTarget } = await import("@/lib/app-links");
+    const opened = await App.addListener("appUrlOpen", ({ url }) => {
+      const target = appLinkTarget(url, window.location.origin);
+      if (target) window.location.assign(target);
+    });
+    cleanups.push(() => void opened.remove());
     const { closeTopOverlay } = await import("@/lib/native-back");
     const handle = await App.addListener("backButton", ({ canGoBack }) => {
       // An open sheet or dialog closes first, as Escape closes it (O-07); otherwise back, or leave the app.
