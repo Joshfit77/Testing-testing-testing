@@ -70,13 +70,61 @@ then run in the full suite. "Device" means the code is done but its behaviour on
 | O-19 | Low: integration suites skipped silently | `REQUIRE_TEST_STACK=1` (CI, `npm run verify`) fails instead | `13d7db30` | Verified both ways | — |
 | O-20 | Low: sleep test across midnight UTC | Tests that would start within 4 minutes of midnight wait until after it | `13d7db30` | — | — |
 
+## Third round (2026-11-26): native persistence, billing at volume, trigger-free quotas, review fixes (T-01..T-26)
+
+Each item was verified in the code first. "Fails on old code" means the new test was run against the previous version
+of the file and failed.
+
+| # | Severity | Defect or gap | Fix | Commit | Proof |
+|---|---|---|---|---|---|
+| T-01 | High | Locked-screen GPS depended on the web view: fixes reaching JavaScript were journalled (O-01), but while iOS suspended the web view nothing reached it, and an ended app lost them | Native run journal: Swift (`RunJournalRecorder`, its own CLLocationManager with background updates, every fix fsynced to protected app storage) and Java (LocationManager in the foreground-service process, fsynced to no-backup storage). Recovery merges native fixes through the live rules (nothing counted twice) | `77ce4060`, `ef3c9001` | XCTest (5) in `ios/RunJournalCore` on GitHub macOS; JUnit (5) locally and in the APK workflow; `native-run-journal.test.ts`. **Device:** tests 15, 15a, Android 6a |
+| T-02 | High (privacy) | Recorded routes stayed on a shared phone after sign-out and account deletion; a discarded run's native journal stayed | `clearAllDrafts` removes the web journal and the native journal (that member's on sign-out, all on deletion); saving, discarding or starting a recording clears it | `77ce4060` | `native-run-journal.test.ts`. Device test 26a |
+| T-03 | Medium | A Capacitor bridge reset (web content crash, full-page navigation) stopped native recording mid-run; notification taps and "I'm up" did a full reload | Process-level recorder singleton; in-app navigation for notification taps, the alarm and app links; app start stops a journal with nothing to continue | `ef3c9001` | `native-run-journal.test.ts` (navigation, reconcile). Device tests 15a, 15b |
+| T-04 | Medium | Android 14+: the GPS plugin started its foreground service before the location prompt; a WebView renderer crash ended the app and its run service; the plugin's service was exported | Permission first (`RunJournal.ensurePermission`), refusal starts nothing; renderer crash recreates the page; service overridden to `exported=false` | `ef3c9001` | `native-run-journal.test.ts` (Android permission). Android tests 6, 6b |
+| T-05 | Medium | The alarm follow-up used its own 7 notification ids: with every reminder and a 7-day alarm on, reminders 55 + alarm ids 15 + rest timer = 71, over iOS's 64 pending notifications, so some silently never fired; a later sync re-added a ring after "I'm up" | Follow-up shares the snooze's slot (64 exactly, tested); "I'm up" is remembered for the day; Snooze replaces the follow-up in one step; reminder rebuilds serialised | `ef3c9001` | `native-alarm-followup.test.ts`, `notification-limit.test.ts`, `sleep-alarm.test.ts`. Device test 25a |
+| T-06 | Medium | A replayed `charge.dispute.created` revoked a dispute already won | Re-read the dispute; skip won / warning_closed | `430e3758` | `entitlements.test.ts`, fails on old code |
+| T-07 | Medium | An outage longer than 3 days lost refunds and cancellations for good; a large backlog was replayed newest first and could time out | Replay from a stored cursor (`billing_reconcile_state`, migration 096), 3–30 days back, in 6-hour windows oldest first; the cursor only passes fully handled windows; subscriptions Stripe created that never reached the database are found | `430e3758` | `entitlements.test.ts` (8-day-old refund after a 10-day gap; never-stored subscription), fail on old code |
+| T-08 | Medium | The store rotation could be filled by lapsed members, starving current subscribers; one slow section stopped the whole check | Rotation chosen in SQL (`store_reconcile_candidates`), least recently read current subscribers first; per-section time budget and error isolation; route `maxDuration` 300 s | `430e3758` | `store-billing.test.ts` (rotation starvation guard) |
+| T-09 | Low–Medium | Concurrent restores of one store purchase on two accounts could leave both granted for a moment; sandbox purchases could decide which real account held a transaction | `apply_store_snapshot` bumps the other holders' billing versions; released holders recomputed; sandbox eligibility applied first | `430e3758` | `store-billing.test.ts` (6 concurrent restores), existing sandbox tests |
+| T-10 | Low | Admin grants that ended more than 7 days before a missed run were never recomputed; members paying twice (Stripe + store) were invisible | Ended grants recomputed however old; duplicates counted and logged | `430e3758` | `entitlements.test.ts` (grant ended 20 days ago), fails on old code |
+| T-11 | Medium (cost) | On a hosted project without storage triggers, simultaneous uploads passed the photo limits (measured: 44 of 60 against a daily limit of 30; 10 of 10 past the byte limit) | Upload reservations under the member's lock (migration 097); both photo insert policies require one | `5200bc09` | `storage-upload-reservations.test.ts` (triggers dropped for the file), 9 of 12 fail on the old policies |
+| T-12 | Medium (cost) | Progress photos could be replaced: upload small files, then overwrite them with large ones past the 1 GiB limit | UPDATE policy removed (the app never replaces a file) | `5200bc09` | Same file (overwrite and `update()` refused, size unchanged) |
+| T-13 | Low | Catalog test didn't know `billing_reconcile_state` (096) | Registered with its reason | `5200bc09` | `account-deletion-closure.test.ts` |
+| T-14 | Low (data loss) | After a timeout or dropped connection the server could delete an uploaded photo whose row was in fact written; the screen also deleted it | File removed only after a definite refusal; otherwise "couldn't confirm", file kept for a retry | `d0a5f7aa` | `progress-photo-save.test.ts`, 3 fail on old code |
+| T-15 | Low | Finishing a workout waited for two rounds of summary extras (up to 16 s); a failing verse lookup or cache refresh could turn a saved workout into an error | One round (8 s at most); verse and refresh guarded | `d0a5f7aa` | `workout-finish-extras.test.ts`, 2 fail on old code |
+| T-16 | Low (security hygiene) | The load-test script took the service key on the command line, used a fixed password, and left accounts behind on failure | Keys from the environment, random password per run, cleanup in `finally` and on Ctrl-C | `d0a5f7aa` | Smoke run: 3 members created and removed |
+| T-17 | Low (battery) | The web GPS journal rewrote every fix since the last save every 2 s (an hour locked: the whole hour each time); the route preview was recomputed every second | Chunked journal (only the open chunk is rewritten; the old format is still read); preview memoized on the track's lines | `d0a5f7aa` | `run-fix-journal.test.ts` (6 fail on old code), `gps-route-memo.test.ts` |
+
+**Found by the two independent reviews of this round's own changes** (correctness; security and database), each
+reproduced or traced before fixing:
+
+| # | Severity | Defect | Fix | Commit | Proof |
+|---|---|---|---|---|---|
+| T-18 | Medium-high (regression in T-07) | One Stripe event that failed on every attempt stopped the replay of everything after it, for up to 30 days | Every window is handled; the starting point still only passes finished windows; an ownership conflict (needs a person) doesn't hold it back | `89260c5b` | `entitlements.test.ts`, 2 tests fail on the previous loop |
+| T-19 | Medium | A window with over 5,000 events re-listed the newest 5,000 every run and never reached the oldest | Full windows split in half, older half first | `89260c5b` | `entitlements.test.ts` (lowered cap), fails on the previous loop |
+| T-20 | Low (reproduced) | Two accounts restoring one purchase at once could deadlock (one restore failed) | Migration 098 locks the billing versions involved in member-id order | `89260c5b` | 6-concurrent-restores test: 2 of 4 failed on 096's function, 8 of 8 passed |
+| T-21 | Low | Members whose store sync kept failing stayed first in the rotation | `store_sync_state.attempted_at` (098); rotation orders by last success or attempt | `89260c5b` | `store-billing.test.ts` |
+| T-22 | Low | T-14 kept files after errors that carry a database code, which means the row was not written | Only a reply with no code is uncertain | `89260c5b` | `progress-photo-save.test.ts` |
+| T-23 | Low | Load test: a member failing after creation, or Ctrl-C during setup, could be left behind | Recorded on creation; Ctrl-C lets `finally` clean up | `89260c5b` | Normal run and Ctrl-C mid-setup: 10 created, 10 removed |
+| T-24 | Medium | Signed upload URLs (checked once, valid 2 hours) could be saved up across reservation expiries, past the limits without triggers | A reservation counts as pending until its file exists or 2 hours after expiry; files and pending counted in one snapshot | `c71e652f` | `storage-upload-reservations.test.ts`, 2 tests fail on the previous text; a burst test caught the two-snapshot race (31 of 60) before commit |
+| T-25 | Medium | A retry after a lost upload reply got "already exists" forever | The screens treat that answer for their own random name as uploaded | `c71e652f` | Integration test with the real storage answer; unit tests |
+| T-26 | Low | A refusal after a granted reservation showed the photo-limit message (inviting deletions); the deploy-order note was wrong | Retry message instead; note corrected | `c71e652f` | `storage-reservation.test.ts` |
+
+**Platform limits, documented rather than fixed:**
+
+- After a **force-quit** iOS stops all location updates for the app: nothing after that moment can be recorded by
+  any app code (the route up to that moment is kept). Android behaves the same when the app is swiped away and the
+  service is stopped by the system.
+- The community GPS plugin asks for "Always" location on iOS and sets its own activity type; changing that needs a fork
+  of the plugin (optional, post-launch). Our own recorder uses "When in use" with background updates and `.fitness`.
+
 ## What remains (each needs a phone, an account or a hosted service)
 
 | # | Severity | Description | Who | Hours (with Claude) | TF | Launch | Paid |
 |---|---|---|---|---|---|---|---|
 | R-01 | High | Physical iPhone run of IPHONE_DEVICE_TESTING.md, especially GPS (14–16), purchases (29–31), HealthKit (17–18), alarm (25); then O-02 wording | Founder + mobile consultant; Claude fixes findings | 6–10 | No | Yes | Yes |
 | R-02 | High | App Store sandbox purchase, restore, transfer; Stripe test-mode checkout, portal, refund on staging | Payments consultant + founder accounts | 3–5 | No | No | Yes |
-| R-03 | Medium | Staging: `supabase db push` (085 → 095), `npm run db:verify`, cron jobs, staging load test including writes | Backend/DevOps consultant | 3–5 | Yes, if O-16 trips | Yes | No |
+| R-03 | Medium | Staging: `supabase db push` (085 → 098), `npm run db:verify`, cron jobs (billing reconcile now drains backlogs over several runs), staging load test including writes. The storage-trigger question no longer blocks: limits hold without triggers (T-11) | Backend/DevOps consultant | 2.5–4 | No | Yes | No |
 | R-04 | Medium | Release engineering: signing, TestFlight upload, App Store Connect record, Associated Domains, privacy label | iOS consultant + founder | 3–5 | Yes | Yes | No |
 | R-05 | Medium | Independent review of the consolidation PR (security and payments focus) | Security + payments consultants | 4–6 | No | Yes | Yes |
 | R-06 | Low | Android device pass, Play Console, Health Connect declaration | Mobile consultant | 3–5 | n/a | Android only | Android only |

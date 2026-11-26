@@ -128,9 +128,10 @@ Do not upload anything without the owner's explicit approval in this conversatio
 
 ```
 Use the security agent, then the payments agent, to review the diff of release/narrow-gate-production-consolidation
-against main, focusing on: migrations 088-095, src/server/services/{billing,billing-reconcile,store-billing}.ts,
-src/server/api-auth.ts, src/lib/run/fix-journal.ts, src/lib/native/location.ts, src/lib/app-links.ts and the
-.well-known routes. For each finding give the exploit or failure path from a real entry point, severity and a minimal
+against main, focusing on: migrations 088-098, src/server/services/{billing,billing-reconcile,store-billing}.ts,
+src/server/api-auth.ts, src/lib/run/fix-journal.ts, src/lib/native/location.ts, src/lib/native/run-journal.ts,
+ios/App/App/RunJournal*.swift, android/app/src/main/java/com/narrowgatefitness/app/runjournal/, src/lib/app-links.ts,
+src/lib/storage-reservation.ts and the .well-known routes. For each finding give the exploit or failure path from a real entry point, severity and a minimal
 fix; drop anything you can't trace. I will decide which to fix; then implement the accepted ones with tests.
 ```
 
@@ -139,6 +140,6 @@ fix; drop anything you can't trace. I will decide which to fix; then implement t
 **Agent:** native-mobile · **Needs:** an Android 15/16 phone, the APK from the "Android APK" workflow.
 
 ```
-Use the native-mobile agent. Here are my results for ANDROID_DEVICE_TESTING.md tests 1-15: <table>. For each failure
+Use the native-mobile agent. Here are my results for ANDROID_DEVICE_TESTING.md (tests 1-15, including 6a and 6b): <table>. For each failure
 follow P-02. For test 3 (edge-to-edge) include screenshots with gesture and 3-button navigation.
 ```

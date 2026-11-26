@@ -32,18 +32,23 @@ Mark a test passed **only** after doing it on a real device. Use a TestFlight bu
 | 12 | Finish workout | Finish | Summary and personal records shown; history shows it once |
 | 13 | Exercise animations | Open 10 exercises from different categories | Animations play smoothly; no clipping; form cues readable |
 | 14 | GPS run, screen locked (30 min) | Start a run outdoors; lock; walk or run 2 km; unlock; finish | Continuous route and distance within about 5% of a known route; blue location indicator while recording, gone after Finish |
-| 15 | GPS run, app killed | Start a run, lock, 10 min, force-quit, relaunch | Record how much of the route remains (known risk O-01) |
+| 15 | GPS run, app ended by iOS | Start a run, lock, 10 min; then end the app from the app switcher; relaunch and open Run | The unfinished run is offered; the route up to the moment the app was ended is there (the native journal writes every fix to the device). Note: after a force-quit iOS stops all location updates, so **nothing after that moment** can be recorded; that is a platform limit, not a defect |
+| 15a | Run journal survives a web-content reset | During a locked run, open 10–15 heavy apps (forces iOS to drop the web content), wait 5 min, return | Page may reload; the run continues and the 5 minutes are in the route (native recorder keeps running; journal merged on recovery) |
+| 15b | Notification tap during a run | During a run, tap a workout reminder or the alarm's "I'm up" | The app opens the target screen without a full reload; the run keeps recording (in-app navigation) |
+| 15c | Location permission | Fresh install; start the first run; choose "Allow While Using"; then later "Allow Once" | Recording works while using; with "Allow Once" the app explains when it stops. Note which prompt iOS shows: the community GPS plugin asks for "Always" on iOS, which we can't change from our code |
 | 16 | Guided interval cues | Start a guided run; lock | A vibration (and voice if on) at each phase change. Locked-screen cues may not work (O-04) |
 | 17 | HealthKit steps | Steps → Connect Apple Health | One permission sheet listing **read** Steps only; steps appear |
 | 18 | HealthKit sleep | Sleep → connect | A sheet listing Sleep, Heart Rate, HRV and Respiratory Rate, **read only**; nights appear; denying everything is handled calmly |
 | 19 | Barcode scanner | Nutrition → scan a packaged food | Camera permission asked; the product is found and logged with the right amount |
 | 20 | Barcode, camera denied | Deny the camera | A message pointing to Settings; no crash |
 | 21 | Meal photo (only if AI is on) | Photograph a meal | An estimate to confirm; never logged without confirming |
-| 22 | Progress photo | Progress → add a photo with the camera | Saved privately; shown in compare |
+| 22 | Progress photo | Progress → add a photo with the camera | Saved privately; shown in compare. Then airplane mode on just after tapping Save: "couldn't confirm" message, Save again online saves it once (no duplicate, image intact) |
 | 23 | Body Scan (Pro) | Run a guided scan with the timer | A countdown vibration; photos saved; measurements recorded |
 | 24 | Reminders | Turn on Faith and workout reminders; change the time zone ±8 h; reopen | Rescheduled to local times; none inside quiet hours |
 | 25 | Sleep "alarm" | Set an alarm 2 minutes ahead with Silent on and Sleep Focus on | Note whether it is audible (O-04); test Snooze from the lock screen with the app closed |
+| 25a | Alarm follow-up and snooze share one slot | Set an alarm 2 minutes ahead; don't answer; wait the snooze time | One follow-up ring; tap Snooze on it: exactly one ring after the snooze time (not two); tap "I'm up": no further ring that morning, and tomorrow's alarm still scheduled |
 | 26 | Sign-out cleanup | With reminders and a running rest timer, sign out | No notifications arrive afterwards |
+| 26a | Sign-out removes recorded routes | Start a run, end the app (test 15), relaunch, sign out without reopening the run; sign in as another member | The other member is not offered the first member's run; the blue location indicator is gone |
 | 27 | Bible offline | Open a chapter, airplane mode, open another | The bundled Bible reads offline |
 | 28 | Prayer journal | Write an entry; force-quit mid-typing; reopen | The draft is kept; the saved entry is private |
 | 29 | Purchase (sandbox) | Settings → App Store → sandbox account; Profile → Plans → buy monthly | Pro within about 10 s; the price shown is Apple's ($17.99 in the US) |

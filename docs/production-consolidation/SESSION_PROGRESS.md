@@ -35,6 +35,7 @@ Read this first in any new session. It records what has been done, with evidence
 | Pull request into `main` (not merged) | Open, draft | Joshfit77/Testing-testing-testing#13 |
 | Round 2: O-01..O-20 implemented | Done 2026-11-26 | `13d7db30`, `b0a11cc0`, `15c52df8`, `8a6babae`, `ee13eff0`, `100502d5`; BUG_FIX_REGISTER.md |
 | Engagement package | Done | CLAUDE.md, `.claude/agents/` (6), `npm run setup / verify / test:e2e:mocked / db:verify`, docs/engagement/ |
+| Round 3: native persistence, billing at volume, trigger-free quotas, review fixes (T-01..T-26) | Done 2026-11-26 | `77ce4060`, `ef3c9001`, `430e3758`, `5200bc09`, `d0a5f7aa` and the report commit after them; BUG_FIX_REGISTER.md (third round) |
 
 ## Next steps if continuing
 
@@ -56,3 +57,11 @@ Read this first in any new session. It records what has been done, with evidence
   1. start `dockerd` again;
   2. run `npx supabase start` in the worktree.
 - `e2e/sleep.spec.ts` can fail when it runs across midnight UTC: "last night" changes meaning mid-test. Passed on rerun.
+- **No Swift or Android SDK in this sandbox.** The Swift store tests run on GitHub (`ios.yml`, job `native-tests`);
+  the Java store tests run locally with plain `javac`/JUnit and on GitHub in `android-apk.yml`
+  (`./gradlew testDebugUnitTest`).
+- **Applying a migration by hand to the local database:** also insert its version into
+  `supabase_migrations.schema_migrations`, or `npm run db:verify` reports one migration missing.
+- **`tests/integration/storage-upload-reservations.test.ts` drops the two storage quota triggers for the length of the
+  file** (to behave like a hosted project without them) and restores them in `afterAll`. If a run is killed part-way,
+  restore them by re-running the trigger blocks of migrations 086 and 088 (or `supabase db reset`).

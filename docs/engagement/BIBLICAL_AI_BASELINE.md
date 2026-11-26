@@ -7,9 +7,10 @@ below; if `npm run verify` and the browser suite don't match these numbers befor
 
 - **Branch:** `release/narrow-gate-production-consolidation` (PR into `main`, not merged).
 - **Commit:** see TEST_RESULTS.md in docs/production-consolidation for the exact verified head and its test counts.
-- **Database:** 85 migration files (through `20261126000095`); `npm run db:verify` all ok after a fresh install.
+- **Database:** 88 migration files (through `20261127000098`); `npm run db:verify` all ok after a fresh install.
 - **Gates that must stay green:** GitHub CI (typecheck, lint, unit, build, integration, secret scan, dependency audit),
-  iOS workflow, Android APK workflow, the browser suite with mocks, the tap-every-control sweep.
+  iOS workflow (including the native run-journal tests), Android APK workflow (including the JVM unit tests), the
+  browser suite with mocks, the tap-every-control sweep.
 
 ## What already exists (reuse it; don't build a second one)
 

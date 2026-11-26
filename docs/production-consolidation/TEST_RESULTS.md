@@ -3,6 +3,37 @@
 Every figure below comes from an actual run. Nothing was skipped, disabled or weakened to get a pass. Where a test was
 changed, the reason is given (see also BUG_FIX_REGISTER.md).
 
+## Round 3 head: `c71e652f` and the report commit after it (T-01..T-26)
+
+| Suite | Where | Result |
+|---|---|---|
+| Typecheck, lint (0 warnings) | This sandbox | **Passed** |
+| Unit tests | This sandbox | **301 files; 4,982 passed, 1 skipped**, 0 failed |
+| Fresh install of all 88 migrations (`supabase db reset`) + `npm run db:verify` | This sandbox | **Passed; 10 of 10 checks ok** (new: reservations required, no photo UPDATE policy) |
+| Integration tests, `REQUIRE_TEST_STACK=1`, after that fresh install | This sandbox | **103 files (1 skipped); 670 passed, 1 skipped**, 0 failed (the skip is the opt-in live Open Food Facts test) |
+| Production build | This sandbox | **Passed** on `c71e652f` |
+| Browser suite with mocks (`npm run test:e2e:mocked`) | This sandbox | **168 passed, 0 failed, 101 skipped** (the opt-in suites, as before), 15.2 min, on `d0a5f7aa` |
+| Tap every control (`E2E_BUTTON_SWEEP=1`) | This sandbox | **Passed: 49 screens, 281 controls, 0 findings**, on `89260c5b` |
+| Java run-journal store (JUnit, plain `javac`) | This sandbox | **5 of 5 passed** |
+| Swift run-journal store (XCTest), Android `testDebugUnitTest`, iOS build | GitHub | See the PR checks for the pushed head |
+| Load-test script | This sandbox | Smoke runs only (no app server): members created and always removed, including on Ctrl-C mid-setup |
+
+**Failures found during this round, and what was done:**
+
+| Where | Failure | Cause | Action |
+|---|---|---|---|
+| Sandbox integration (before commit `430e3758`) | Sandbox store tests | `sandboxOk` used before it was computed in the new code | Fixed before commit |
+| `account-deletion-closure.test.ts` | New table not in the catalog | `billing_reconcile_state` (096) unregistered | Registered with its reason (T-13) |
+| `api-function-surface.test.ts` | 2 new member-callable functions | Reservation functions (097) | Registered with their reasons |
+| `store-billing.test.ts` (6 concurrent restores) | Intermittent `deadlock detected` | Real defect in 096 (T-20) | Migration 098; 8 of 8 runs pass, 2 of 4 failed before |
+| `storage-upload-reservations.test.ts` | 31 of 60 landed against 30 | Real race introduced while fixing T-24 (two snapshots) | One-statement count, before commit |
+| Same file, byte-limit burst | Intermittent | The test assumed no upload lands before all reservations; a landed small file correctly gives room back | Test rewritten to reserve without uploading (exact bound); the rule unchanged |
+| `gps-route-memo.test.ts` (new) | Identity assertion | The test assumed every accepted fix adds a point; the track adds points only after enough movement | Test corrected to check that lines change exactly when a point is added |
+| `workout-finish-extras.test.ts` (new) | Timeout | A stand-in left an extra waiting on its 8-second limit | Stand-in corrected |
+
+No existing test was weakened or skipped. Existing upload tests now reserve first, as the app does; negative tests
+reserve too, so they still fail for their original reason (type, size, plan, consent).
+
 ## Round 2 head: `100502d5` and the engagement-package commit after it (O-01..O-20 implemented)
 
 | Suite | Where | Result |
@@ -53,5 +84,6 @@ changed, the reason is given (see also BUG_FIX_REGISTER.md).
 | App Store / Play sandbox purchases | Needs store accounts and a device | PAYMENT_VERIFICATION.md (simulated vs sandbox) |
 | Stripe test-mode end to end | Needs the owner's Stripe test keys; billing was tested with local stand-ins | PAYMENT_VERIFICATION.md |
 | Live AI | Paid service not approved. Every AI path ran against the local mock | AI_COST_ANALYSIS.md |
-| Hosted Supabase (`storage.objects` triggers) | Needs a staging project | O-16 |
+| Hosted Supabase (`storage.objects` triggers) | Needs a staging project. No longer blocks: limits hold without the triggers (T-11, T-24) | O-16, R-03 |
+| Native recorder behaviour (iOS suspension, app ended, Android service) | Needs a phone; the stores are unit-tested and the projects compile in CI | IPHONE_DEVICE_TESTING.md 15–15c, 26a; ANDROID_DEVICE_TESTING.md 6–6b |
 | Production-scale load, write paths | Local machine only | PERFORMANCE_REPORT.md |
