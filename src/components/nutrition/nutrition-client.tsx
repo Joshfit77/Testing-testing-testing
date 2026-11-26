@@ -310,13 +310,15 @@ export function AddFoodDialog({
     }
   };
 
-  // One id per attempt: a retry after a timeout reuses it, so the item can't be logged twice.
-  const attempt = useRef<string | null>(null);
+  // One id per attempt: a retry of the SAME item after a timeout reuses it, so it can't be logged twice; changing the
+  // food, amount, meal or day makes it a new attempt with a new id (otherwise the server would report the earlier item
+  // as this one).
+  const attempt = useRef<{ key: string; id: string } | null>(null);
   const submit = (item: unknown, onOk?: () => void) =>
     startTransition(async () => {
-      attempt.current ??= crypto.randomUUID();
+      const clientId = attemptId(attempt, JSON.stringify([item, date, mealType, status]));
       try {
-        const res = await logFoodAction({ clientId: attempt.current, date, mealType, status, item });
+        const res = await logFoodAction({ clientId, date, mealType, status, item });
         setResult(res);
         if (res.ok) {
           attempt.current = null;

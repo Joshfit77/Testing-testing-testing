@@ -30,6 +30,7 @@ import { getBrowserSupabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { saveBodyScanAction } from "@/server/actions/body-scan";
 import { PoseOutline } from "./pose-outline";
+import { vibrate } from "@/lib/native";
 
 type Step = "prepare" | ScanPose | "details";
 const ORDER: Step[] = ["prepare", "front", "side", "back", "details"];
@@ -296,7 +297,7 @@ function PoseStep({ pose, shot, ghost, onShot, onNext, optional }: { pose: ScanP
     if (count == null) return;
     if (count === 0) {
       setCount(null);
-      navigator.vibrate?.(150);
+      void vibrate([150]);
       void grab();
       return;
     }

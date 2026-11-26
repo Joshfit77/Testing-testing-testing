@@ -35,6 +35,7 @@ import { buildScript, completedSets, phaseAt, scriptSeconds, type RunPrescriptio
 import { canOpenLocationSettings, hasNativeBackgroundLocation, keepScreenOn, locationSourceLabel, openLocationSettings, watchLocation, type LocationError } from "@/lib/native/location";
 import { attachScreen, keepRecording, routeError, routeFix, shouldKeep, takeBack } from "@/lib/run/live-recording";
 import { saveGpsActivityAction } from "@/server/actions/gps-activities";
+import { vibrate } from "@/lib/native";
 
 export interface GuidedSession {
   userProgramId: string;
@@ -304,7 +305,8 @@ export function GpsRecorder({
     if (phase.index === lastPhaseRef.current) return;
     lastPhaseRef.current = phase.index;
     try {
-      navigator.vibrate?.([200, 100, 200]);
+      // The phone's haptics in the app (the iOS web view has no navigator.vibrate); the browser API elsewhere.
+      void vibrate([200, 100, 200]);
       if (voice && "speechSynthesis" in window) {
         const text = phase.phase ? `${phase.phase.label}, ${Math.round(phase.phase.seconds / 60) || phase.phase.seconds} ${phase.phase.seconds >= 60 ? "minutes" : "seconds"}` : "Session complete. Well done.";
         window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));

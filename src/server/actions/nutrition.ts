@@ -175,16 +175,22 @@ async function removeEmptyMeals(supabase: Awaited<ReturnType<typeof getServerSup
   }
 }
 
-export async function deleteMealItemAction(formData: FormData): Promise<void> {
+export async function deleteMealItemAction(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
   const id = uuid.safeParse(formData.get("id"));
-  if (!id.success) return;
+  if (!id.success) return { ok: false, error: "That item wasn't found." };
   const supabase = await getServerSupabase();
   const { data: item } = await supabase.from("meal_items").select("meal_id").eq("id", id.data).eq("user_id", user.id).maybeSingle();
-  await supabase.from("meal_items").delete().eq("id", id.data).eq("user_id", user.id);
+  // A failed delete must say so (the delete button shows the error instead of quietly refreshing).
+  const { error } = await supabase.from("meal_items").delete().eq("id", id.data).eq("user_id", user.id);
+  if (error) {
+    logError("nutrition.delete_item", error);
+    return { ok: false, error: "Couldn't remove that item. Please try again." };
+  }
   if (item) await removeEmptyMeals(supabase, user.id, [item.meal_id as string]);
   revalidatePath("/nutrition");
   revalidatePath("/home");
+  return { ok: true };
 }
 
 /**
@@ -216,13 +222,18 @@ export async function undoLoggedItemsAction(input: unknown): Promise<ActionState
   }
 }
 
-export async function markPlannedEatenAction(formData: FormData): Promise<void> {
+export async function markPlannedEatenAction(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
   const id = uuid.safeParse(formData.get("mealId"));
-  if (!id.success) return;
+  if (!id.success) return { ok: false, error: "That meal wasn't found." };
   const supabase = await getServerSupabase();
-  await supabase.from("meals").update({ status: "logged" }).eq("id", id.data).eq("user_id", user.id).eq("status", "planned");
+  const { error } = await supabase.from("meals").update({ status: "logged" }).eq("id", id.data).eq("user_id", user.id).eq("status", "planned");
+  if (error) {
+    logError("nutrition.mark_eaten", error);
+    return { ok: false, error: "Couldn't mark that meal as eaten. Please try again." };
+  }
   revalidatePath("/nutrition");
+  return { ok: true };
 }
 
 export async function createCustomFoodAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

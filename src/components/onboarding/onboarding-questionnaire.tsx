@@ -38,6 +38,7 @@ import { bmi, paceLabel, paceOptions } from "@/lib/domain/diary";
 import { DIET_TYPES, DIETS, type DietType } from "@/lib/domain/diets";
 import type { Sex } from "@/lib/domain/nutrition";
 import { completeOnboardingAction } from "@/server/actions/onboarding";
+import { unstable_rethrow } from "next/navigation";
 
 /** Goals where a target bodyweight matters; for the rest the goal-weight question starts hidden. */
 const WEIGHT_GOALS: PrimaryGoal[] = ["lose_fat", "build_muscle", "general_health"];
@@ -203,8 +204,8 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
       /* unreadable or blocked storage: start fresh */
     }
   }, [userId]);
-  useEffect(() => {
-    if (!saving.current || !restored.current) return;
+  // Writes the answers so far (also called after a failed submit, which cleared them first).
+  const persistProgress = () => {
     try {
       window.sessionStorage.setItem(
         PROGRESS_KEY,
@@ -213,6 +214,12 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
     } catch {
       /* storage full or blocked: the questionnaire still works, it just won't survive a reload */
     }
+  };
+  useEffect(() => {
+    if (!saving.current || !restored.current) return;
+    persistProgress();
+    // persistProgress reads exactly the answers listed here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, step, goal, sex, age, units, feet, inches, cm, weight, goalWeight, showGoalWeight, pace, activity, experience, days, minutes, preset, dietType, name, faith]);
 
   const current: StepId = STEPS[step]!.id;
@@ -359,7 +366,9 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
     }
     const equipment = EQUIPMENT_PRESETS.find((p) => p.label === preset)!.items;
     startTransition(async () => {
-      const res = await completeOnboardingAction({
+      let res: Awaited<ReturnType<typeof completeOnboardingAction>>;
+      try {
+        res = await completeOnboardingAction({
         displayName: name.trim(),
         primaryGoal: goal!,
         sex: sex!,
@@ -380,10 +389,19 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
         textSize,
         reduceMotion,
         timeZone: deviceTimeZone(),
-      });
+        });
+      } catch (err) {
+        unstable_rethrow(err); // the success redirect to the plan summary must still happen
+        // Offline or the request never arrived: keep every answer (here and across a reload) and say so.
+        saving.current = true;
+        persistProgress();
+        setError(typeof navigator !== "undefined" && !navigator.onLine ? "You're offline. Your answers are saved here: try again when you're connected." : "Something went wrong. Your answers are saved here: please try again.");
+        return;
+      }
       // On success the action redirects to the plan summary; we only get here on failure.
       if (res && !res.ok) {
         saving.current = true;
+        persistProgress();
         setError(res.message ?? "Something went wrong. Please try again.");
       }
     });

@@ -9,7 +9,7 @@ import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { ACTIVITY_INFO, ACTIVITY_LEVELS, WEEKLY_RATES_KG, type ActivityLevel } from "@/lib/domain/calorie-budget";
-import { paceLabel, saveFailed, shortDate, type LogResult } from "@/lib/domain/diary";
+import { attemptId, paceLabel, saveFailed, shortDate, type LogResult } from "@/lib/domain/diary";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, toKg, weightUnit } from "@/lib/domain/units";
@@ -52,14 +52,15 @@ export function QuickAddDialog({
   const [pending, start] = useTransition();
   const mealName = MEAL_TYPES.find(([v]) => v === mealType)?.[1] ?? "meal";
 
-  // One id per attempt: a retry after a timeout reuses it, so the item can't be logged twice.
-  const attempt = useRef<string | null>(null);
+  // One id per attempt: a retry of the SAME numbers after a timeout reuses it, so they can't be logged twice; changed
+  // numbers, meal or day are a new attempt with a new id.
+  const attempt = useRef<{ key: string; id: string } | null>(null);
   const submit = () =>
     start(async () => {
-      attempt.current ??= crypto.randomUUID();
+      const clientId = attemptId(attempt, JSON.stringify([values.calories, values.protein_g, values.carbs_g, values.fat_g, date, mealType]));
       try {
         const res = await logFoodAction({
-          clientId: attempt.current,
+          clientId,
           date,
           mealType,
           status: "logged",
