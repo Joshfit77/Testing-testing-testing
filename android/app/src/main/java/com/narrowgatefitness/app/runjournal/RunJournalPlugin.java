@@ -9,14 +9,20 @@ import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.WebView;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Logger;
 import com.getcapacitor.Plugin;
+import com.getcapacitor.WebViewListener;
 import com.getcapacitor.PluginCall;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -29,7 +35,10 @@ import java.util.List;
  * every fix to a file with no JavaScript involved, so the route survives the web view being paused or the app being
  * ended. It never asks for permission itself: the run screen asks when the member taps Start.
  */
-@CapacitorPlugin(name = "RunJournal")
+@CapacitorPlugin(
+    name = "RunJournal",
+    permissions = { @Permission(alias = "location", strings = { Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION }) }
+)
 public class RunJournalPlugin extends Plugin {
     private RunJournalStore store;
     private LocationManager locationManager;
@@ -55,6 +64,16 @@ public class RunJournalPlugin extends Plugin {
     public void load() {
         store = new RunJournalStore(new File(getContext().getNoBackupFilesDir(), "run-journal"));
         locationManager = (LocationManager) getContext().getSystemService(Context.LOCATION_SERVICE);
+        // A crashed or killed WebView renderer would otherwise end the whole app (Capacitor returns false), taking the
+        // run's foreground service and this recorder with it. Recreate the page instead; the recording carries on.
+        getBridge().addWebViewListener(new WebViewListener() {
+            @Override
+            public boolean onRenderProcessGone(WebView webView, RenderProcessGoneDetail detail) {
+                Logger.error("RunJournal", "WebView renderer gone; recreating the page", null);
+                getActivity().runOnUiThread(() -> getActivity().recreate());
+                return true;
+            }
+        });
     }
 
     @PluginMethod
@@ -82,6 +101,39 @@ public class RunJournalPlugin extends Plugin {
             ret.put("recording", false);
         }
         ret.put("authorized", true);
+        call.resolve(ret);
+    }
+
+    /** The member's answer to the location prompt, asked before the background watcher starts (see below). */
+    @PluginMethod
+    public void ensurePermission(PluginCall call) {
+        if (getPermissionState("location") == PermissionState.GRANTED) {
+            JSObject ret = new JSObject();
+            ret.put("granted", true);
+            call.resolve(ret);
+            return;
+        }
+        requestPermissionForAlias("location", call, "permissionAnswered");
+    }
+
+    /**
+     * Android 14+: the background-geolocation plugin starts its "Recording your run" foreground service before the
+     * location prompt is answered; startForeground then fails and is never retried, so a run recorded on the first
+     * start after install stops when the screen locks. The run screen asks here first, so the service starts with the
+     * permission already granted.
+     */
+    @PermissionCallback
+    private void permissionAnswered(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("granted", getPermissionState("location") == PermissionState.GRANTED);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void status(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("active", activeKey != null);
+        if (activeKey != null) ret.put("key", activeKey);
         call.resolve(ret);
     }
 

@@ -6,7 +6,28 @@
  * Every function is a safe no-op outside the iOS/Android shells. Not yet verified on a physical phone.
  */
 import { NOTIFICATION_SOUND, isNativeApp } from "@/lib/native";
-import { ALARM_ACTION_TYPE, ALL_ALARM_IDS, alarmNotifications, FOLLOW_UP_IDS, followUpRings, SNOOZE_NOTIFICATION_ID, type AlarmConfig } from "@/lib/domain/sleep-alarm";
+import { navigateInApp } from "@/lib/in-app-navigation";
+import { ALARM_ACTION_TYPE, ALL_ALARM_IDS, alarmNotifications, nextFollowUp, SNOOZE_NOTIFICATION_ID, type AlarmConfig } from "@/lib/domain/sleep-alarm";
+
+/** The local date (YYYY-MM-DD) the member last answered an alarm: that morning's follow-up isn't scheduled again. */
+const ANSWERED_KEY = "ngf.alarm.answered";
+function localDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function answeredToday(now: Date): boolean {
+  try {
+    return localStorage.getItem(ANSWERED_KEY) === localDate(now);
+  } catch {
+    return false;
+  }
+}
+function markAnswered(now: Date): void {
+  try {
+    localStorage.setItem(ANSWERED_KEY, localDate(now));
+  } catch {
+    /* storage unavailable: the follow-up may ring once more */
+  }
+}
 
 export type AlarmScheduleResult =
   | { ok: true; scheduled: number; exact: boolean }
@@ -16,16 +37,30 @@ const TITLE = "Time to get up";
 const BODY = "Your Narrow Gate alarm. Snooze, or tap I'm up and tell the app how you slept.";
 const FOLLOW_UP_TITLE = "Still time to get up";
 
-/** Cancel the follow-up ring due within the next few hours (this morning's): the member is up, or snoozed. */
-async function cancelTodaysFollowUp(LocalNotifications: Awaited<ReturnType<typeof plugin>>["LocalNotifications"]): Promise<void> {
-  try {
+type Notifications = Awaited<ReturnType<typeof plugin>>["LocalNotifications"];
+
+/**
+ * Put the next follow-up ring in the shared snooze slot (or clear the slot when there is none). A snooze still ahead is
+ * left alone unless `replaceSnooze`.
+ */
+async function scheduleFollowUp(LocalNotifications: Notifications, config: AlarmConfig, exact: boolean, replaceSnooze = false): Promise<void> {
+  const now = new Date();
+  if (!replaceSnooze) {
     const { notifications } = await LocalNotifications.getPending();
-    const soon = Date.now() + 3 * 3600_000;
-    const due = notifications.filter((n) => FOLLOW_UP_IDS.includes(n.id) && n.schedule?.at && new Date(n.schedule.at).getTime() <= soon);
-    if (due.length) await LocalNotifications.cancel({ notifications: due.map((n) => ({ id: n.id })) });
-  } catch {
-    /* the follow-up rings once; nothing is lost */
+    const slot = notifications.find((n) => n.id === SNOOZE_NOTIFICATION_ID);
+    const snoozed = (slot?.extra as { snoozed?: boolean } | undefined)?.snoozed === true;
+    if (slot && snoozed && slot.schedule?.at && new Date(slot.schedule.at).getTime() > now.getTime()) return;
   }
+  const at = nextFollowUp(config, now, answeredToday(now));
+  if (!at) {
+    await LocalNotifications.cancel({ notifications: [{ id: SNOOZE_NOTIFICATION_ID }] });
+    return;
+  }
+  // Scheduling the same id replaces whatever was in the slot.
+  await LocalNotifications.schedule({
+    notifications: [{ id: SNOOZE_NOTIFICATION_ID, title: FOLLOW_UP_TITLE, body: BODY, actionTypeId: ALARM_ACTION_TYPE, sound: NOTIFICATION_SOUND,
+      extra: { snoozeMinutes: config.snoozeMinutes, followUp: true, config }, schedule: { at, allowWhileIdle: true }, isExactNotification: exact }],
+  });
 }
 
 /**
@@ -85,7 +120,8 @@ export async function scheduleSleepAlarm(config: AlarmConfig): Promise<AlarmSche
         if (req.display !== "granted") return { ok: false, reason: "permission-denied" };
       }
     }
-    await LocalNotifications.cancel({ notifications: ALL_ALARM_IDS.map((id) => ({ id })) });
+    // A snooze in progress is kept (opening the app during it must not silence it); everything else is replaced.
+    await LocalNotifications.cancel({ notifications: ALL_ALARM_IDS.filter((id) => id !== SNOOZE_NOTIFICATION_ID).map((id) => ({ id })) });
     if (!entries.length) return { ok: true, scheduled: 0, exact: true };
     const exact = await exactAllowed(LocalNotifications);
     const res = await LocalNotifications.schedule({
@@ -95,28 +131,14 @@ export async function scheduleSleepAlarm(config: AlarmConfig): Promise<AlarmSche
         body: BODY,
         actionTypeId: ALARM_ACTION_TYPE,
         sound: NOTIFICATION_SOUND,
-        extra: { snoozeMinutes: config.snoozeMinutes },
+        extra: { snoozeMinutes: config.snoozeMinutes, config },
         // `on` repeats every matching weekday/time; exact only where Android allows it, otherwise it may run a few minutes late.
         schedule: { on: { weekday: e.weekday, hour: e.hour, minute: e.minute }, allowWhileIdle: true },
         isExactNotification: exact,
       })),
     });
-    // Follow-up rings for the next 7 days (they don't depend on the app running to handle Snooze).
-    const rings = followUpRings(config, new Date());
-    if (rings.length) {
-      await LocalNotifications.schedule({
-        notifications: rings.map((r) => ({
-          id: r.id,
-          title: FOLLOW_UP_TITLE,
-          body: BODY,
-          actionTypeId: ALARM_ACTION_TYPE,
-          sound: NOTIFICATION_SOUND,
-          extra: { snoozeMinutes: config.snoozeMinutes, followUp: true },
-          schedule: { at: r.at, allowWhileIdle: true },
-          isExactNotification: exact,
-        })),
-      });
-    }
+    // The next follow-up ring (it doesn't depend on the app running to handle Snooze).
+    await scheduleFollowUp(LocalNotifications, config, exact);
     return { ok: true, scheduled: res.notifications.length, exact };
   } catch {
     return { ok: false, reason: "error" };
@@ -170,15 +192,20 @@ export async function installSleepAlarmActions(): Promise<() => void> {
     const handle = await LocalNotifications.addListener("localNotificationActionPerformed", (event) => {
       const n = event.notification;
       if (!ALL_ALARM_IDS.includes(n.id)) return;
-      void cancelTodaysFollowUp(LocalNotifications);
+      markAnswered(new Date());
+      const extra = (n.extra ?? {}) as { snoozeMinutes?: unknown; config?: AlarmConfig };
       if (event.actionId === "snooze") {
-        const minutes = Math.min(30, Math.max(1, Math.round(Number((n.extra as { snoozeMinutes?: unknown } | undefined)?.snoozeMinutes) || 9)));
+        const minutes = Math.min(30, Math.max(1, Math.round(Number(extra.snoozeMinutes) || 9)));
+        // The snooze goes into the follow-up's slot (same id), replacing this morning's follow-up in one step.
         void LocalNotifications.schedule({
-          notifications: [{ id: SNOOZE_NOTIFICATION_ID, title: TITLE, body: BODY, actionTypeId: ALARM_ACTION_TYPE,
-        sound: NOTIFICATION_SOUND, extra: n.extra, schedule: { at: new Date(Date.now() + minutes * 60_000), allowWhileIdle: true } }],
+          notifications: [{ id: SNOOZE_NOTIFICATION_ID, title: TITLE, body: BODY, actionTypeId: ALARM_ACTION_TYPE, sound: NOTIFICATION_SOUND,
+            extra: { ...extra, snoozed: true }, schedule: { at: new Date(Date.now() + minutes * 60_000), allowWhileIdle: true } }],
         }).catch(() => undefined);
       } else {
-        window.location.assign("/progress/sleep/checkin");
+        // I'm up: this morning's follow-up (or snooze) is replaced by the next alarm's follow-up.
+        if (extra.config) void scheduleFollowUp(LocalNotifications, extra.config, true, true).catch(() => undefined);
+        else void LocalNotifications.cancel({ notifications: [{ id: SNOOZE_NOTIFICATION_ID }] }).catch(() => undefined);
+        navigateInApp("/progress/sleep/checkin");
       }
     });
     return () => void handle.remove();

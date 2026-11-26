@@ -1,5 +1,7 @@
 "use client";
 
+import { navigateInApp } from "@/lib/in-app-navigation";
+
 /**
  * Bridge to native capabilities when running inside the Capacitor iOS/Android shells.
  * Every function is a safe no-op in a regular browser / installed PWA.
@@ -115,7 +117,7 @@ export async function initNativeShell(): Promise<() => void> {
     const { appLinkTarget } = await import("@/lib/app-links");
     const opened = await App.addListener("appUrlOpen", ({ url }) => {
       const target = appLinkTarget(url, window.location.origin);
-      if (target) window.location.assign(target);
+      if (target) navigateInApp(target);
     });
     cleanups.push(() => void opened.remove());
     const { closeTopOverlay } = await import("@/lib/native-back");

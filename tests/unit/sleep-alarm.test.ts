@@ -63,29 +63,28 @@ describe("alarm configuration", () => {
   });
 });
 
-describe("follow-up rings (O-04: snooze works even when the app isn't running)", () => {
-  it("one ring the snooze time after each alarm in the next 7 days, only on alarm days and never in the past", async () => {
-    const { followUpRings, FOLLOW_UP_IDS } = await import("@/lib/domain/sleep-alarm");
-    // Wednesday 25 Nov 2026, 06:35 local: today's 06:30 alarm already rang, its 06:39 follow-up is still ahead.
-    const now = new Date(2026, 10, 25, 6, 35);
-    const rings = followUpRings({ ...DEFAULT_ALARM, enabled: true, wakeTime: "06:30", snoozeMinutes: 9, days: ["mon", "wed", "fri"] }, now);
-    expect(rings.map((r) => [r.at.getDate(), r.at.getHours(), r.at.getMinutes()])).toEqual([
-      [25, 6, 39], // Wed (today, still ahead)
-      [27, 6, 39], // Fri
-      [30, 6, 39], // Mon
-      [2, 6, 39], // Wed (Dec)
-    ]);
-    // An hour later today's follow-up is past and isn't scheduled.
-    expect(followUpRings({ ...DEFAULT_ALARM, enabled: true, wakeTime: "06:30", snoozeMinutes: 9, days: ["mon", "wed", "fri"] }, new Date(2026, 10, 25, 7, 35))[0]!.at.getDate()).toBe(27);
-    expect(rings.every((r) => FOLLOW_UP_IDS.includes(r.id))).toBe(true);
-    expect(new Set(rings.map((r) => r.id)).size).toBe(rings.length);
-    // Every follow-up id is cancelled with the alarm, and none clashes with other reminders.
-    expect(FOLLOW_UP_IDS.every((id) => ALL_ALARM_IDS.includes(id))).toBe(true);
-    expect(FOLLOW_UP_IDS.filter((id) => ALL_REMINDER_IDS.includes(id) || ALL_FAITH_REMINDER_IDS.includes(id))).toEqual([]);
+describe("follow-up ring (O-04: a second ring even when the app isn't running)", () => {
+  const cfg = { ...DEFAULT_ALARM, enabled: true, wakeTime: "06:30", snoozeMinutes: 9, days: ["mon", "wed", "fri"] as ("mon" | "wed" | "fri")[] };
+
+  it("is the snooze time after the next alarm still ahead, only on alarm days", async () => {
+    const { nextFollowUp } = await import("@/lib/domain/sleep-alarm");
+    // Wednesday 25 Nov 2026, 06:35 local: today's 06:30 alarm rang, its 06:39 follow-up is still ahead.
+    const at = nextFollowUp(cfg, new Date(2026, 10, 25, 6, 35))!;
+    expect([at.getDate(), at.getHours(), at.getMinutes()]).toEqual([25, 6, 39]);
+    // After 06:39 it's Friday's; on Thursday too.
+    expect(nextFollowUp(cfg, new Date(2026, 10, 25, 7, 0))!.getDate()).toBe(27);
+    expect(nextFollowUp(cfg, new Date(2026, 10, 26, 5, 0))!.getDate()).toBe(27);
   });
 
-  it("none when the alarm is off", async () => {
-    const { followUpRings } = await import("@/lib/domain/sleep-alarm");
-    expect(followUpRings({ ...DEFAULT_ALARM, enabled: false }, new Date(2026, 10, 26, 5, 0))).toEqual([]);
+  it("skips this morning's once the member has answered an alarm today; none when the alarm is off", async () => {
+    const { nextFollowUp } = await import("@/lib/domain/sleep-alarm");
+    expect(nextFollowUp(cfg, new Date(2026, 10, 25, 6, 35), true)!.getDate()).toBe(27);
+    expect(nextFollowUp({ ...cfg, enabled: false }, new Date(2026, 10, 25, 5, 0))).toBeNull();
+  });
+
+  it("shares the snooze's notification slot, so the alarm uses 8 ids and none clash with reminders", () => {
+    expect(ALL_ALARM_IDS).toHaveLength(8);
+    expect(ALL_ALARM_IDS).toContain(SNOOZE_NOTIFICATION_ID);
+    expect(ALL_ALARM_IDS.filter((id) => ALL_REMINDER_IDS.includes(id) || ALL_FAITH_REMINDER_IDS.includes(id))).toEqual([]);
   });
 });

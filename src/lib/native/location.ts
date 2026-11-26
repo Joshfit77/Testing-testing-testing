@@ -13,7 +13,7 @@
  */
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import type { GpsFix } from "@/lib/domain/gps-track";
-import { startNativeRunJournal, stopNativeRunJournal } from "@/lib/native/run-journal";
+import { ensureNativeLocationPermission, startNativeRunJournal, stopNativeRunJournal } from "@/lib/native/run-journal";
 
 export type LocationError = "denied" | "unavailable" | "unsupported" | "timeout";
 
@@ -135,6 +135,10 @@ export async function removeOrphanedWatchers(): Promise<number> {
 export async function watchLocation(onFix: (fix: GpsFix) => void, onError: (e: LocationError) => void, journalKey?: string): Promise<() => void> {
   if (hasNativeBackgroundLocation()) {
     await ensureAndroidNotificationPermission();
+    if (!(await ensureNativeLocationPermission())) {
+      onError("denied");
+      return () => undefined;
+    }
     await removeOrphanedWatchers();
     const id = await BackgroundGeolocation.addWatcher(
       { backgroundTitle: "Recording your run", backgroundMessage: "Narrow Gate Fitness is recording your route. Tap to return.", requestPermissions: true, stale: false, distanceFilter: 0 },

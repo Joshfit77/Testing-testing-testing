@@ -12,6 +12,7 @@
  * - Signing out (or another member signing in) removes everything this app scheduled on the phone.
  * Delivery on real phones still has to be checked by hand (docs/NOTIFICATIONS.md).
  */
+import { navigateInApp } from "@/lib/in-app-navigation";
 import { NOTIFICATION_SOUND, isNativeApp } from "@/lib/native";
 import { ALL_FAITH_REMINDER_IDS } from "@/lib/faith-reminders";
 import { ALL_APP_REMINDER_IDS, NOTIFICATION_CHANNELS, safeNotificationPath } from "@/lib/notifications/catalog";
@@ -169,7 +170,16 @@ export async function clearDeviceNotifications(): Promise<void> {
  * Rebuild this phone's reminders from the account. Asks for permission only when `askPermission` is set (after the
  * member saves reminders) and at least one reminder is planned; otherwise never prompts.
  */
-export async function syncReminders(
+/** Rebuilds run one after another: two interleaved schedule-then-cancel passes could cancel what the other scheduled. */
+let syncChain: Promise<unknown> = Promise.resolve();
+
+export async function syncReminders(...args: Parameters<typeof syncRemindersNow>): ReturnType<typeof syncRemindersNow> {
+  const run = syncChain.then(() => syncRemindersNow(...args));
+  syncChain = run.catch(() => undefined);
+  return run;
+}
+
+async function syncRemindersNow(
   load: (device: { key: string; platform: "ios" | "android"; timezone: string; permission: PermissionState }) => Promise<NotificationSync>,
   opts: { askPermission?: boolean } = {},
 ): Promise<SyncResult> {
@@ -248,7 +258,7 @@ export async function cancelDoneToday(today: string, done: Partial<DoneToday>): 
 }
 
 /** Tapping a reminder opens its screen (only the app's own sections; anything else opens Home). */
-export async function installReminderTapHandler(navigate: (path: string) => void = (p) => window.location.assign(p)): Promise<() => void> {
+export async function installReminderTapHandler(navigate: (path: string) => void = navigateInApp): Promise<() => void> {
   if (!isNativeApp()) return () => {};
   try {
     const handle = await (await plugin()).LocalNotifications.addListener("localNotificationActionPerformed", (event) => {

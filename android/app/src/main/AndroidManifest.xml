@@ -33,6 +33,13 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+        <!-- The run-recording service from @capacitor-community/background-geolocation is declared exported="true" by
+             the plugin; only this app binds to it, so no other app may start or bind it. -->
+        <service
+            android:name="com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService"
+            android:exported="false"
+            tools:node="merge"
+            tools:replace="android:exported" />
     </application>
 
     <!-- Permissions -->

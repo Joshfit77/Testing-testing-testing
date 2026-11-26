@@ -8,8 +8,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const calls: { plugin: string; method: string; args: unknown }[] = [];
 let nativeFixes: { lat: number; lng: number; accuracy: number; t: number }[] = [];
 let native = true;
+let platform = "ios";
+let status: { active: boolean; key?: string } = { active: false };
+let granted = true;
 vi.mock("@capacitor/core", () => ({
-  Capacitor: { isNativePlatform: () => native, isPluginAvailable: () => native, getPlatform: () => "ios" },
+  Capacitor: { isNativePlatform: () => native, isPluginAvailable: () => native, getPlatform: () => platform },
   registerPlugin: (name: string) =>
     new Proxy(
       {},
@@ -19,6 +22,8 @@ vi.mock("@capacitor/core", () => ({
           if (name === "BackgroundGeolocation" && method === "addWatcher") return "w1";
           if (name === "RunJournal" && method === "start") return { recording: true, authorized: true };
           if (name === "RunJournal" && method === "read") return { fixes: nativeFixes };
+          if (name === "RunJournal" && method === "status") return status;
+          if (name === "RunJournal" && method === "ensurePermission") return { granted };
           return undefined;
         },
       },
@@ -29,6 +34,9 @@ beforeEach(() => {
   calls.length = 0;
   nativeFixes = [];
   native = true;
+  platform = "ios";
+  status = { active: false };
+  granted = true;
   localStorage.clear();
   vi.resetModules();
 });
@@ -88,5 +96,57 @@ describe("native run journal", () => {
     await flush();
     expect(localStorage.getItem("run.fixjournal")).toBeNull();
     expect(calls).toContainEqual({ plugin: "RunJournal", method: "clear", args: {} });
+  });
+
+  it("at app start, a native journal with nothing to continue is stopped; one that can be continued keeps recording", async () => {
+    const { reconcileNativeRunJournal } = await import("@/lib/native/run-journal");
+    status = { active: true, key: "run.recording.u1" };
+    expect(await reconcileNativeRunJournal(() => false)).toBe("stopped");
+    expect(calls.map((c) => c.method)).toContain("stop");
+    calls.length = 0;
+    expect(await reconcileNativeRunJournal((k) => k === "run.recording.u1")).toBe("kept");
+    expect(calls.map((c) => c.method)).not.toContain("stop");
+    status = { active: false };
+    expect(await reconcileNativeRunJournal(() => false)).toBe("none");
+  });
+
+  it("Android: location is asked for before the background watcher starts; a refusal starts nothing", async () => {
+    platform = "android";
+    granted = false;
+    const { watchLocation } = await import("@/lib/native/location");
+    const errors: string[] = [];
+    await watchLocation(() => undefined, (e) => errors.push(e), "run.recording.u1");
+    expect(errors).toEqual(["denied"]);
+    expect(calls.some((c) => c.plugin === "BackgroundGeolocation" && c.method === "addWatcher")).toBe(false);
+    granted = true;
+    calls.length = 0;
+    await watchLocation(() => undefined, () => undefined, "run.recording.u1");
+    const order = calls.map((c) => `${c.plugin}.${c.method}`);
+    expect(order.indexOf("RunJournal.ensurePermission")).toBeLessThan(order.indexOf("BackgroundGeolocation.addWatcher"));
+  });
+});
+
+describe("navigation started by native code", () => {
+  it("goes through the page's router when it listens, and falls back to a page load otherwise", async () => {
+    const { navigateInApp, NAVIGATE_EVENT } = await import("@/lib/in-app-navigation");
+    const assign = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, "location", { configurable: true, value: { ...original, assign } });
+    try {
+      const routed: string[] = [];
+      const listener = (e: Event) => {
+        e.preventDefault();
+        routed.push((e as CustomEvent<string>).detail);
+      };
+      window.addEventListener(NAVIGATE_EVENT, listener);
+      navigateInApp("/progress/sleep/checkin");
+      window.removeEventListener(NAVIGATE_EVENT, listener);
+      expect(routed).toEqual(["/progress/sleep/checkin"]);
+      expect(assign).not.toHaveBeenCalled();
+      navigateInApp("/train");
+      expect(assign).toHaveBeenCalledWith("/train");
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: original });
+    }
   });
 });

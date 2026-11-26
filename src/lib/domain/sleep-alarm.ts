@@ -61,11 +61,7 @@ export function alarmConfigFromForm(form: FormData, previous: AlarmConfig = DEFA
 /** Stable notification ids: one per weekday, plus one for a snoozed alarm. Distinct from workout (5200+) and faith (5300+) reminders. */
 export const ALARM_ID_BASE = 5400;
 export const SNOOZE_NOTIFICATION_ID = 5410;
-/** Follow-up rings, one per day for the next 7 days (see followUpRings). */
-export const FOLLOW_UP_ID_BASE = 5420;
-export const FOLLOW_UP_DAYS = 7;
-export const FOLLOW_UP_IDS: number[] = Array.from({ length: FOLLOW_UP_DAYS }, (_, i) => FOLLOW_UP_ID_BASE + i);
-export const ALL_ALARM_IDS: number[] = [...WEEKDAYS.map((d) => ALARM_ID_BASE + CAPACITOR_WEEKDAY[d]), SNOOZE_NOTIFICATION_ID, ...FOLLOW_UP_IDS];
+export const ALL_ALARM_IDS: number[] = [...WEEKDAYS.map((d) => ALARM_ID_BASE + CAPACITOR_WEEKDAY[d]), SNOOZE_NOTIFICATION_ID];
 export const ALARM_ACTION_TYPE = "SLEEP_ALARM";
 
 export interface AlarmNotification {
@@ -142,21 +138,22 @@ export const ALARM_HONESTY = [
 ];
 
 /**
- * A second ring the snooze interval after each alarm in the next 7 days, scheduled ahead as one-off notifications (O-04).
- * Snooze as an action needs the app's code to run, which may not happen when the app was closed; these ring whatever
- * the app is doing. Tapping "I'm up" (or Snooze, which schedules its own) cancels that morning's follow-up, and the
- * app plans the next 7 days again each time it opens. Times are the phone's local time.
+ * When the next follow-up ring is due: the snooze interval after the next alarm that is still ahead (O-04). Snooze as
+ * an action needs the app's code to run, which may not happen when the app was closed; the follow-up is scheduled
+ * ahead and rings regardless. It shares the snooze's notification slot (SNOOZE_NOTIFICATION_ID): a snooze replaces
+ * that morning's follow-up, and iOS keeps only 64 pending notifications (reminders 55 + weekly alarms 7 + this 1 +
+ * rest timer 1). `answeredToday` skips this morning's (the member already tapped I'm up or Snooze). Local time.
  */
-export function followUpRings(config: AlarmConfig, now: Date): { id: number; at: Date }[] {
-  if (!config.enabled || !config.days.length) return [];
+export function nextFollowUp(config: AlarmConfig, now: Date, answeredToday = false): Date | null {
+  if (!config.enabled || !config.days.length) return null;
   const [hour, minute] = config.wakeTime.split(":").map(Number) as [number, number];
-  const rings: { id: number; at: Date }[] = [];
-  for (let i = 0; i < FOLLOW_UP_DAYS + 1 && rings.length < FOLLOW_UP_DAYS; i++) {
-    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, hour, minute + config.snoozeMinutes, 0, 0);
-    const alarmDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-    const weekday = WEEKDAYS[(alarmDay.getDay() + 6) % 7]!;
-    if (!config.days.includes(weekday) || day.getTime() <= now.getTime()) continue;
-    rings.push({ id: FOLLOW_UP_ID_BASE + rings.length, at: day });
+  for (let i = 0; i <= 7; i++) {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+    const weekday = WEEKDAYS[(day.getDay() + 6) % 7]!;
+    if (!config.days.includes(weekday)) continue;
+    if (i === 0 && answeredToday) continue;
+    const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, minute + config.snoozeMinutes, 0, 0);
+    if (at.getTime() > now.getTime()) return at;
   }
-  return rings;
+  return null;
 }

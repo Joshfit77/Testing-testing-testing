@@ -14,6 +14,8 @@ import type { GpsFix } from "@/lib/domain/gps-track";
 
 interface RunJournalNative {
   start(options: { key: string }): Promise<{ recording: boolean; authorized: boolean }>;
+  status(): Promise<{ active: boolean; key?: string }>;
+  ensurePermission(): Promise<{ granted: boolean }>;
   stop(): Promise<void>;
   read(options: { key: string }): Promise<{ fixes: GpsFix[] }>;
   clear(options: { key?: string }): Promise<void>;
@@ -63,5 +65,36 @@ export async function clearNativeRunJournal(key?: string): Promise<void> {
     await RunJournal.clear(key ? { key } : {});
   } catch {
     /* nothing stored */
+  }
+}
+
+/**
+ * Android: ask for location before the background watcher starts (works around the plugin starting its foreground
+ * service before the prompt is answered on Android 14+). True when granted, or when there's nothing to ask here.
+ */
+export async function ensureNativeLocationPermission(): Promise<boolean> {
+  if (!hasNativeRunJournal() || Capacitor.getPlatform() !== "android") return true;
+  try {
+    return (await RunJournal.ensurePermission()).granted;
+  } catch {
+    return true; // the watcher's own prompt still runs
+  }
+}
+
+/**
+ * At app start: a native journal still recording for a recording that can't be continued here (none saved, or
+ * finished) is stopped, so a run abandoned after a crash doesn't keep the GPS on. One that can be continued is left
+ * running: the member's route keeps being recorded until they reopen the run and continue it.
+ */
+export async function reconcileNativeRunJournal(canContinue: (key: string) => boolean): Promise<"none" | "kept" | "stopped"> {
+  if (!hasNativeRunJournal()) return "none";
+  try {
+    const { active, key } = await RunJournal.status();
+    if (!active || !key) return "none";
+    if (canContinue(key)) return "kept";
+    await RunJournal.stop();
+    return "stopped";
+  } catch {
+    return "none";
   }
 }
