@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { disconnectSleepSourceAction } from "@/server/actions/sleep-import";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 /**
  * One "Disconnect…" button. The confirm step asks what happens to the nights already imported: keep them, or remove
@@ -15,7 +16,7 @@ import { disconnectSleepSourceAction } from "@/server/actions/sleep-import";
 export function DisconnectSleepSource({ sourceLabel, importedCount }: { sourceLabel: string; importedCount: number }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [choice, setChoice] = useState<"keep" | "remove" | null>(null);
   const run = (remove: boolean) => {
     setChoice(remove ? "remove" : "keep");

@@ -45,6 +45,9 @@ jobs:
         run: npx supabase start
       - run: npx supabase db reset
       - run: npm run test:integration
+        env:
+          # Fail instead of skipping if the stack didn't come up (tests/integration/helpers.ts).
+          REQUIRE_TEST_STACK: "1"
 
   security-scan:
     # Secrets in any commit of any branch (gitleaks, pinned and checksum-verified; allowlist in .gitleaks.toml) and

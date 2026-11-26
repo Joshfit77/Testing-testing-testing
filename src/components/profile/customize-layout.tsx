@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { ArrowDown, ArrowUp, Eye, EyeOff, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -23,6 +23,7 @@ import {
 } from "@/lib/layout-prefs";
 import { cn } from "@/lib/utils";
 import { updateUiPrefsAction } from "@/server/actions/ui-prefs";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 type Labels<T extends string> = Record<T, { title: string; body: string }>;
 
@@ -70,7 +71,7 @@ export function CustomizeLayout({ defaultOrder, prefs }: { defaultOrder: HomeMod
   const [faithHidden, setFaithHidden] = useState<Set<FaithSection>>(() => new Set(prefs.faith?.hidden ?? []));
   const [train, setTrain] = useState<{ order: TrainSection[]; hidden: Set<TrainSection> }>(() => ({ order: startOrder(TRAIN_SECTIONS, prefs.train?.order), hidden: new Set(prefs.train?.hidden ?? []) }));
   const [nutrition, setNutrition] = useState<{ order: NutritionSection[]; hidden: Set<NutritionSection> }>(() => ({ order: startOrder(NUTRITION_SECTIONS, prefs.nutrition?.order), hidden: new Set(prefs.nutrition?.hidden ?? []) }));
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   type Snapshot = { order: HomeModule[]; hidden: Set<HomeModule>; faithHidden: Set<FaithSection>; train: typeof train; nutrition: typeof nutrition };
   const save = (next: Snapshot) =>

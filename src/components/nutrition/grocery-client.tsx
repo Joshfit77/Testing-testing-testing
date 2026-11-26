@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, X } from "lucide-react";
 import { ActionButton } from "@/components/common/action-button";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import type { ActionState } from "@/lib/action-state";
 import { parseQuantity } from "@/lib/domain/food-units";
 import { addGroceryItemAction, generateGroceryAction, removeGroceryItemAction, toggleGroceryItemAction } from "@/server/actions/grocery";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 function Message({ state }: { state: ActionState | null }) {
   if (!state?.message) return null;
@@ -25,7 +26,7 @@ export function GenerateGroceryForm({ defaultFrom, defaultTo }: { defaultFrom: s
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
   const [state, setState] = useState<ActionState | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <form
       className="space-y-3"
@@ -127,7 +128,7 @@ export function AddGroceryItemForm() {
   const [qty, setQty] = useState("");
   const [unit, setUnit] = useState("");
   const [state, setState] = useState<ActionState | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const quantity = qty.trim() ? parseQuantity(qty) : null;
   const qtyBad = quantity != null && !(quantity > 0);
   return (

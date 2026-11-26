@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeftRight, Check, Loader2, Minus, Plus, Repeat2 } from "lucide-react";
@@ -24,6 +24,7 @@ import {
   swapPlanMealAction,
   type SwapOption,
 } from "@/server/actions/meal-plan";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 function Message({ state }: { state: ActionState | null }) {
   if (!state?.message) return null;
@@ -56,7 +57,7 @@ export function PlannerSettingsForm({ prefs }: { prefs: PlannerPrefsView }) {
   const [dislikes, setDislikes] = useState(prefs.dislikes.join(", "));
   const [includeApp, setIncludeApp] = useState(prefs.includeApp);
   const [state, setState] = useState<ActionState | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <form
       className="space-y-3"
@@ -118,7 +119,7 @@ export function GeneratePlanForm({ defaultStart, hasPlan }: { defaultStart: stri
   const router = useRouter();
   const [start, setStart] = useState(defaultStart);
   const [state, setState] = useState<ActionState | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
   return (
     <form
       className="space-y-3"
@@ -196,7 +197,7 @@ function FitLine({ fit, target }: { fit: DayFit; target: PlanNutrition }) {
 function MealRow({ label, meal, myFoods }: { label: string; meal: PlanMealView; myFoods: MyFood[] }) {
   const router = useRouter();
   const [state, setState] = useState<ActionState | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [swapOpen, setSwapOpen] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [replaceIndex, setReplaceIndex] = useState<number | null>(null);
@@ -322,7 +323,7 @@ function SwapDialog({ open, onOpenChange, entryId, current, label }: { open: boo
   const router = useRouter();
   const [options, setOptions] = useState<SwapOption[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   useEffect(() => {
     if (!open) return;
     let alive = true;

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AlertTriangle, Camera, Check, ImageUp, Loader2, ListChecks, RefreshCw } from "lucide-react";
 import { IngredientAlertsSection } from "@/components/nutrition/food-iq-sections";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { LABEL_PHOTO_MAX_DIMENSION, type LabelReading, type Legibility } from "@
 import { analyzeLabel, LABEL_TEXT_MAX, unreadableParts, type LabelAnalysis, type LabelNutrition } from "@/lib/label-analysis";
 import { compressImage } from "@/lib/image-compress";
 import { logLabelFoodAction } from "@/server/actions/label";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 type Meal = "breakfast" | "lunch" | "dinner" | "snack";
 const MEALS: [Meal, string][] = [
@@ -68,7 +69,7 @@ export function LabelCheck({ photo, date: initialDate, defaultMeal }: { photo: {
   const [meal, setMeal] = useState<Meal>(defaultMeal);
   const [date, setDate] = useState(initialDate);
   const [saveId, setSaveId] = useState("");
-  const [saving, start] = useTransition();
+  const [saving, start] = useSafeTransition();
   const [saved, setSaved] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 

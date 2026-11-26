@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { giveBodyScanConsentAction } from "@/server/actions/body-scan";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 const POINTS = [
   "Body Scan stores the front, side and optional rear photos you take, plus any measurements you enter.",
@@ -19,7 +20,7 @@ const POINTS = [
 export function BodyScanConsentCard() {
   const router = useRouter();
   const [agreed, setAgreed] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
   return (
     <Card data-testid="body-scan-consent">

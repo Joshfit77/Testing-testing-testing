@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { updateMealItemAction } from "@/server/actions/nutrition";
 import { isFavoritableKey } from "@/lib/domain/food-favorites";
 import { FavoriteStar } from "./favorite-star";
 import { SourceBadge } from "./source-badge";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 const fmt = (n: number | null | undefined, d = 1) => (n == null ? null : Number.isInteger(n) ? String(n) : n.toFixed(d).replace(/\.0$/, ""));
 
@@ -235,7 +236,7 @@ export function EditableMealItem({ item }: { item: EditableItem }) {
   const [open, setOpen] = useState(false);
   const [mealType, setMealType] = useState(item.mealType);
   const [result, setResult] = useState<ActionState | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <button

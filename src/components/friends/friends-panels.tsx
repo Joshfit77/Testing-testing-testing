@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { Check, Flag, Search, Share2, ShieldBan, UserMinus, UserPlus, X } from "lucide-react";
 import { Avatar } from "@/components/friends/avatar";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,7 @@ import {
   withdrawFriendInviteAction,
 } from "@/server/actions/friends";
 import type { OpenFriendInvite } from "@/server/services/friends";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 async function shareOrCopy(text: string): Promise<void> {
   try {
@@ -69,7 +70,7 @@ export function UsernameForm({ current, submitLabel = "Save username", onDone }:
   const router = useRouter();
   const [value, setValue] = useState(current ?? "");
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const name = normalizeUsername(value);
   return (
     <form
@@ -135,7 +136,7 @@ export function FriendSearch() {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const latest = useRef(0);
 
   const search = () => {
@@ -229,7 +230,7 @@ export function FriendSearch() {
 /** Requests sent to me: accept or decline. */
 export function IncomingRequests({ requests }: { requests: RequestEntry[] }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const respond = (r: RequestEntry, accept: boolean) =>
     start(async () => {
       const res = await respondFriendRequestAction(r.requestId, accept);
@@ -263,7 +264,7 @@ export function IncomingRequests({ requests }: { requests: RequestEntry[] }) {
 /** Requests I sent that haven't been answered: withdraw. */
 export function OutgoingRequests({ requests }: { requests: RequestEntry[] }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <ul className="space-y-2" data-testid="friend-requests-outgoing">
       {requests.map((r) => (
@@ -297,7 +298,7 @@ export function OutgoingRequests({ requests }: { requests: RequestEntry[] }) {
 /** My open invite links, with share and withdraw, and a button for a new one. */
 export function InviteLinks({ invites, siteUrl }: { invites: OpenFriendInvite[]; siteUrl: string }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const create = () =>
     start(async () => {
       const r = await createFriendInviteAction();
@@ -357,7 +358,7 @@ export function InviteLinks({ invites, siteUrl }: { invites: OpenFriendInvite[];
 /** The privacy switches. Each takes effect at once. */
 export function PrivacySwitches({ initial, group }: { initial: PrivacySettings; group: "finding" | "friends" }) {
   const [settings, setSettings] = useState<PrivacySettings>(initial);
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   const toggle = (key: PrivacyKey, value: boolean) => {
     const prev = settings;
     setSettings({ ...settings, [key]: value });
@@ -394,7 +395,7 @@ export function PrivacySwitches({ initial, group }: { initial: PrivacySettings; 
 /** Members I blocked, with unblock. */
 export function BlockedList({ blocked }: { blocked: BlockedEntry[] }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <ul className="space-y-2" data-testid="friends-blocked">
       {blocked.map((b) => (
@@ -424,7 +425,7 @@ export function BlockedList({ blocked }: { blocked: BlockedEntry[] }) {
 /** On a friend's profile: remove, block or report. */
 export function FriendActions({ userId, name }: { userId: string; name: string }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [reporting, setReporting] = useState(false);
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState("");
@@ -542,7 +543,7 @@ export function AcceptInvite({ code, hasUsername }: { code: string; hasUsername:
   const [ready, setReady] = useState(hasUsername);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   const accept = () => {
     setError(null);

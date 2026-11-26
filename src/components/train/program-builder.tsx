@@ -1,7 +1,7 @@
 "use client";
 
 import { EQUIPMENT_PRESETS } from "@/lib/domain/equipment-presets";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Anchor,
@@ -63,6 +63,7 @@ import { cmToFeetInches, displayWeight, feetInchesToCm, formatDuration, toKg, we
 import { cn } from "@/lib/utils";
 import type { CustomProgramFormInput } from "@/lib/validation/schemas";
 import { buildCustomProgramAction } from "@/server/actions/custom-programs";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 const TYPE_ICONS: Record<CustomProgramType, LucideIcon> = {
   strength: Dumbbell,
@@ -171,7 +172,7 @@ export function ProgramBuilder({
 }) {
   const units = initial.units;
   const unit = weightUnit(units);
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
 
   const [type, setType] = useState<CustomProgramType | null>(initialType);

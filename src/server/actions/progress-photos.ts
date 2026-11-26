@@ -69,8 +69,10 @@ export async function saveProgressPhotoAction(input: unknown): Promise<Result> {
   }
   if (error) {
     logError("progress_photos.insert", error);
-    // Don't leave an orphaned object behind.
-    await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([v.path]);
+    // Don't leave an orphaned object behind, but never delete a file a saved photo already uses (an earlier attempt
+    // whose reply was lost, retried with different details).
+    const { data: inUse, error: useErr } = await supabase.from("progress_photos").select("id").eq("user_id", user.id).eq("storage_path", v.path).limit(1);
+    if (!useErr && !inUse?.length) await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([v.path]);
     return { ok: false, error: "Couldn't save your photo. Please try again." };
   }
   revalidatePath("/progress", "layout");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { DraftRestoredNotice } from "@/components/drafts/draft-notice";
@@ -17,6 +17,7 @@ import { parseQuantity } from "@/lib/domain/food-units";
 import { perServing, recipeTotals } from "@/lib/domain/recipes";
 import { useDraft } from "@/lib/use-draft";
 import { saveRecipeAction } from "@/server/actions/recipes";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 export interface EditorIngredient {
   /** Local id for React keys. */
@@ -50,7 +51,7 @@ export function RecipeEditor({ recipeId, initial, myFoods }: { recipeId?: string
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editing, setEditing] = useState<EditorIngredient | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   const servings = parseQuantity(v.servings);
   const servingsOk = Number.isFinite(servings) && servings > 0 && servings <= 100;

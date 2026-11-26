@@ -1,12 +1,13 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { addDays } from "@/lib/domain/dates";
 import { movePlannedSessionAction } from "@/server/actions/calendar";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 /** "Move" control for one planned session: pick a new date (today or later, not before the previous session). */
 export function MoveSession({ dayId, name, date, minDate }: { dayId: string; name: string; date: string; minDate: string }) {
@@ -15,7 +16,7 @@ export function MoveSession({ dayId, name, date, minDate }: { dayId: string; nam
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(date === minDate ? addDays(date, 1) : date);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();

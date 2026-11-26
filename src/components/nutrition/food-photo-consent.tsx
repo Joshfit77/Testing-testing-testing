@@ -1,15 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { setFoodPhotoConsentAction } from "@/server/actions/food-photo";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 export function FoodPhotoConsentCard() {
   const router = useRouter();
   const [agreed, setAgreed] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
   return (
     <section className="space-y-4 rounded-2xl border border-gold-muted/60 bg-card p-5" aria-labelledby="photo-consent-title" data-testid="food-photo-consent">

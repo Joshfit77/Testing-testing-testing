@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Bookmark, BookmarkCheck, Brain, Copy, Minus, NotebookPen, Plus, Settings2, Share2, Trash2, X } from "lucide-react";
@@ -24,6 +24,9 @@ import {
   toggleBookmarkAction,
   type HighlightColor,
 } from "@/server/actions/bible";
+import { useSafeTransition } from "@/lib/use-safe-transition";
+import { useDraft } from "@/lib/use-draft";
+import { DraftRestoredNotice } from "@/components/drafts/draft-notice";
 
 export interface ReaderNote {
   id: string;
@@ -75,7 +78,7 @@ export function ChapterReader(props: {
   const [scale, setScale] = useState(props.fontScale);
   const [noteOpen, setNoteOpen] = useState<{ id: string | null; start: number; end: number; body: string } | null>(null);
   const [viewNotes, setViewNotes] = useState<number | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [redLetters, setRedLetters] = useState(props.redLetters ?? true);
   const [pageTheme, setPageTheme] = useState<BiblePageTheme>(props.pageTheme ?? "dark");
   const [displayOpen, setDisplayOpen] = useState(false);
@@ -394,46 +397,25 @@ export function ChapterReader(props: {
       <Dialog open={noteOpen !== null} onOpenChange={(o) => !o && setNoteOpen(null)}>
         <DialogContent side="bottom">
           {noteOpen && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const body = String(new FormData(e.currentTarget).get("body") ?? "");
+            <NoteForm
+              key={`${noteOpen.id ?? "new"}:${noteOpen.start}-${noteOpen.end}`}
+              note={noteOpen}
+              reference={selectionReference(bookId, chapter, verseRange(noteOpen.start, noteOpen.end))}
+              draftKey={`bible.note.${bookId}.${chapter}.${noteOpen.start}-${noteOpen.end}.${noteOpen.id ?? "new"}`}
+              pending={pending}
+              onCancel={() => setNoteOpen(null)}
+              onSave={(body, done) =>
                 start(async () => {
                   const r = await saveBibleNoteAction({ id: noteOpen.id, bookId, chapter, verseStart: noteOpen.start, verseEnd: noteOpen.end, body });
                   if (!r.ok) return toast.error(r.error);
+                  done();
                   toast.success("Note saved. Only you can see it.");
                   setNoteOpen(null);
                   setSelected([]);
                   router.refresh();
-                });
-              }}
-            >
-              <DialogHeader>
-                <DialogTitle>Note on {selectionReference(bookId, chapter, verseRange(noteOpen.start, noteOpen.end))}</DialogTitle>
-                <DialogDescription>Private to you. Notes are never shared or given to the AI.</DialogDescription>
-              </DialogHeader>
-              <label htmlFor="bible-note" className="sr-only">
-                Note
-              </label>
-              <textarea
-                id="bible-note"
-                name="body"
-                defaultValue={noteOpen.body}
-                required
-                maxLength={10000}
-                rows={6}
-                autoFocus
-                className="w-full rounded-xl border border-border bg-elevated p-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight"
-              />
-              <div className="mt-3 flex justify-end gap-2">
-                <Button type="button" variant="secondary" onClick={() => setNoteOpen(null)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={pending}>
-                  Save note
-                </Button>
-              </div>
-            </form>
+                })
+              }
+            />
           )}
         </DialogContent>
       </Dialog>
@@ -494,5 +476,63 @@ function ToolButton({ onClick, label, icon, disabled }: { onClick: () => void; l
       {icon}
       {label}
     </button>
+  );
+}
+
+/**
+ * The note editor. What is typed is kept on this device (per member) until it is saved, so a failed save, a lost
+ * connection or an accidental swipe that closes the sheet never loses it: reopening the same verses brings it back.
+ */
+function NoteForm(props: {
+  note: { id: string | null; body: string };
+  reference: string;
+  draftKey: string;
+  pending: boolean;
+  onCancel: () => void;
+  onSave: (body: string, done: () => void) => void;
+}) {
+  const draft = useDraft(props.draftKey, props.note.body);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        props.onSave(draft.value, draft.clear);
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>Note on {props.reference}</DialogTitle>
+        <DialogDescription>Private to you. Notes are never shared or given to the AI.</DialogDescription>
+      </DialogHeader>
+      {draft.restored && <DraftRestoredNotice label="Unsaved note restored" onDiscard={draft.clear} onDismiss={draft.dismissRestored} />}
+      <label htmlFor="bible-note" className="sr-only">
+        Note
+      </label>
+      <textarea
+        id="bible-note"
+        name="body"
+        value={draft.value}
+        onChange={(e) => draft.setValue(e.target.value)}
+        required
+        maxLength={10000}
+        rows={6}
+        autoFocus
+        className="w-full rounded-xl border border-border bg-elevated p-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight"
+      />
+      <div className="mt-3 flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            draft.clear(); // Cancel is a deliberate discard; closing the sheet any other way keeps the draft
+            props.onCancel();
+          }}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={props.pending}>
+          Save note
+        </Button>
+      </div>
+    </form>
   );
 }

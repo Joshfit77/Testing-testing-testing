@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
 import type { FoodChoice } from "@/lib/domain/food-basis";
 import { isFavoritableKey } from "@/lib/domain/food-favorites";
 import { cn } from "@/lib/utils";
 import { setFoodFavoriteAction } from "@/server/actions/nutrition";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 /**
  * Star toggle for a food (search results, the amount step, diary rows, the Favorites tab).
@@ -24,7 +25,7 @@ export function FavoriteStar({
 }) {
   const [on, setOn] = useState(initial);
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   useEffect(() => setOn(initial), [initial]);
   if (!isFavoritableKey(food.key)) return null;
 

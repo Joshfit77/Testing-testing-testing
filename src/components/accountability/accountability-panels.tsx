@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Send, Share2, UserMinus, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { confirmDialog } from "@/components/ui/confirm";
@@ -28,6 +28,7 @@ import {
   withdrawInviteAction,
 } from "@/server/actions/accountability";
 import type { OpenInvite, PartnerView } from "@/server/services/accountability";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 async function shareOrCopy(text: string): Promise<void> {
   try {
@@ -49,7 +50,7 @@ const dateFmt = (iso: string) => new Date(iso).toLocaleDateString(undefined, { m
 /** My open invite codes, with share and withdraw, and a button for a new one. */
 export function InviteCodes({ invites, full }: { invites: OpenInvite[]; full: boolean }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   const create = () =>
     start(async () => {
@@ -114,7 +115,7 @@ export function EnterCodeForm({ disabled }: { disabled: boolean }) {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <form
       className="space-y-2"
@@ -167,7 +168,7 @@ export function PartnerCard({ partner }: { partner: PartnerView }) {
   const router = useRouter();
   const [shares, setShares] = useState<ShareSettings>(partner.myShares);
   const [showNudges, setShowNudges] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const name = partner.summary.partnerName;
   const lines = summaryLines(partner.summary);
 

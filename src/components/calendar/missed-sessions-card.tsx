@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarX2, Loader2 } from "lucide-react";
@@ -9,6 +9,7 @@ import { confirmDialog } from "@/components/ui/confirm";
 import { toast } from "@/components/ui/toaster";
 import { MoveSession } from "@/components/calendar/move-session";
 import { skipMissedSessionsAction } from "@/server/actions/calendar";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 export interface MissedSessionsView {
   missed: { dayId: string; name: string; wasDue: string }[];
@@ -30,7 +31,7 @@ export function MissedSessionsCard({ view, today, canReschedule, startHref }: { 
   const signature = first ? `${first.dayId}:${first.wasDue}:${today}` : "";
   const [hidden, setHidden] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   useEffect(() => {
     try {

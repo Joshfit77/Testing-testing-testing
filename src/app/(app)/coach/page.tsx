@@ -92,8 +92,13 @@ export default async function CoachPage({
   const plans = getPlans();
   const conversations = convRes.data ?? [];
   const { data: memoryProfile } = await supabase.from("profiles").select("coach_memory_enabled").eq("id", user.id).maybeSingle();
-  const selected =
-    sp.c && conversations.find((c) => c.id === sp.c) ? sp.c : null;
+  // The history lists the 30 most recent chats; a link to an older one (from memories or a bookmark) still opens it.
+  let selectedConversation = sp.c ? conversations.find((c) => c.id === sp.c) : undefined;
+  if (sp.c && !selectedConversation && /^[0-9a-f-]{36}$/i.test(sp.c)) {
+    const { data: older } = await supabase.from("ai_conversations").select("id, title, updated_at, memory_off").eq("user_id", user.id).eq("id", sp.c).maybeSingle();
+    if (older) selectedConversation = older;
+  }
+  const selected = selectedConversation?.id ?? null;
   const { data: msgs } = selected
     ? await supabase
         .from("ai_messages")
@@ -248,7 +253,7 @@ export default async function CoachPage({
               entitled
                 ? {
                     enabled: Boolean(memoryProfile?.coach_memory_enabled),
-                    chatOff: Boolean(conversations.find((c) => c.id === selected)?.memory_off),
+                    chatOff: Boolean(selectedConversation?.memory_off),
                   }
                 : null
             }

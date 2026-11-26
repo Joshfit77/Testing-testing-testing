@@ -352,6 +352,7 @@ function calcProfile(ctx: ToolContext) {
     diet: isDietType(s.dietType) ? s.dietType : null,
     activity: isActivityLevel(s.activity) ? s.activity : null,
     weeklyChangeKg: s.weeklyChangeKg,
+    goalWeightKg: s.goalWeightKg,
   };
 }
 

@@ -11,6 +11,26 @@ async function fillLastEightHours(page: Page) {
   await page.getByLabel("Got up").fill(up.toISOString().slice(0, 16));
 }
 
+/**
+ * These tests seed "last night" and "today" from the clock (in UTC, the test account's zone). A run that crosses
+ * midnight UTC sees the dates change underneath it, so a test that would start in the last few minutes before
+ * midnight waits until just after it. Nothing is skipped and no assertion changes; it only avoids the boundary.
+ */
+const MIDNIGHT_MARGIN_MS = 4 * 60_000;
+function msUntilSafeOfUtcMidnight(now = Date.now()): number {
+  const nextMidnight = Math.ceil((now + 1) / 86_400_000) * 86_400_000;
+  const left = nextMidnight - now;
+  return left <= MIDNIGHT_MARGIN_MS ? left + 5_000 : 0;
+}
+
+test.beforeEach(async () => {
+  const wait = msUntilSafeOfUtcMidnight();
+  if (wait > 0) {
+    test.info().setTimeout(test.info().timeout + wait);
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+});
+
 test.describe("Sleep & Recovery", () => {
   test("a night recorded by a watch: stages, overnight measurements and the connection status, nothing invented", async ({ page }) => {
     test.setTimeout(150_000);

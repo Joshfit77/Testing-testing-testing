@@ -1,7 +1,7 @@
 "use client";
 
 import { EQUIPMENT_PRESETS } from "@/lib/domain/equipment-presets";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
@@ -36,6 +36,7 @@ import type { OnboardingInput } from "@/lib/validation/schemas";
 import { saveOnboardingAction } from "@/server/actions/onboarding";
 import { DIET_TYPES, DIETS, type DietType } from "@/lib/domain/diets";
 import type { Sex } from "@/lib/domain/nutrition";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 const DIET_LABELS: Record<DietaryPreference, string> = {
   no_preference: "No preference",
@@ -74,7 +75,7 @@ const STEPS = ["About you", "Your goal", "Your schedule", "Diet & preferences"] 
 
 export function OnboardingWizard({ initial, mode = "create" }: { initial: OnboardingInitial; mode?: "create" | "edit" }) {
   const [step, setStep] = useState(0);
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState<string | null>(null);

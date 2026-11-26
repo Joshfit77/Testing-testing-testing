@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { applyDisplayPrefs, type TextSize } from "@/components/shell/app-shell";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import { updateUiPrefsAction, type UiPrefsInput } from "@/server/actions/ui-prefs";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 const SIZES: { value: TextSize; label: string; sample: string }[] = [
   { value: "default", label: "Default", sample: "text-base" },
@@ -18,7 +19,7 @@ export function DisplaySettings({ initial }: { initial: { textSize: TextSize; re
   const [textSize, setTextSize] = useState<TextSize>(initial.textSize);
   const [reduceMotion, setReduceMotion] = useState(initial.reduceMotion);
   const [homeScripture, setHomeScripture] = useState(initial.homeScripture);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   const save = (patch: UiPrefsInput, revert: () => void) =>
     start(async () => {

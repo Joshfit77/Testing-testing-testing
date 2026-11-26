@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { deleteWeeklyReportAction } from "@/server/actions/weekly-reports";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 /**
  * Copy the shareable summary (headline numbers only: no foods, notes, journal or photos) and delete the report.
@@ -13,7 +14,7 @@ export function ReportActions({ weekStart, summary }: { weekStart: string; summa
   const router = useRouter();
   const [status, setStatus] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   async function share() {
     try {

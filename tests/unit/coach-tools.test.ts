@@ -106,6 +106,20 @@ describe("calculator", () => {
     expect(runCalculation({ ...calcBase, operation: "calorie_budget" }, { ...profile, age: null })).toHaveProperty("note");
   });
 
+  it("steers the saved pace toward the goal weight, as the app's budget does (O-15)", () => {
+    // At the goal weight: no further loss, so the budget is maintenance, with a note saying why.
+    const atGoal = runCalculation({ ...calcBase, operation: "calorie_budget" }, { ...profile, goalWeightKg: 83 }) as { calories: number; maintenance: number; note: string; inputs: { weeklyChangeKg: number } };
+    expect(atGoal.inputs.weeklyChangeKg).toBe(0);
+    expect(Math.abs(atGoal.calories - atGoal.maintenance)).toBeLessThanOrEqual(10);
+    expect(atGoal.note).toMatch(/adjusted to 0 kg\/week because of the goal weight/);
+    // Goal above current weight with a saved loss pace: the pace turns to gain.
+    const below = runCalculation({ ...calcBase, operation: "calorie_budget" }, { ...profile, goalWeightKg: 90 }) as { inputs: { weeklyChangeKg: number } };
+    expect(below.inputs.weeklyChangeKg).toBe(0.5);
+    // Still far from the goal: unchanged. An explicit "what if" pace is calculated as asked.
+    expect((runCalculation({ ...calcBase, operation: "calorie_budget" }, { ...profile, goalWeightKg: 75 }) as { inputs: { weeklyChangeKg: number } }).inputs.weeklyChangeKg).toBe(-0.5);
+    expect((runCalculation({ ...calcBase, operation: "calorie_budget", weekly_change_kg: -0.25 }, { ...profile, goalWeightKg: 83 }) as { inputs: { weeklyChangeKg: number } }).inputs.weeklyChangeKg).toBe(-0.25);
+  });
+
   it("guards nutrition targets: floor, macro math and protein range", () => {
     const ctx = { sex: "female" as const, weightKg: 60 };
     expect(checkNutritionTargets({ calories: 1800, protein_g: 120, carbs_g: 200, fat_g: 58 }, ctx)).toEqual([]);

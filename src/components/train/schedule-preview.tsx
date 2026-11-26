@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { Notice } from "@/components/common/states";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { buildCustomProgram } from "@/lib/domain/custom-programs";
 import type { CatalogExercise } from "@/lib/domain/program-generator";
 import { starterProgramInput, type StarterAnswers } from "@/lib/domain/starter-program";
 import { applyScheduleChangeAction } from "@/server/actions/plan-schedule";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 const DAY_OPTIONS = [2, 3, 4, 5, 6];
 const MINUTE_OPTIONS = [30, 45, 60, 75, 90];
@@ -25,7 +26,7 @@ export function SchedulePreview({ answers, catalog, current, suggestedDays }: { 
   const router = useRouter();
   const [days, setDays] = useState(suggestedDays ?? answers.daysPerWeek);
   const [minutes, setMinutes] = useState(answers.sessionMinutes);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);
   const proposed = useMemo(
     () => {

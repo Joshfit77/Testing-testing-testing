@@ -89,6 +89,25 @@ test.describe("Bible reader", () => {
     await expect(page.getByRole("dialog").getByText("God's love gives, and keeps.")).toBeVisible();
     await page.keyboard.press("Escape");
 
+    // A note survives a failed save and a closed sheet (O-11): offline, saving shows a message and keeps the text;
+    // closing the sheet and opening the note again brings the text back, and it saves once online.
+    await page.locator("#v18").getByRole("button").click();
+    await page.getByRole("toolbar").getByRole("button", { name: "Note", exact: true }).click();
+    const draftNote = page.getByRole("dialog");
+    await draftNote.getByLabel("Note").fill("Not condemned.");
+    await page.context().setOffline(true);
+    await draftNote.getByRole("button", { name: "Save note" }).click();
+    await expect(page.getByText(/You appear to be offline|didn't go through/)).toBeVisible();
+    await expect(draftNote.getByLabel("Note")).toHaveValue("Not condemned.");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await page.context().setOffline(false);
+    await page.getByRole("toolbar").getByRole("button", { name: "Note", exact: true }).click();
+    await expect(page.getByRole("dialog").getByLabel("Note")).toHaveValue("Not condemned.");
+    await expect(page.getByTestId("draft-restored")).toBeVisible();
+    await page.getByRole("dialog").getByRole("button", { name: "Save note" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Note saved. Only you can see it." }).last()).toBeVisible();
+
     // Copy gives the exact words and the reference.
     await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.locator("#v16").getByRole("button").click();

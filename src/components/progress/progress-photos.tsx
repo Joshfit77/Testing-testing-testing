@@ -83,7 +83,9 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
 
   // An upload whose save we couldn't confirm (connection lost): retries reuse the same file, and the server treats a
   // second save of the same file as already done, so a retry never makes a second entry or loses the image.
-  const pending = useRef<{ file: File; path: string } | null>(null);
+  // `unconfirmed` marks a file whose earlier save may have succeeded on the server: it is never deleted from here, since
+  // a saved photo may already point at it (the server only removes a file that no saved photo uses).
+  const pending = useRef<{ file: File; path: string; unconfirmed: boolean } | null>(null);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return setError("Choose a photo first.");
@@ -110,16 +112,22 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
         setStage("idle");
         return setError(photoUploadErrorMessage(upErr));
       }
-      pending.current = { file, path };
+      pending.current = { file, path, unconfirmed: false };
     }
     setStage("saving");
     const res = await saveProgressPhotoAction({ path, takenOn, pose, note, weight }).catch(() => null);
     if (!res) {
       // The server may have saved it: keep the file and let a retry confirm (no second entry).
+      if (pending.current) pending.current.unconfirmed = true;
       setStage("idle");
       return setError("We couldn't confirm the save. Check your connection and tap Save again.");
     }
     if (!res.ok) {
+      if (pending.current?.unconfirmed) {
+        // An earlier attempt may have saved this photo; keep the file and the upload so a corrected retry confirms it.
+        setStage("idle");
+        return setError(res.error);
+      }
       await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([path]).catch(() => null);
       pending.current = null;
       setStage("idle");

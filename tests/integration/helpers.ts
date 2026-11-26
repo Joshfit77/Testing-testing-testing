@@ -13,13 +13,27 @@ export function anonClient(): SupabaseClient {
   return createClient(url(), anonKey(), { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
+/**
+ * Whether the local Supabase stack is reachable. Suites skip themselves when it isn't, which is convenient on a laptop
+ * without Docker but would let a broken CI job pass silently: with REQUIRE_TEST_STACK=1 (set in CI and by
+ * `npm run verify`) an unreachable stack fails the run instead.
+ */
 export async function stackAvailable(): Promise<boolean> {
+  let ok = false;
   try {
     const res = await fetch(`${url()}/auth/v1/health`, { headers: { apikey: anonKey() }, signal: AbortSignal.timeout(3000) });
-    return res.ok;
+    ok = res.ok;
   } catch {
-    return false;
+    ok = false;
   }
+  if (!ok && requireStack()) {
+    throw new Error(`REQUIRE_TEST_STACK is set but the Supabase stack at ${url()} isn't reachable. Run \`npx supabase start\`.`);
+  }
+  return ok;
+}
+
+export function requireStack(): boolean {
+  return process.env.REQUIRE_TEST_STACK === "1" || process.env.REQUIRE_TEST_STACK === "true";
 }
 
 export interface TestUser {

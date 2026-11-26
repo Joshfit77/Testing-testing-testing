@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, RefreshCw, ThumbsUp, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { redLetterWordFlags, type TextPart } from "@/lib/bible/red-letter";
 import { ScriptureText } from "@/components/bible/scripture-text";
 import { cn } from "@/lib/utils";
 import { reviewMemoryAction } from "@/server/actions/bible";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 /**
  * Practise one memory passage: words hidden for the current level (tap one to see it), or recall the reference from
@@ -21,7 +22,7 @@ export function MemoryPractice({ id, text, parts, reference, level }: { id: stri
   const [seed, setSeed] = useState(0);
   const [shown, setShown] = useState<Set<number>>(new Set());
   const [refShown, setRefShown] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const words = useMemo(() => maskWords(text, level, seed), [text, level, seed]);
   // Words of Jesus stay red when shown (same word split as maskWords).
   const red = useMemo(() => (parts ? redLetterWordFlags(parts) : []), [parts]);

@@ -296,6 +296,30 @@ test.describe("AI coach", () => {
     await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
   });
 
+  test("a link to a conversation older than the 30 in History still opens it (O-15)", async ({ page }) => {
+    test.skip(!MOCK_PORT, "set E2E_ANTHROPIC_MOCK_PORT and start the app with ANTHROPIC_BASE_URL pointing at it");
+    const email = uniqueEmail("coach-old-chat");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await grantPlan(email, "pro");
+    const uid = await userIdFor(email);
+    await serviceRest(`profiles?id=eq.${uid}`, { method: "PATCH", body: { ai_data_consent_at: new Date().toISOString() }, prefer: "return=minimal" });
+    const oldId = crypto.randomUUID();
+    const recent = Array.from({ length: 30 }, (_, i) => ({ id: crypto.randomUUID(), user_id: uid, title: `Recent chat ${i + 1}`, updated_at: new Date(Date.now() - i * 60_000).toISOString() }));
+    await serviceRest("ai_conversations", { method: "POST", body: [{ id: oldId, user_id: uid, title: "The oldest chat", updated_at: "2025-01-05T10:00:00Z" }, ...recent], prefer: "return=minimal" });
+    await serviceRest("ai_messages", {
+      method: "POST",
+      body: [
+        { conversation_id: oldId, user_id: uid, role: "user", content: "How should I warm up for squats?", created_at: "2025-01-05T10:00:00Z" },
+        { conversation_id: oldId, user_id: uid, role: "assistant", content: "Start with an empty bar and add weight over three sets.", created_at: "2025-01-05T10:00:05Z" },
+      ],
+      prefer: "return=minimal",
+    });
+    await page.goto(`/coach?c=${oldId}`);
+    await expect(page.getByText("Start with an empty bar and add weight over three sets.")).toBeVisible();
+    await expect(page.getByText("How should I warm up for squats?")).toBeVisible();
+  });
+
   test("streams a tool-using answer, persists history and applies a confirmed swap", async ({ page, context }) => {
     test.skip(!MOCK_PORT, "set E2E_ANTHROPIC_MOCK_PORT and start the app with ANTHROPIC_BASE_URL pointing at it");
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);

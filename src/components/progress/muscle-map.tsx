@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Info, Loader2 } from "lucide-react";
 import { BarSeriesChart, LineSeriesChart } from "@/components/charts/charts";
 import { Notice } from "@/components/common/states";
@@ -30,6 +30,7 @@ import { formatRecordValue, RECORD_TYPE_LABEL } from "@/lib/domain/record-labels
 import { setStrengthStandardsAction } from "@/server/actions/body-map";
 import { BodyFigure, type FigureView, type RegionPaint } from "./body-figure";
 import { BELOW_BRONZE_COLOR, RANK_COLORS, StrengthRankEmblem } from "./strength-rank-emblem";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 const FRONT: BodyRegion[] = ["shoulders", "chest", "biceps", "forearms", "abdominals", "quadriceps", "calves"];
 const VOLUME_COLORS: Record<VolumeBand, string> = { none: "#1f1d19", low: "#7a6230", in_range: "#cfa53e", high: "#d9774f", no_range: "#8b7d5c" };
@@ -170,7 +171,7 @@ export function MuscleMap(props: MuscleMapProps) {
 
 function StandardsChooser({ table }: { table: StandardsTable | null }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [msg, setMsg] = useState<{ text: string } | null>(null);
   const choose = (t: StandardsTable) =>
     start(async () => {

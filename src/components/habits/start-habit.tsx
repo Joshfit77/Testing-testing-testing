@@ -1,14 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { startHabitProgramAction } from "@/server/actions/habit-programs";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 export function StartHabitProgram({ slug, label = "Start program" }: { slug: string; label?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <div className="space-y-2">
       <Button

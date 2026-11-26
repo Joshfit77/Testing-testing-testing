@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import { saveStudyNotesAction } from "@/server/actions/studies";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 export function StudyNotesForm({ study, lesson, initial }: { study: string; lesson: string; initial: string }) {
   const [value, setValue] = useState(initial);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <form
       onSubmit={(e) => {

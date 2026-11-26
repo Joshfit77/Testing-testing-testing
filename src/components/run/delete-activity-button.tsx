@@ -1,16 +1,16 @@
 "use client";
 
-import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { confirmDialog } from "@/components/ui/confirm";
 import { toast } from "@/components/ui/toaster";
 import { deleteActivityAction } from "@/server/actions/activities";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 export function DeleteActivityButton({ id, label }: { id: string; label: string }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Button
       type="button"

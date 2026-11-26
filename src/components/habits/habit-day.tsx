@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { HabitActivity } from "@/lib/domain/habit-programs";
 import { setHabitActivityAction, stopHabitProgramAction, updateHabitGoalsAction } from "@/server/actions/habit-programs";
 import type { HabitGoalField } from "@/lib/domain/habit-programs";
 import { cn } from "@/lib/utils";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 export interface DayItem extends HabitActivity {
   done: boolean;
@@ -20,7 +21,7 @@ export interface DayItem extends HabitActivity {
 export function HabitDay({ enrollmentId, day, items, editable }: { enrollmentId: string; day: number; items: DayItem[]; editable: boolean }) {
   const [state, setState] = useState(items);
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   function toggle(item: DayItem, answer?: string) {
     if (!editable || item.auto) return;
@@ -103,7 +104,7 @@ function CheckinAnswer({ item, onSave }: { item: DayItem; onSave: (answer: strin
 export function HabitGoals({ enrollmentId, fields, goals }: { enrollmentId: string; fields: HabitGoalField[]; goals: Record<string, number> }) {
   const [values, setValues] = useState<Record<string, number>>(() => Object.fromEntries(fields.map((f) => [f.key, goals[f.key] ?? f.default])));
   const [msg, setMsg] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   if (!fields.length) return null;
   return (
     <form
@@ -135,7 +136,7 @@ export function HabitGoals({ enrollmentId, fields, goals }: { enrollmentId: stri
 
 export function StopHabitProgram({ enrollmentId }: { enrollmentId: string }) {
   const [confirm, setConfirm] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return confirm ? (
     <Button type="button" variant="destructive" disabled={pending} onClick={() => start(async () => void (await stopHabitProgramAction(enrollmentId)))}>
       Yes, stop (your records stay)

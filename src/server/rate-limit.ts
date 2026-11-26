@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { headers } from "next/headers";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { isServiceRoleConfigured } from "@/server/env";
@@ -78,7 +78,24 @@ export function clientIpFrom(h: Headers): string {
   return (forwarded || h.get("x-real-ip") || "unknown").slice(0, 64);
 }
 
-/** Stable, non-reversible key part for an identifier such as an email address or IP (counters never store it). */
+/**
+ * The secret that keys {@link hashKey}: derived from the service-role key (server-only, already required wherever the
+ * shared limiter runs), so no extra setting is needed. Without it (local development without Supabase) the plain hash
+ * is used. Rotating the service-role key only restarts the short rate-limit windows.
+ */
+function hashSecret(): string | null {
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return service ? createHash("sha256").update(`ngf-rate-limit-key:${service}`).digest("hex") : null;
+}
+
+/**
+ * Stable, non-reversible key part for an identifier such as an email address or IP (counters never store it). Keyed
+ * with a server secret (HMAC-SHA-256), so a copy of the rate-limit table can't be matched against a list of known
+ * email addresses by hashing them.
+ */
 export function hashKey(value: string): string {
-  return createHash("sha256").update(value.trim().toLowerCase()).digest("hex").slice(0, 32);
+  const normalized = value.trim().toLowerCase();
+  const secret = hashSecret();
+  const digest = secret ? createHmac("sha256", secret).update(normalized) : createHash("sha256").update(normalized);
+  return digest.digest("hex").slice(0, 32);
 }

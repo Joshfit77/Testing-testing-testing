@@ -1,19 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HEALTH_APP_NAME, healthSyncPlatform, type HealthPlatform } from "@/lib/native-health";
 import { readRecentSleep } from "@/lib/native-sleep";
 import { importSleepAction } from "@/server/actions/sleep-import";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 /** Reads sleep from the phone's health platform and sends it to the server, reporting exactly what was added. */
 export function SleepImportCard({ enabled }: { enabled: boolean }) {
   const router = useRouter();
   const [platform, setPlatform] = useState<HealthPlatform | null | undefined>(undefined);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   useEffect(() => setPlatform(healthSyncPlatform()), []);
 
   if (platform === undefined) return <p className="text-sm text-muted-foreground">Checking this device…</p>;

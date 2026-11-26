@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Footprints, HeartPulse, Loader2, Pencil } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
@@ -15,6 +15,7 @@ import { formatSteps, STEP_GOAL_MAX, STEP_GOAL_MIN, STEP_SOURCE_LABELS, stepAver
 import { HEALTH_APP_NAME, healthSyncPlatform, readRecentSteps, type HealthPlatform } from "@/lib/native-health";
 import { cn } from "@/lib/utils";
 import { saveStepsManualAction, syncStepsAction, updateStepGoalAction } from "@/server/actions/steps";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 export interface StepsCardProps {
   today: string;
@@ -78,7 +79,7 @@ function WeekBars({ week, goal, today, recordedDays }: { week: StepsCardProps["w
 function HealthSync() {
   const router = useRouter();
   const [platform, setPlatform] = useState<HealthPlatform | null | undefined>(undefined);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
 
   // Native detection needs `window`, so it happens after hydration.

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { submitCoachFeedbackAction } from "@/server/actions/coach-feedback";
 import { cn } from "@/lib/utils";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 type Rating = "yes" | "partially" | "no";
 const OPTIONS: { value: Rating; label: string }[] = [
@@ -21,7 +22,7 @@ export function CoachFeedback({ messageId }: { messageId: string }) {
   const [mode, setMode] = useState<"ask" | "comment" | "safety" | "sent">("ask");
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   const send = (input: { rating: Rating | null; safetyConcern: boolean; comment?: string }) =>
     start(async () => {

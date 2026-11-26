@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ActionState } from "@/lib/action-state";
@@ -8,6 +8,7 @@ import { UNDO_LOG_MS, type LogResult } from "@/lib/domain/diary";
 import { isCovered, prefersReducedMotion } from "@/lib/keyboard";
 import { cn } from "@/lib/utils";
 import { undoLoggedItemsAction } from "@/server/actions/nutrition";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 /**
  * The confirmation after food is logged ("Logged Banana (1 medium) to breakfast.") with an "Undo" beside it for
@@ -23,7 +24,7 @@ export function LoggedUndo({ result, className, onUndone }: { result: LogResult 
 function LoggedUndoLine({ result, className, onUndone }: { result: LogResult; className?: string; onUndone?: () => void }) {
   const [expired, setExpired] = useState(false);
   const [undone, setUndone] = useState<ActionState | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const canUndo = result.ok && Boolean(result.itemIds?.length);
   const line = useRef<HTMLDivElement & HTMLParagraphElement>(null);
   // The confirmation can appear below the fold or behind the phone tab bar (a long Recent foods list puts it there):

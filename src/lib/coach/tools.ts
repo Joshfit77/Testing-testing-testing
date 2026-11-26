@@ -7,7 +7,7 @@
  */
 import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
-import { ACTIVITY_LEVELS, calorieBudget, calorieFloor, isWeeklyRate, type ActivityLevel, type WeeklyRateKg } from "@/lib/domain/calorie-budget";
+import { ACTIVITY_LEVELS, calorieBudget, calorieFloor, isWeeklyRate, rateTowardGoal, type ActivityLevel, type WeeklyRateKg } from "@/lib/domain/calorie-budget";
 import type { DietType } from "@/lib/domain/diets";
 import type { Sex } from "@/lib/domain/nutrition";
 import { estimateOneRepMax } from "@/lib/domain/strength";
@@ -494,6 +494,8 @@ export interface CalcProfile {
   diet: DietType | null;
   activity: ActivityLevel | null;
   weeklyChangeKg: number | null;
+  /** The saved goal weight: the saved pace stops (or turns) at the goal, exactly as the app's own budget does. */
+  goalWeightKg?: number | null;
 }
 
 const KG_PLATES = [25, 20, 15, 10, 5, 2.5, 1.25];
@@ -557,9 +559,13 @@ export function runCalculation(input: ToolInput<"calculate">, profile: CalcProfi
       if (!weightKg || !profile.age || !profile.heightCm || !activity) {
         return { note: "Missing age, height, bodyweight or activity level in the profile; the budget can't be calculated." };
       }
-      const weeklyChangeKg = isWeeklyRate(rate) ? (rate as WeeklyRateKg) : 0;
+      const asked = isWeeklyRate(rate) ? (rate as WeeklyRateKg) : 0;
+      // The saved pace is steered toward the saved goal weight (no further loss once it's reached), as the app's own
+      // budget does (rateTowardGoal); a pace the athlete asks about explicitly is calculated as asked.
+      const weeklyChangeKg = input.weekly_change_kg == null ? rateTowardGoal(weightKg, profile.goalWeightKg, asked) : asked;
       const b = calorieBudget({ sex: profile.sex, age: profile.age, heightCm: profile.heightCm, weightKg, activity, weeklyChangeKg, goal: profile.goal ?? "general_health", diet: profile.diet });
-      return { ...b, inputs: { weightKg: r2(weightKg), activity, weeklyChangeKg }, note: "Estimate (Mifflin–St Jeor × activity); logged exercise is added back on the day." };
+      const atGoal = weeklyChangeKg !== asked ? ` The saved pace (${asked} kg/week) was adjusted to ${weeklyChangeKg} kg/week because of the goal weight (${profile.goalWeightKg} kg).` : "";
+      return { ...b, inputs: { weightKg: r2(weightKg), activity, weeklyChangeKg }, note: `Estimate (Mifflin–St Jeor × activity); logged exercise is added back on the day.${atGoal}` };
     }
   }
 }

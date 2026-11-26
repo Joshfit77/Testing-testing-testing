@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { Globe2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { initialTimeZoneOptions, timeZoneOptions } from "@/lib/time-zone-options";
 import { setJourneyTimezoneAction } from "@/server/actions/journeys";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 /**
  * The journey's time zone, and an explicit way to change it. The journey keeps the zone it started with; changing the
@@ -24,7 +25,7 @@ export function JourneyTimezone({
   const [choice, setChoice] = useState(pending?.timezone ?? (profileTimezone !== timezone ? profileTimezone : timezone));
   const [options, setOptions] = useState(() => initialTimeZoneOptions(choice));
   const [state, setState] = useState<{ pending: { timezone: string; switchAt: string } | null; error: string | null }>({ pending, error: null });
-  const [busy, start] = useTransition();
+  const [busy, start] = useSafeTransition();
   useEffect(() => {
     if (open) setOptions(timeZoneOptions(choice));
   }, [open, choice]);

@@ -53,6 +53,29 @@ describe("shared rate limiter", () => {
   });
 });
 
+describe("rate-limit key hashing (O-18)", () => {
+  it("is keyed with a server secret, so a plain SHA-256 of a known email doesn't match the stored key", async () => {
+    const { createHash } = await import("node:crypto");
+    const { hashKey } = await import("@/server/rate-limit");
+    const plain = createHash("sha256").update("member@example.com").digest("hex").slice(0, 32);
+    const prev = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    try {
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key-one";
+      const one = hashKey("member@example.com");
+      expect(one).toMatch(/^[0-9a-f]{32}$/);
+      expect(one).not.toBe(plain);
+      expect(hashKey(" Member@Example.com")).toBe(one);
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key-two";
+      expect(hashKey("member@example.com")).not.toBe(one);
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+      expect(hashKey("member@example.com")).toBe(plain);
+    } finally {
+      if (prev === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+      else process.env.SUPABASE_SERVICE_ROLE_KEY = prev;
+    }
+  });
+});
+
 describe("webhook failure codes", () => {
   it("record the error's class and code only, never its message", async () => {
     const { webhookErrorCode } = await import("@/server/services/webhook-events");

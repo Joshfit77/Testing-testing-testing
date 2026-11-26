@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Loader2, Plus, Sparkles } from "lucide-react";
 import { BarcodeScanner } from "@/components/nutrition/barcode-scanner";
 import { FoodPickerDialog } from "@/components/nutrition/food-picker";
@@ -16,6 +16,7 @@ import { EXPLAIN_FOCUS, FOCUS_LABEL, type ExplainFocus, type ProductExplanation 
 import { cn } from "@/lib/utils";
 import { logFoodAction } from "@/server/actions/nutrition";
 import { explainProductAction, setFoodFiltersAction } from "@/server/actions/food-quality";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 /** The existing barcode scanner (camera, native scanner or typed code), opening the product's quality page. */
 export function QualityScanner() {
@@ -36,7 +37,7 @@ export function AddProductToDiary({ choice, date, defaultMeal }: { choice: FoodC
   const [open, setOpen] = useState(false);
   const [meal, setMeal] = useState<Meal>(defaultMeal);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   // The amount of a save that didn't get through: the dialog reopens on it, and sending it again reuses its id.
   const [unsent, setUnsent] = useState<{ quantity: number; unitId: string } | null>(null);
   const attempt = useRef<{ key: string; id: string } | null>(null);
@@ -93,7 +94,7 @@ export function AddProductToDiary({ choice, date, defaultMeal }: { choice: FoodC
 }
 
 export function ExplainProduct({ code }: { code: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [result, setResult] = useState<ProductExplanation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [focus, setFocus] = useState<ExplainFocus>("goals");
@@ -176,7 +177,7 @@ export function ExplainProduct({ code }: { code: string }) {
 export function FiltersEditor({ initial }: { initial: FoodFilters }) {
   const router = useRouter();
   const [f, setF] = useState<FoodFilters>(initial);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const toggle = <T extends string>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   return (

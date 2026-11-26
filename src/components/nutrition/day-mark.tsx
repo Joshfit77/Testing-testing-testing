@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ActionState } from "@/lib/action-state";
 import { setDayMarkAction } from "@/server/actions/nutrition-days";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 /**
  * Mark the day complete, or record that you ate nothing (a fast). Weekly insights then count the day
@@ -15,7 +16,7 @@ import { setDayMarkAction } from "@/server/actions/nutrition-days";
 export function DayMarkControls({ date, mark, hasFood }: { date: string; mark: "complete" | "fasted" | null; hasFood: boolean }) {
   const router = useRouter();
   const [state, setState] = useState<ActionState | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const set = (status: "complete" | "fasted" | null) =>
     start(async () => {
       const res = await setDayMarkAction({ date, status });

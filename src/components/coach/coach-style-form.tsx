@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toaster";
 import { COACH_STYLE_LABELS, COACH_STYLES, type CoachStyle } from "@/lib/coach/style";
 import { setCoachStyleAction } from "@/server/actions/coach-memory";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 /** Choose how the coach talks to you. Tone and depth only: the facts, safety rules and approvals never change. */
 export function CoachStyleForm({ current }: { current: CoachStyle | null }) {
   const [value, setValue] = useState<CoachStyle | "">(current ?? "");
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <form
       data-testid="coach-style"
