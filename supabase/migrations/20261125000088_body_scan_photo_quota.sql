@@ -100,9 +100,19 @@ end;
 $$;
 revoke all on function public.enforce_body_scan_photo_quota() from public, anon, authenticated;
 
-drop trigger if exists body_scan_photos_quota on storage.objects;
-create trigger body_scan_photos_quota
-  before insert on storage.objects
-  for each row
-  when (new.bucket_id = 'body-scans')
-  execute function public.enforce_body_scan_photo_quota();
+-- Supabase grants the migration role (postgres) TRIGGER on storage.objects, locally and on hosted projects. If a project
+-- has had that grant removed, the deploy must not stop here: the storage policy (layer 1) still enforces the limit,
+-- only without the guarantee under simultaneous uploads, and a warning says so. scripts/verify-database.sql reports
+-- whether this trigger is installed after every deploy (production consolidation O-16).
+do $$
+begin
+  drop trigger if exists body_scan_photos_quota on storage.objects;
+  create trigger body_scan_photos_quota
+    before insert on storage.objects
+    for each row
+    when (new.bucket_id = 'body-scans')
+    execute function public.enforce_body_scan_photo_quota();
+exception when insufficient_privilege then
+  raise warning 'body_scan_photos_quota trigger not installed (no TRIGGER privilege on storage.objects): the storage policy still limits body scan photos, but not under simultaneous uploads';
+end
+$$;

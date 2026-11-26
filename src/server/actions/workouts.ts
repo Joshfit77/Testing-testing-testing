@@ -7,6 +7,7 @@ import { draftSnapshotSchema, editWorkoutSchema, finishWorkoutSchema } from "@/l
 import { getCurrentUser, getProfile, requireUser } from "@/server/auth";
 import { SIGNED_OUT_WORKOUT_MESSAGE } from "@/lib/domain/workout-draft";
 import { logError } from "@/server/log";
+import { withTimeout } from "@/lib/with-timeout";
 import { badgesUnlockedBySession, type BadgeIconName, type BadgeTier } from "@/lib/domain/achievements";
 import { isoDateInTz } from "@/lib/domain/dates";
 import { getAchievementStats } from "@/server/services/achievements";
@@ -138,57 +139,66 @@ export async function finishWorkoutAction(input: unknown): Promise<
   if (!parsed.data.exercises.some((e) => !e.skipped && e.sets.some((s) => s.completed))) {
     return { ok: false, error: "Complete at least one set before finishing." };
   }
+  let supabase: Awaited<ReturnType<typeof getServerSupabase>>;
+  let res: Awaited<ReturnType<typeof finishWorkout>>;
   try {
-    const supabase = await getServerSupabase();
-    const res = await finishWorkout(supabase, user.id, parsed.data);
-    // Badges are worked out from the saved sessions, so a retried finish (first response lost) shows them too.
-    const badges = await unlockedBadges(supabase, user.id, res.sessionId);
-    const profile = await getProfile(user.id);
-    // Milestones this session reached, from the saved history (so a retried finish shows them too). Never blocks the save.
-    const milestones = await milestonesReached(
-      supabase,
-      user.id,
-      res.sessionId,
-      parsed.data.exercises.filter((e) => !e.skipped).map((e) => e.exerciseId),
-      profile?.unit_system ?? "imperial",
-    ).catch((err: unknown) => {
-      logError("workouts.finish.milestones", err);
-      return [] as ReachedMilestone[];
-    });
-    const tz = profile?.timezone ?? "UTC";
-    // What the program has next, also after a workout outside it (never blocks the save: the summary goes without).
-    const programId =
-      parsed.data.userProgramId ??
-      ((await supabase.from("user_programs").select("id").eq("user_id", user.id).eq("status", "active").maybeSingle()).data?.id as string | undefined) ??
-      null;
-    const next = programId
-      ? await nextSessionSummary(supabase, user.id, programId, tz).catch((err: unknown) => {
-          logError("workouts.finish.next", err);
-          return null;
-        })
-      : null;
-    const previous = await previousComparableSession(supabase, user.id, {
-      sessionId: res.sessionId,
-      startedAt: parsed.data.startedAt,
-      programDayId: parsed.data.programDayId,
-      name: parsed.data.name,
-    }).catch((err: unknown) => {
-      logError("workouts.finish.previous", err);
-      return null;
-    });
-    const verse = profile?.faith_enabled ? scriptureForDate(isoDateInTz(new Date(), tz)) : null;
-    const reflection = verse ? { reference: verse.reference, parts: scriptureParts(verse.reference, verse.text), prompt: verse.reflection } : null;
-    revalidatePath("/", "layout");
-    return {
-      ok: true,
-      data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges, milestones, next, previous, reflection, addedSets: res.addedSets, differingSets: res.differingSets ?? 0, alreadyCompleted: res.alreadyCompleted },
-    };
+    supabase = await getServerSupabase();
+    res = await finishWorkout(supabase, user.id, parsed.data);
   } catch (err) {
     if (err instanceof DraftConflictError) return { ok: false, error: "conflict", conflict: { rev: err.rev, draft: err.draft } };
     logError("workouts.finish", err);
     return { ok: false, error: err instanceof WorkoutError && err.code === "invalid" ? "One of the exercises is no longer available." : "We couldn't save your workout. It's still on this device — please try again." };
   }
+
+  // The workout is saved. Everything below only fills in the summary screen: each part runs at the same time, has its
+  // own time limit, and on failure is simply left out. None of it can turn a saved workout into "couldn't save" (O-12).
+  const sessionId = res.sessionId;
+  const extra = <T,>(scope: string, p: Promise<T>, fallback: T): Promise<T> =>
+    withTimeout(p, FINISH_EXTRAS_TIMEOUT_MS).catch((err: unknown) => {
+      logError(`workouts.finish.${scope}`, err);
+      return fallback;
+    });
+  const profilePromise = extra("profile", getProfile(user.id), null);
+  const programIdPromise: Promise<string | null> = parsed.data.userProgramId
+    ? Promise.resolve(parsed.data.userProgramId)
+    : extra(
+        "program",
+        Promise.resolve(supabase.from("user_programs").select("id").eq("user_id", user.id).eq("status", "active").maybeSingle()).then((r) => (r.data?.id as string | undefined) ?? null),
+        null,
+      );
+  const [badges, profile, programId, previous] = await Promise.all([
+    // Badges are worked out from the saved sessions, so a retried finish (first response lost) shows them too.
+    extra("badges", unlockedBadges(supabase, user.id, sessionId), [] as UnlockedBadge[]),
+    profilePromise,
+    programIdPromise,
+    extra(
+      "previous",
+      previousComparableSession(supabase, user.id, { sessionId, startedAt: parsed.data.startedAt, programDayId: parsed.data.programDayId, name: parsed.data.name }),
+      null,
+    ),
+  ]);
+  const tz = profile?.timezone ?? "UTC";
+  const [milestones, next] = await Promise.all([
+    // Milestones this session reached, from the saved history (so a retried finish shows them too).
+    extra(
+      "milestones",
+      milestonesReached(supabase, user.id, sessionId, parsed.data.exercises.filter((e) => !e.skipped).map((e) => e.exerciseId), profile?.unit_system ?? "imperial"),
+      [] as ReachedMilestone[],
+    ),
+    // What the program has next, also after a workout outside it.
+    programId ? extra("next", nextSessionSummary(supabase, user.id, programId, tz), null) : Promise.resolve(null),
+  ]);
+  const verse = profile?.faith_enabled ? scriptureForDate(isoDateInTz(new Date(), tz)) : null;
+  const reflection = verse ? { reference: verse.reference, parts: scriptureParts(verse.reference, verse.text), prompt: verse.reflection } : null;
+  revalidatePath("/", "layout");
+  return {
+    ok: true,
+    data: { sessionId, volumeKg: res.volumeKg, records: res.records, badges, milestones, next, previous, reflection, addedSets: res.addedSets, differingSets: res.differingSets ?? 0, alreadyCompleted: res.alreadyCompleted },
+  };
 }
+
+/** How long each part of the summary screen may take after the workout is saved before it is left out. */
+const FINISH_EXTRAS_TIMEOUT_MS = 8_000;
 
 export async function editWorkoutAction(input: unknown): Promise<Result<{ volumeKg: number }>> {
   const user = await requireUser();

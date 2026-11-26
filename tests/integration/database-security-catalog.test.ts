@@ -82,7 +82,8 @@ describe.skipIf(!available)("database security invariants (live catalog)", () =>
       expect(ADMIN_SCOPE, `admin policy on ${table}`).toContain(table);
       if (table === "foods" || table === "training_programs") {
         const uses = expr!.match(/is_admin\(\)/g)?.length ?? 0;
-        const scoped = expr!.match(/owner_id IS NULL\) AND is_admin\(\)/g)?.length ?? 0;
+        // is_admin() may be written directly or as an InitPlan, ( SELECT is_admin() AS is_admin ) (migration 094).
+        const scoped = expr!.match(/owner_id IS NULL\) AND (?:is_admin\(\)|\( SELECT is_admin\(\) AS is_admin\))/g)?.length ?? 0;
         expect(scoped, `${table}: every admin grant limited to rows with no owner`).toBe(uses);
       }
     }
