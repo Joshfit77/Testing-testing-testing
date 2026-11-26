@@ -43,14 +43,17 @@ async function json(url, init) {
 }
 const admin = { apikey: service, Authorization: `Bearer ${service}`, "Content-Type": "application/json" };
 
+/** Creates member i and records it in `members` the moment it exists, so cleanup finds it even if a later step fails. */
 async function makeMember(i) {
   const email = `load-${RUN}-${i}@example.test`;
   const u = await json(`${sbUrl}/auth/v1/admin/users`, { method: "POST", headers: admin, body: JSON.stringify({ email, password: PASSWORD, email_confirm: true }) });
+  const member = { id: u.id, token: null, cookie: null };
+  members.push(member);
   // Onboarded, so the app pages render instead of redirecting to onboarding.
   await json(`${sbUrl}/rest/v1/profiles?id=eq.${u.id}`, { method: "PATCH", headers: { ...admin, Prefer: "return=minimal" }, body: JSON.stringify({ onboarding_completed_at: new Date().toISOString(), display_name: `Load ${i}` }) });
   const s = await json(`${sbUrl}/auth/v1/token?grant_type=password`, { method: "POST", headers: { apikey: anon, "Content-Type": "application/json" }, body: JSON.stringify({ email, password: PASSWORD }) });
-  const cookie = `${cookieName}=base64-${Buffer.from(JSON.stringify(s)).toString("base64url")}`;
-  return { id: u.id, token: s.access_token, cookie };
+  member.token = s.access_token;
+  member.cookie = `${cookieName}=base64-${Buffer.from(JSON.stringify(s)).toString("base64url")}`;
 }
 
 const ROUTES = [
@@ -89,41 +92,46 @@ async function cleanUp() {
   for (const id of ids) await fetch(`${sbUrl}/auth/v1/admin/users/${id}`, { method: "DELETE", headers: admin }).catch(() => undefined);
   if (ids.length) console.log(`removed ${ids.length} synthetic members (run ${RUN})`);
 }
+// Ctrl-C only asks the run to stop: the loops below check `interrupted`, and the finally block removes every member
+// created so far (including one whose creation was in flight). A second Ctrl-C exits at once.
 let interrupted = false;
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
     if (interrupted) process.exit(130);
     interrupted = true;
-    console.error(`${signal}: removing the synthetic members first…`);
-    void cleanUp().finally(() => process.exit(130));
+    console.error(`${signal}: stopping; the synthetic members are removed before exit (press again to quit now)…`);
   });
 }
 
 try {
-  for (let i = 0; i < MEMBERS && !interrupted; i++) members.push(await makeMember(i));
-  console.log(`members ready: ${members.length}; concurrency ${CONC}; ${SECS}s`);
-  // Warm-up: one pass so first-compile costs don't count.
-  for (const r of ROUTES) await hit(members[0], r);
-  for (const s of stats.values()) { s.lat = []; s.errors = 0; s.statuses = {}; }
+  for (let i = 0; i < MEMBERS && !interrupted; i++) await makeMember(i);
+  const ready = members.filter((m) => m.token);
+  if (!interrupted && ready.length) {
+    console.log(`members ready: ${ready.length}; concurrency ${CONC}; ${SECS}s`);
+    // Warm-up: one pass so first-compile costs don't count.
+    for (const r of ROUTES) await hit(ready[0], r);
+    for (const s of stats.values()) { s.lat = []; s.errors = 0; s.statuses = {}; }
 
-  const end = Date.now() + SECS * 1000;
-  let total = 0;
-  await Promise.all(Array.from({ length: CONC }, async (_, w) => {
-    let k = w;
-    while (Date.now() < end && !interrupted) {
-      const m = members[k % members.length];
-      const r = ROUTES[k % ROUTES.length];
-      await hit(m, r);
-      total++;
-      k += CONC;
+    const end = Date.now() + SECS * 1000;
+    let total = 0;
+    await Promise.all(Array.from({ length: CONC }, async (_, w) => {
+      let k = w;
+      while (Date.now() < end && !interrupted) {
+        const m = ready[k % ready.length];
+        const r = ROUTES[k % ROUTES.length];
+        await hit(m, r);
+        total++;
+        k += CONC;
+      }
+    }));
+    console.log(`total requests ${total} in ${SECS}s = ${(total / SECS).toFixed(1)} req/s`);
+    console.log("route | n | p50 ms | p95 ms | p99 ms | non-200 | statuses");
+    for (const [name, s] of stats) {
+      console.log(`${name} | ${s.lat.length} | ${pct(s.lat, 50).toFixed(0)} | ${pct(s.lat, 95).toFixed(0)} | ${pct(s.lat, 99).toFixed(0)} | ${s.errors} | ${JSON.stringify(s.statuses)}`);
     }
-  }));
-  console.log(`total requests ${total} in ${SECS}s = ${(total / SECS).toFixed(1)} req/s`);
-  console.log("route | n | p50 ms | p95 ms | p99 ms | non-200 | statuses");
-  for (const [name, s] of stats) {
-    console.log(`${name} | ${s.lat.length} | ${pct(s.lat, 50).toFixed(0)} | ${pct(s.lat, 95).toFixed(0)} | ${pct(s.lat, 99).toFixed(0)} | ${s.errors} | ${JSON.stringify(s.statuses)}`);
   }
 } finally {
-  // Always remove the synthetic members, also after an error part-way through.
+  // Always remove the synthetic members: after a normal run, an error part-way through, or Ctrl-C.
   await cleanUp();
+  if (interrupted) process.exit(130);
 }

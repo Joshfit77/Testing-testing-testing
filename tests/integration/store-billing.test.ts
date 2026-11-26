@@ -296,6 +296,35 @@ describe.skipIf(!available)("App Store / Google Play subscriptions via RevenueCa
     }
   });
 
+  it("members whose sync keeps failing don't pin the store rotation (correctness review 6)", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    const svc = serviceClient();
+    const stuck = await createTestUser("rotation-stuck");
+    try {
+      // A current subscriber read longest ago, whose RevenueCat read fails every time.
+      await svc.from("store_subscriptions").insert({ user_id: stuck.id, store: "app_store", product_id: "ngf_pro_monthly", plan: "pro", period_type: "normal", is_sandbox: false, purchased_at: iso(-5 * day), expires_at: iso(25 * day) });
+      await svc.from("store_sync_state").upsert({ user_id: stuck.id, fetched_at: iso(-300 * day) });
+      setCustomer(user.id, { ngf_pro_monthly: sub({ expires_date: iso(25 * day) }) }, { pro: "ngf_pro_monthly" });
+      await syncStoreSubscriber(user.id);
+      await svc.from("store_sync_state").update({ fetched_at: iso(-200 * day), attempted_at: null }).eq("user_id", user.id);
+      expect((await svc.rpc("store_reconcile_candidates", { p_limit: 1 })).data).toEqual([{ user_id: stuck.id }]);
+      failNext = 1000;
+      try {
+        await reconcileBilling({ limit: 2 });
+      } finally {
+        failNext = 0;
+      }
+      const state = (await svc.from("store_sync_state").select("fetched_at, attempted_at").eq("user_id", stuck.id).single()).data!;
+      expect(Date.now() - Date.parse(state.attempted_at as string)).toBeLessThan(60_000);
+      // Next run starts with the member who wasn't just tried.
+      expect((await svc.rpc("store_reconcile_candidates", { p_limit: 1 })).data).toEqual([{ user_id: user.id }]);
+    } finally {
+      await deleteTestUser(stuck);
+      setCustomer(user.id, {});
+      await syncStoreSubscriber(user.id);
+    }
+  });
+
   it("a member paying on the web and in the app gets the higher plan", async () => {
     setCustomer(user.id, { ngf_plus_monthly: sub() }, { plus: "ngf_plus_monthly" });
     await syncStoreSubscriber(user.id);

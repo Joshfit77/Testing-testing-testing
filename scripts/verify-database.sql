@@ -5,8 +5,8 @@
 select check_name, case when passed then 'ok' else 'FAILED: ' || detail end as result
 from (
   select 'migrations applied' as check_name,
-         (select count(*) from supabase_migrations.schema_migrations) >= 87 as passed,
-         (select count(*)::text || ' applied; expected at least 87 (through 097)' from supabase_migrations.schema_migrations) as detail
+         (select count(*) from supabase_migrations.schema_migrations) >= 88 as passed,
+         (select count(*)::text || ' applied; expected at least 88 (through 098)' from supabase_migrations.schema_migrations) as detail
   union all
   select 'row-level security on every public table',
          not exists (select 1 from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and not c.relrowsecurity),

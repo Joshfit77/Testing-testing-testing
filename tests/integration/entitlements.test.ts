@@ -68,7 +68,10 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
         const gte = Number(url.searchParams.get("created[gte]") ?? 0);
         const lt = Number(url.searchParams.get("created[lt]") ?? Number.MAX_SAFE_INTEGER);
         const types = url.searchParams.getAll("types[]");
-        const data = stripeEventLog.filter((e) => (e.created as number) >= gte && (e.created as number) < lt && (!types.length || types.includes(e.type as string)));
+        // Newest first, like Stripe.
+        const data = stripeEventLog
+          .filter((e) => (e.created as number) >= gte && (e.created as number) < lt && (!types.length || types.includes(e.type as string)))
+          .sort((x, y) => (y.created as number) - (x.created as number));
         return json(200, { object: "list", has_more: false, url: "/v1/events", data });
       }
       if (url.pathname === "/v1/subscriptions" && req.method === "GET") {
@@ -81,6 +84,8 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
         const invoice = pi ? stripeInvoiceByIntent.get(pi) : undefined;
         return json(200, { object: "list", has_more: false, data: invoice ? [{ id: `inpay_${pi}`, object: "invoice_payment", invoice }] : [] });
       }
+      // A charge Stripe can't serve right now (a failure that repeats on every retry).
+      if (url.pathname.startsWith("/v1/charges/ch_unavailable")) return json(500, { error: { type: "api_error", message: "unavailable" } });
       const m = url.pathname.match(/^\/v1\/(subscriptions|charges|invoices|disputes)\/([^/?]+)/);
       const store = m ? { subscriptions: stripeSubs, charges: stripeCharges, invoices: stripeInvoices, disputes: stripeDisputes }[m[1] as "subscriptions"] : undefined;
       const obj = m && store ? (store as Map<string, unknown>).get(decodeURIComponent(m[2]!)) : undefined;
@@ -449,6 +454,97 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       expect(report.stripeEvents.complete).toBe(true);
       expect(await ent()).toBe("free");
       // A complete pass moves the starting point to (about) now.
+      const state = (await svc.from("billing_reconcile_state").select("stripe_events_through").eq("id", 1).single()).data!;
+      expect(Date.now() - Date.parse(state.stripe_events_through as string)).toBeLessThan(60_000);
+    } finally {
+      stripeEventLog.length = 0;
+      await deleteTestUser(u);
+    }
+  });
+
+  it("an event that keeps failing doesn't stop the repair of later events; the starting point stays before it (correctness review 1)", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    const u = await createTestUser("replay-stuck-event");
+    const svc = serviceClient();
+    const ent = async () => (await svc.from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si_1", price: { id: "price_test_pro" }, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400 }] } });
+      const pay = fakePayment(sub.id);
+      stripeSubs.set(sub.id, { ...sub, latest_invoice: pay.invoice.id } as Stripe.Subscription);
+      await syncSubscription(stripeSubs.get(sub.id)!);
+      expect(await ent()).toBe("pro");
+      const tenDaysAgo = Date.now() - 10 * 86400_000;
+      await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(tenDaysAgo).toISOString() });
+      const nowS = Math.floor(Date.now() / 1000);
+      // 8 days ago: an event whose charge Stripe can't serve (fails on every attempt). 5 days ago: a lost full refund.
+      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 1799, refunded: true });
+      stripeEventLog.push(
+        { id: `evt_${crypto.randomUUID()}`, object: "event", type: "charge.refunded", created: nowS - 8 * 86400, data: { object: { id: "ch_unavailable_1", object: "charge" } } },
+        { id: `evt_${crypto.randomUUID()}`, object: "event", type: "charge.refunded", created: nowS - 5 * 86400, data: { object: stripeCharges.get(pay.charge.id) } },
+      );
+      const report = await reconcileBilling();
+      expect(report.stripeEvents.failed).toBeGreaterThanOrEqual(1);
+      expect(report.stripeEvents.complete).toBe(false);
+      // The refund after the failing event was still applied...
+      expect(await ent()).toBe("free");
+      // ...and the starting point didn't move past the failing event, so the next run tries it again.
+      const state = (await svc.from("billing_reconcile_state").select("stripe_events_through").eq("id", 1).single()).data!;
+      expect(Date.parse(state.stripe_events_through as string)).toBeLessThanOrEqual((nowS - 8 * 86400) * 1000);
+    } finally {
+      stripeEventLog.length = 0;
+      await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date().toISOString() });
+      await deleteTestUser(u);
+    }
+  });
+
+  it("a subscription naming a different member (needs a person) is reported but doesn't hold the starting point back", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    const u = await createTestUser("replay-owner-conflict");
+    const svc = serviceClient();
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id } });
+      stripeSubs.set(sub.id, sub);
+      await syncSubscription(sub); // records u's customer
+      // Someone edited the subscription's metadata in Stripe to name another member.
+      const edited = { ...sub, metadata: { user_id: crypto.randomUUID() } } as Stripe.Subscription;
+      stripeSubs.set(sub.id, edited);
+      await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(Date.now() - 6 * 86400_000).toISOString() });
+      const eventId = `evt_${crypto.randomUUID()}`;
+      stripeEventLog.push({ id: eventId, object: "event", type: "customer.subscription.updated", created: Math.floor(Date.now() / 1000) - 5 * 86400, data: { object: edited } });
+      const report = await reconcileBilling();
+      expect(report.stripeEvents.failed).toBeGreaterThanOrEqual(1);
+      expect((await svc.from("stripe_events").select("last_error").eq("id", eventId).single()).data?.last_error).toContain("OwnershipConflictError");
+      const state = (await svc.from("billing_reconcile_state").select("stripe_events_through").eq("id", 1).single()).data!;
+      expect(Date.now() - Date.parse(state.stripe_events_through as string)).toBeLessThan(60_000);
+    } finally {
+      stripeEventLog.length = 0;
+      await deleteTestUser(u);
+    }
+  });
+
+  it("a window with more events than one listing takes is split, so its oldest events are handled too (correctness review 2)", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    const u = await createTestUser("replay-busy-window");
+    const svc = serviceClient();
+    const ent = async () => (await svc.from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si_1", price: { id: "price_test_pro" }, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400 }] } });
+      const pay = fakePayment(sub.id);
+      stripeSubs.set(sub.id, { ...sub, latest_invoice: pay.invoice.id } as Stripe.Subscription);
+      await syncSubscription(stripeSubs.get(sub.id)!);
+      expect(await ent()).toBe("pro");
+      await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(Date.now() - 4 * 86400_000).toISOString() });
+      // One 6-hour window with 7 events and a listing cap of 3: the oldest is the lost refund that matters (Stripe
+      // lists newest first, so a cut-off listing never reached it).
+      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 1799, refunded: true });
+      const base = Math.floor((Date.now() - 3.5 * 86400_000) / 1000);
+      const ids = Array.from({ length: 7 }, () => `evt_${crypto.randomUUID()}`);
+      ids.forEach((id, i) => stripeEventLog.push({ id, object: "event", type: "charge.refunded", created: base + i * 600, data: { object: stripeCharges.get(pay.charge.id) } }));
+      const report = await reconcileBilling({ maxEventsPerWindow: 3 });
+      expect(report.stripeEvents.complete).toBe(true);
+      expect(await ent()).toBe("free");
+      const { data: stored } = await svc.from("stripe_events").select("id, status").in("id", ids);
+      expect(stored?.filter((r) => r.status === "processed").map((r) => r.id).sort()).toEqual([...ids].sort());
       const state = (await svc.from("billing_reconcile_state").select("stripe_events_through").eq("id", 1).single()).data!;
       expect(Date.now() - Date.parse(state.stripe_events_through as string)).toBeLessThan(60_000);
     } finally {

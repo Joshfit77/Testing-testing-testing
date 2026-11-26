@@ -13,13 +13,13 @@ import { logError } from "@/server/log";
 type Result = { ok: true } | { ok: false; error: string; uncertain?: true };
 
 /**
- * The database refused this row for good (bad value, a constraint, a permission rule), as opposed to an answer that
- * never arrived or a timeout, after which the row may still have been written. Only a definite refusal may remove the
- * uploaded file: removing it after an uncertain failure could leave a saved photo without its image.
+ * The database answered with an error, so the insert's transaction rolled back and the row was NOT written (a refused
+ * value or rule, but also a timeout, deadlock or serialization failure: each carries a Postgres or PostgREST code).
+ * Only a reply with no code (the request or its answer was lost on the way) leaves it uncertain whether the row exists,
+ * and only then must the uploaded file stay: removing it could leave a saved photo without its image.
  */
-function definitelyRefused(error: { code?: string }): boolean {
-  const code = error.code ?? "";
-  return (/^2[23]/.test(code) && code !== "23505") || code === "42501";
+function definitelyNotWritten(error: { code?: string }): boolean {
+  return Boolean(error.code);
 }
 
 const savePhotoSchema = z.object({
@@ -80,8 +80,8 @@ export async function saveProgressPhotoAction(input: unknown): Promise<Result> {
   }
   if (error) {
     logError("progress_photos.insert", error);
-    // Uncertain (timeout, dropped connection): the row may exist, so the file stays and a retry confirms it.
-    if (!definitelyRefused(error)) return { ok: false, error: "We couldn't confirm the save. Check your connection and tap Save again.", uncertain: true };
+    // Uncertain (no answer from the database): the row may exist, so the file stays and a retry confirms it.
+    if (!definitelyNotWritten(error)) return { ok: false, error: "We couldn't confirm the save. Check your connection and tap Save again.", uncertain: true };
     // Refused: don't leave an orphaned object behind, but never delete a file a saved photo already uses (an earlier
     // attempt whose reply was lost, retried with different details).
     const { data: inUse, error: useErr } = await supabase.from("progress_photos").select("id").eq("user_id", user.id).eq("storage_path", v.path).limit(1);

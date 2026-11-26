@@ -4,7 +4,7 @@ import type Stripe from "stripe";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { isRevenueCatConfigured, isStripeConfigured, serverEnv } from "@/server/env";
 import { logError, logInfo } from "@/server/log";
-import { getStripe, handleStripeEvent, recomputeEntitlement, syncSubscription } from "@/server/services/billing";
+import { getStripe, handleStripeEvent, OwnershipConflictError, recomputeEntitlement, syncSubscription } from "@/server/services/billing";
 import { syncStoreSubscriber } from "@/server/services/store-billing";
 
 /**
@@ -60,7 +60,7 @@ const MIN_LOOKBACK_MS = 3 * DAY;
 const MAX_LOOKBACK_MS = 30 * DAY;
 /** Replay works through the log in windows of this length, oldest first. */
 const WINDOW_MS = 6 * 3600_000;
-/** Most events handled from one window (a window busier than this is reported for the owner). */
+/** Most events taken from one listing; a busier window is split in half until each part fits. */
 const MAX_EVENTS_PER_WINDOW = 5000;
 /** Default time budget for one run (the route allows 300 s). */
 const DEFAULT_BUDGET_MS = 240_000;
@@ -82,7 +82,10 @@ export function replaySince(now: Date, through: Date | null): Date {
   return new Date(Math.max(minStart, from));
 }
 
-export async function reconcileBilling(options: { limit?: number; now?: Date; budgetMs?: number } = {}): Promise<ReconcileReport> {
+export async function reconcileBilling(
+  options: { limit?: number; now?: Date; budgetMs?: number; /** Tests only: a smaller listing cap than MAX_EVENTS_PER_WINDOW. */ maxEventsPerWindow?: number } = {},
+): Promise<ReconcileReport> {
+  const maxEvents = Math.max(1, options.maxEventsPerWindow ?? MAX_EVENTS_PER_WINDOW);
   const limit = Math.max(1, Math.min(options.limit ?? 50, 200));
   const now = options.now ?? new Date();
   const deadline = Date.now() + (options.budgetMs ?? DEFAULT_BUDGET_MS);
@@ -122,10 +125,16 @@ export async function reconcileBilling(options: { limit?: number; now?: Date; bu
       report.stripeEvents.since = since.toISOString();
       const savedThrough = state?.stripe_events_through ? new Date(state.stripe_events_through as string).getTime() : 0;
       // Windows of 6 hours, oldest first: a backlog bigger than one run is worked through over several runs in date
-      // order, and the starting point only moves past a window once every event in it has been handled.
+      // order. Every window is handled even after one that couldn't be finished (an event that keeps failing must not
+      // stop the repair of everything after it), but the starting point only moves past windows that were finished,
+      // so an unfinished one is tried again next run. A window with more events than one listing handles is split in
+      // half (older half first) until each part fits, so its oldest events are reached too.
       let complete = true;
-      for (let a = since.getTime(); a < now.getTime(); a += WINDOW_MS) {
-        const b = Math.min(a + WINDOW_MS, now.getTime());
+      let cursorFrozen = false;
+      const windows: [number, number][] = [];
+      for (let a = since.getTime(); a < now.getTime(); a += WINDOW_MS) windows.push([a, Math.min(a + WINDOW_MS, now.getTime())]);
+      while (windows.length) {
+        const [a, b] = windows.shift()!;
         if (!timeLeft()) {
           complete = false;
           break;
@@ -133,13 +142,20 @@ export async function reconcileBilling(options: { limit?: number; now?: Date; bu
         const collected: Stripe.Event[] = [];
         let truncated = false;
         for await (const event of stripe.events.list({ created: { gte: Math.floor(a / 1000), lt: Math.ceil(b / 1000) }, types: [...REPLAYED_STRIPE_EVENTS], limit: 100 })) {
-          if (collected.length >= MAX_EVENTS_PER_WINDOW) {
+          if (collected.length >= maxEvents) {
             truncated = true;
             break;
           }
           collected.push(event);
         }
         report.stripeEvents.listed += collected.length;
+        if (truncated && b - a > 2000) {
+          // Too many for one listing: handle the two halves instead (Stripe's `created` is in whole seconds).
+          const mid = Math.floor((a + b) / 2000) * 1000;
+          windows.unshift([a, mid], [mid, b]);
+          report.stripeEvents.listed -= collected.length;
+          continue;
+        }
         const events = collected.reverse(); // Stripe lists newest first; handle them in the order they happened
         const processed = new Set<string>();
         for (let i = 0; i < events.length; i += 200) {
@@ -148,6 +164,7 @@ export async function reconcileBilling(options: { limit?: number; now?: Date; bu
           for (const r of data ?? []) processed.add(r.id as string);
         }
         let windowDone = !truncated;
+        let outOfTime = false;
         for (const event of events) {
           if (processed.has(event.id)) {
             report.stripeEvents.alreadyProcessed++;
@@ -155,22 +172,27 @@ export async function reconcileBilling(options: { limit?: number; now?: Date; bu
           }
           if (!timeLeft()) {
             windowDone = false;
+            outOfTime = true;
             break;
           }
           try {
             if ((await handleStripeEvent(event)) === "processed") report.stripeEvents.applied++;
           } catch (err) {
-            windowDone = false;
             report.stripeEvents.failed++;
-            logError("billing.reconcile.stripe_event", err, { type: event.type });
+            logError("billing.reconcile.stripe_event", err, { type: event.type, id: event.id });
+            // A subscription naming a different member than its customer needs a person (it is logged, and stays
+            // failed in stripe_events); retrying won't change it, so it doesn't hold the starting point back.
+            if (!(err instanceof OwnershipConflictError)) windowDone = false;
           }
         }
-        if (truncated) logError("billing.reconcile.backlog", new Error("More Stripe events in one window than a run handles"), { listed: collected.length });
+        if (truncated) logError("billing.reconcile.backlog", new Error("More Stripe events in one second than one listing handles"), { listed: collected.length });
         if (!windowDone) {
           complete = false;
-          break;
+          cursorFrozen = true;
+          if (outOfTime) break;
+          continue;
         }
-        if (b > savedThrough) {
+        if (!cursorFrozen && b > savedThrough) {
           const { error } = await admin.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(b).toISOString(), updated_at: new Date().toISOString() });
           if (error) throw error;
         }
@@ -221,14 +243,25 @@ export async function reconcileBilling(options: { limit?: number; now?: Date; bu
       const users = [
         ...new Set([...(data ?? []).map((r) => r.user_id as string).slice(0, limit), ...((rotation ?? []) as { user_id: string }[]).map((r) => r.user_id)]),
       ];
-      for (const userId of users) {
-        if (!timeLeft()) throw new Error("time");
-        report.store.checked++;
-        try {
-          await syncStoreSubscriber(userId);
-        } catch (err) {
-          report.store.failed++;
-          logError("billing.reconcile.store", err);
+      const failedIds: string[] = [];
+      try {
+        for (const userId of users) {
+          if (!timeLeft()) throw new Error("time");
+          report.store.checked++;
+          try {
+            await syncStoreSubscriber(userId);
+          } catch (err) {
+            report.store.failed++;
+            failedIds.push(userId);
+            logError("billing.reconcile.store", err);
+          }
+        }
+      } finally {
+        // A member whose sync failed goes to the back of the rotation too (migration 098), so a few accounts that
+        // keep failing can't take every run's places.
+        if (failedIds.length) {
+          const { error: markErr } = await admin.from("store_sync_state").update({ attempted_at: new Date().toISOString() }).in("user_id", failedIds);
+          if (markErr) logError("billing.reconcile.store_attempted", markErr);
         }
       }
     });
