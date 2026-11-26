@@ -15,7 +15,9 @@ changed, the reason is given (see also BUG_FIX_REGISTER.md).
 | Browser suite with mocks (`npm run test:e2e:mocked`) | This sandbox | **168 passed, 0 failed, 101 skipped** (the opt-in suites, as before), 15.2 min, on `d0a5f7aa` |
 | Tap every control (`E2E_BUTTON_SWEEP=1`) | This sandbox | **Passed: 49 screens, 281 controls, 0 findings**, on `89260c5b` |
 | Java run-journal store (JUnit, plain `javac`) | This sandbox | **5 of 5 passed** |
-| Swift run-journal store (XCTest), Android `testDebugUnitTest`, iOS build | GitHub | See the PR checks for the pushed head |
+| GitHub CI on `ed3c4169` (typecheck, lint, unit, build, integration, secret scan, dependency audit) | GitHub CI run 45907478399 | **Passed** |
+| iOS on `ed3c4169`: native unit tests (Swift run journal, XCTest), offline compile, device archive check, full app in the Simulator, WebKit opening/navigation | GitHub iOS run 45907505252 (dispatched; it replaced the push-triggered run 45907473706, cancelled by the workflow's concurrency group) | **Passed** (all jobs) |
+| Android APK on `ed3c4169`: native unit tests (run journal, JVM, `testDebugUnitTest`), APK build | GitHub Android APK run 45907502155 (`publish=false`) | **Passed** |
 | Load-test script | This sandbox | Smoke runs only (no app server): members created and always removed, including on Ctrl-C mid-setup |
 
 **Failures found during this round, and what was done:**

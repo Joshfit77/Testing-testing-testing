@@ -56,8 +56,8 @@
 | Database checks (`npm run db:verify`) | 10 of 10 ok |
 | Browser suite at phone size (production build, mocks) | 168 passed, 0 failed, 101 skipped (opt-in suites) |
 | Tap every safe control on every main screen | 49 screens, 281 controls, 0 problems |
-| Native run-journal stores | Java JUnit 5/5 locally; Swift XCTest and Android unit tests in the GitHub workflows (see PR checks) |
-| GitHub CI, iOS build/archive/Simulator, Android APK | See the PR checks on the pushed head (earlier heads passed) |
+| Native run-journal stores | Java JUnit 5/5 locally and in the Android workflow; Swift XCTest in the iOS workflow: passed on `ed3c4169` |
+| GitHub CI, iOS build/archive/Simulator/WebKit, Android APK | Passed on `ed3c4169` |
 | Local load test | 0 errors up to 100 members and 25 concurrent (round 1) |
 | Physical devices | **Not tested** |
 
