@@ -7,7 +7,7 @@ import { WebMembership } from "@/components/profile/web-membership";
 import { intervalForProduct, type BillingSource } from "@/lib/billing/paywall";
 import { storeRowAsSubscription } from "@/lib/billing/revenuecat";
 import { membershipComparison } from "@/lib/domain/membership";
-import { APPROVED_PRO_PRICE_CENTS, getPlans, subscriptionToShow, yearlySavingsCents, yearlySavingsPercent, type BillingInterval } from "@/lib/domain/plans";
+import { APPROVED_PRO_PRICE_CENTS, getPlans, stripeSubscriptionOpen, subscriptionToShow, yearlySavingsCents, yearlySavingsPercent, type BillingInterval } from "@/lib/domain/plans";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { isServiceRoleConfigured, isStripeConfigured } from "@/server/env";
@@ -63,6 +63,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const storeLabel = storeSub?.store === "play_store" ? "Google Play" : "App Store";
   const storeKey = native ? storePublicKey(native) : "";
   const stripeActive = Boolean(sub && source === "stripe");
+  // Still open at Stripe (e.g. past due beyond the grace period, when the plan already reads Free): Stripe keeps
+  // retrying the card, so Manage billing must stay reachable and no in-app purchase is offered on top of it.
+  const stripeOpen = stripeActive || stripeSubscriptionOpen(sub?.status);
 
   // Current membership summary.
   const interval: BillingInterval | null = storeSub ? intervalForProduct(storeSub.productId, ids) : stripeActive ? await resolvePriceInterval(sub?.stripe_price_id as string | null) : null;
@@ -117,10 +120,10 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           Manage billing shows the subscription itself.
         </Notice>
       )}
-      {stripeActive && sub?.status === "past_due" && (
+      {stripeOpen && sub?.status === "past_due" && (
         <Notice tone="error">Your last payment failed. Stripe will retry automatically. Update your payment method in Manage billing to keep Pro All Access.</Notice>
       )}
-      {stripeActive && sub?.status === "unpaid" && <Notice tone="error">Your membership is unpaid and premium features are paused. Update your payment method to restore access.</Notice>}
+      {stripeOpen && sub?.status === "unpaid" && <Notice tone="error">Your membership is unpaid and premium features are paused. Update your payment method to restore access.</Notice>}
       {storeSub?.status === "past_due" && (
         <Notice tone="error">
           {storeLabel} couldn&apos;t renew your membership. Update your payment method in your {storeLabel} account to keep {plans[plan].name}.
@@ -163,7 +166,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
             )}
             {plan === "free" && <p className="text-sm text-muted-foreground">Everything you need to build your foundation. No card required.</p>}
           </div>
-          {stripeActive && isStripeConfigured() && !native && <PortalButton />}
+          {stripeOpen && isStripeConfigured() && !native && <PortalButton />}
         </div>
         <p className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-sm text-foreground/90" data-testid="faith-free">
           <BookOpen className="size-4 shrink-0 text-gold" aria-hidden /> Included in the Free plan: Bible reading, the prayer journal, devotionals and reading journeys. The AI Bible study helper is part of Pro.
@@ -173,7 +176,15 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         )}
       </section>
 
-      {native && storeKey ? (
+      {native && stripeOpen && !stripeActive ? (
+        // A website membership is still open (its payment failed): buying in the app as well would charge twice.
+        <Notice tone="error">
+          <span data-testid="stripe-open-native">
+            You have a membership billed through Stripe on our website, and its last payment didn&apos;t go through. Update or cancel it on the
+            website before buying here, so you aren&apos;t charged twice.
+          </span>
+        </Notice>
+      ) : native && storeKey ? (
         <StorePaywall
           userId={user.id}
           platform={native}
@@ -205,7 +216,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           comparison={comparison}
           prices={webPrices}
           checkout={checkoutOk}
-          stripeManaged={stripeActive}
+          stripeManaged={stripeOpen}
           storeManaged={storeSub ? storeName : null}
           legal={legalLinks()}
         />

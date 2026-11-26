@@ -220,6 +220,16 @@ export type SubscriptionStatus =
 export const PAST_DUE_GRACE_DAYS = 14;
 
 /**
+ * Stripe statuses in which the subscription still exists and Stripe may still charge the card (it retries a failed
+ * payment for weeks). While one is open the member must be able to reach Manage billing, whatever plan the entitlement
+ * shows after the grace period, and must not be offered a second, in-app subscription.
+ */
+export const OPEN_STRIPE_STATUSES = ["active", "trialing", "past_due", "unpaid", "paused", "incomplete"] as const;
+export function stripeSubscriptionOpen(status: string | null | undefined): boolean {
+  return (OPEN_STRIPE_STATUSES as readonly string[]).includes(status ?? "");
+}
+
+/**
  * When the billing period that ends at `periodEnd` began: one interval earlier, on the same day of the month (or
  * the month's last day when it has no such day, as Stripe anchors renewals).
  */

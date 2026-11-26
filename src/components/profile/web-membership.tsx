@@ -117,6 +117,14 @@ export function WebMembership({
         <p className="text-xs text-muted-foreground">You keep your current membership until you choose to change it.</p>
       </div>
     );
+  } else if (currentPlan === "free" && stripeManaged) {
+    // A website subscription is still open (a failed payment past the grace period): fix it there, don't start another.
+    proAction = (
+      <div className="space-y-2" data-testid="stripe-open-free">
+        <PortalButton label="Update payment in Manage billing" />
+        <p className="text-xs text-muted-foreground">Your membership&apos;s last payment didn&apos;t go through. Update your card to restore Pro All Access, or cancel it.</p>
+      </div>
+    );
   } else if (currentPlan === "free" && checkout[shown] && price) {
     proAction = <CheckoutButton key={shown} plan="pro" interval={shown} price={price} featured label={`Start Pro All Access · ${price} / ${shown === "year" ? "year" : "month"}`} />;
   } else {

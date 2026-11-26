@@ -223,3 +223,11 @@ describe("subscriptionToShow (Plans & billing's current membership)", () => {
     expect(subscriptionToShow([], now)).toBeNull();
   });
 });
+
+describe("open Stripe subscriptions (billing review F1)", () => {
+  it("counts every status in which Stripe may still charge the card", async () => {
+    const { stripeSubscriptionOpen } = await import("@/lib/domain/plans");
+    for (const s of ["active", "trialing", "past_due", "unpaid", "paused", "incomplete"]) expect(stripeSubscriptionOpen(s), s).toBe(true);
+    for (const s of ["canceled", "incomplete_expired", "", null, undefined]) expect(stripeSubscriptionOpen(s as string | null | undefined), String(s)).toBe(false);
+  });
+});

@@ -44,6 +44,10 @@ export interface StripePriceInfo {
   currency: string;
   interval: BillingInterval | null;
   active: boolean;
+  /** Renews every `intervalCount` intervals (must be 1), licensed (not metered), and has no other currencies. */
+  intervalCount?: number | null;
+  usageType?: string | null;
+  extraCurrencies?: string[];
 }
 
 let priceCache: { at: number; prices: Partial<Record<BillingInterval, StripePriceInfo | null>> } | null = null;
@@ -61,7 +65,8 @@ export async function stripeProPrices(): Promise<Partial<Record<BillingInterval,
     try {
       const p = await getStripe().prices.retrieve(id);
       const interval = p.recurring?.interval === "year" ? "year" : p.recurring?.interval === "month" ? "month" : null;
-      return { id: p.id, unitAmount: p.unit_amount ?? null, currency: p.currency, interval, active: p.active };
+      const extra = Object.keys((p as unknown as { currency_options?: Record<string, unknown> }).currency_options ?? {}).filter((c) => c !== p.currency);
+      return { id: p.id, unitAmount: p.unit_amount ?? null, currency: p.currency, interval, active: p.active, intervalCount: p.recurring?.interval_count ?? null, usageType: p.recurring?.usage_type ?? null, extraCurrencies: extra };
     } catch (err) {
       logError("billing.price", err, { price: id });
       return null;
@@ -80,6 +85,10 @@ export function stripePriceProblems(info: StripePriceInfo | null | undefined, in
   if (info.interval !== interval) out.push(`Stripe price ${info.id} renews every ${info.interval ?? "one-off"}, not every ${interval}.`);
   if (info.currency !== "usd") out.push(`Stripe price ${info.id} is in ${info.currency.toUpperCase()}, not USD.`);
   if (info.unitAmount !== approvedCents) out.push(`Stripe price ${info.id} charges ${info.unitAmount ?? "?"} cents; the approved price is ${approvedCents} cents.`);
+  // Billing review F6: $17.99 every 3 months, a metered price or extra currencies would all pass the checks above.
+  if (info.intervalCount != null && info.intervalCount !== 1) out.push(`Stripe price ${info.id} renews every ${info.intervalCount} ${interval}s, not every ${interval}.`);
+  if (info.usageType != null && info.usageType !== "licensed") out.push(`Stripe price ${info.id} is metered, not a fixed price.`);
+  if (info.extraCurrencies?.length) out.push(`Stripe price ${info.id} also charges in ${info.extraCurrencies.map((c) => c.toUpperCase()).join(", ")}; only USD is approved.`);
   return out;
 }
 
@@ -610,7 +619,12 @@ export async function cancelStripeSubscriptionsForUser(userId: string): Promise<
   // Stripe's own list too, in case a subscription never reached the local table.
   const { data: customerRow, error: customerErr } = await getServiceSupabase().from("billing_customers").select("stripe_customer_id").eq("user_id", userId).maybeSingle();
   if (customerErr) throw customerErr;
-  if (customerRow?.stripe_customer_id) for (const id of await openStripeSubscriptions(customerRow.stripe_customer_id as string)) ids.add(id);
+  if (customerRow?.stripe_customer_id) {
+    // A checkout page left open (they last 24 hours) could otherwise still be paid after the account is gone, starting a
+    // subscription with nobody to bill it to (billing review F2). Expire them first.
+    await expireOpenCheckouts(customerRow.stripe_customer_id as string);
+    for (const id of await openStripeSubscriptions(customerRow.stripe_customer_id as string)) ids.add(id);
+  }
   for (const id of ids) {
     try {
       await getStripe().subscriptions.cancel(id);

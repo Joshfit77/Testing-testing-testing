@@ -47,6 +47,8 @@ const stripeSubs = new Map<string, Record<string, unknown>>();
 const subOwner = new Map<string, string>();
 const failCancel = new Set<string>();
 const stripeCalls: StripeCall[] = [];
+/** Open Checkout pages by customer (a tab left open on the payment page). */
+const openCheckouts = new Map<string, { id: string; customer: string; status: string }>();
 const stripeServer = createServer(async (req, res) => {
   const u = new URL(req.url ?? "/", "http://stripe.local");
   const json = (status: number, body: unknown) => void res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
@@ -71,6 +73,18 @@ const stripeServer = createServer(async (req, res) => {
       return json(200, cancelled);
     }
     return json(200, obj);
+  }
+  if (req.method === "GET" && u.pathname === "/v1/checkout/sessions") {
+    const customer = u.searchParams.get("customer");
+    const data = [...openCheckouts.values()].filter((c) => c.customer === customer && c.status === "open");
+    return json(200, { object: "list", url: "/v1/checkout/sessions", has_more: false, data: data.map((c) => ({ object: "checkout.session", ...c })) });
+  }
+  const expire = u.pathname.match(/^\/v1\/checkout\/sessions\/([^/?]+)\/expire$/);
+  if (expire && req.method === "POST") {
+    const c = openCheckouts.get(decodeURIComponent(expire[1]!));
+    if (!c) return json(404, { error: { type: "invalid_request_error", code: "resource_missing", message: "No such checkout session" } });
+    c.status = "expired";
+    return json(200, { object: "checkout.session", ...c });
   }
   const cust = u.pathname.match(/^\/v1\/customers\/([^/?]+)$/);
   if (cust && req.method === "DELETE") return json(200, { id: decodeURIComponent(cust[1]!), object: "customer", deleted: true });
@@ -248,6 +262,8 @@ describe.skipIf(!available)("subscription security closure", async () => {
       await syncSubscription(webSub as unknown as Stripe.Subscription);
       // Created in Stripe a moment ago (another tab's checkout); its webhook hasn't arrived, so there's no local row.
       raceSub = stripeSub(gone, { status: "trialing" });
+      // A checkout page left open in another tab (billing review F2): it must be expired, so it can't be paid later.
+      openCheckouts.set("cs_open_tab", { id: "cs_open_tab", customer: customerOf(gone), status: "open" });
       rcCustomers.set(gone.id, rcPro());
       await syncStoreSubscriber(gone.id);
       expect(await planOf(gone)).toBe("pro");
@@ -262,6 +278,10 @@ describe.skipIf(!available)("subscription security closure", async () => {
         expect(stripeSubs.get(s.id as string)?.status).toBe("canceled");
       }
       expect(stripeCalls.some((c) => c.method === "DELETE" && c.path === `/v1/customers/${customerOf(gone)}`)).toBe(true);
+      const expireAt = stripeCalls.findIndex((c) => c.method === "POST" && c.path === "/v1/checkout/sessions/cs_open_tab/expire");
+      expect(expireAt, "the open checkout page was expired").toBeGreaterThanOrEqual(0);
+      expect(expireAt).toBeLessThan(stripeCalls.findIndex((c) => c.method === "DELETE" && c.path === `/v1/customers/${customerOf(gone)}`));
+      expect(openCheckouts.get("cs_open_tab")?.status).toBe("expired");
       // The store subscription can't be cancelled by the app: only RevenueCat's customer record is removed.
       expect(rcCalls.at(-1)).toEqual({ method: "DELETE", id: gone.id });
       expect((await admin.auth.admin.getUserById(gone.id)).data.user).toBeNull();
