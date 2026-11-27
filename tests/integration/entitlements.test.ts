@@ -27,7 +27,7 @@ function fakePayment(subscriptionId: string, over: { refunded?: boolean; amount_
     ...(over.created === undefined ? {} : { created: over.created }),
     parent: { type: "subscription_details", subscription_details: { subscription: subscriptionId } },
   };
-  const charge = { id: `ch_${key}`, object: "charge", amount: 1799, amount_refunded: over.amount_refunded ?? 0, refunded: over.refunded ?? false, payment_intent: `pi_${key}` };
+  const charge = { id: `ch_${key}`, object: "charge", amount: 2499, amount_refunded: over.amount_refunded ?? 0, refunded: over.refunded ?? false, payment_intent: `pi_${key}` };
   stripeInvoices.set(invoice.id, invoice);
   stripeCharges.set(charge.id, charge);
   stripeInvoiceByIntent.set(charge.payment_intent, invoice.id);
@@ -334,7 +334,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       expect(await ent()).toBe("pro");
 
       // A full refund of the current period's payment ends that period's access, whatever Stripe's status says.
-      stripeCharges.set(first.charge.id, { ...first.charge, amount_refunded: 1799, refunded: true });
+      stripeCharges.set(first.charge.id, { ...first.charge, amount_refunded: 2499, refunded: true });
       await send("charge.refunded", stripeCharges.get(first.charge.id));
       expect(await ent()).toBe("free");
       const row = (await serviceClient().from("subscriptions").select("status, access_revoked_reason, revoked_invoice_id").eq("stripe_subscription_id", sub.id).single()).data;
@@ -365,7 +365,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       await syncSubscription(stripeSubs.get(sub.id)!);
       expect(await ent()).toBe("pro");
       // Stripe refunded the payment in full; the subscription is still "active" there, and the webhook was lost.
-      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 1799, refunded: true });
+      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 2499, refunded: true });
       const lost = { id: `evt_${crypto.randomUUID()}`, object: "event", type: "charge.refunded", created: Math.floor(Date.now() / 1000), data: { object: stripeCharges.get(pay.charge.id) } };
       stripeEventLog.unshift(lost);
       expect(await ent()).toBe("pro");
@@ -455,7 +455,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       await syncSubscription(stripeSubs.get(sub.id)!);
       // Reconciliation last completed 10 days ago; a full refund 8 days ago was never delivered.
       await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(Date.now() - 10 * 86400_000).toISOString() });
-      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 1799, refunded: true });
+      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 2499, refunded: true });
       stripeEventLog.unshift({ id: `evt_${crypto.randomUUID()}`, object: "event", type: "charge.refunded", created: Math.floor(Date.now() / 1000) - 8 * 86400, data: { object: stripeCharges.get(pay.charge.id) } });
       const report = await reconcileBilling();
       expect(report.stripeEvents.complete).toBe(true);
@@ -484,7 +484,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(tenDaysAgo).toISOString() });
       const nowS = Math.floor(Date.now() / 1000);
       // 8 days ago: an event whose charge Stripe can't serve (fails on every attempt). 5 days ago: a lost full refund.
-      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 1799, refunded: true });
+      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 2499, refunded: true });
       stripeEventLog.push(
         { id: `evt_${crypto.randomUUID()}`, object: "event", type: "charge.refunded", created: nowS - 8 * 86400, data: { object: { id: "ch_unavailable_1", object: "charge" } } },
         { id: `evt_${crypto.randomUUID()}`, object: "event", type: "charge.refunded", created: nowS - 5 * 86400, data: { object: stripeCharges.get(pay.charge.id) } },
@@ -543,7 +543,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(Date.now() - 4 * 86400_000).toISOString() });
       // One 6-hour window with 7 events and a listing cap of 3: the oldest is the lost refund that matters (Stripe
       // lists newest first, so a cut-off listing never reached it).
-      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 1799, refunded: true });
+      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 2499, refunded: true });
       const base = Math.floor((Date.now() - 3.5 * 86400_000) / 1000);
       const ids = Array.from({ length: 7 }, () => `evt_${crypto.randomUUID()}`);
       ids.forEach((id, i) => stripeEventLog.push({ id, object: "event", type: "charge.refunded", created: base + i * 600, data: { object: stripeCharges.get(pay.charge.id) } }));
@@ -571,7 +571,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       stripeSubs.set(sub.id, { ...sub, latest_invoice: pay.invoice.id } as Stripe.Subscription);
       await syncSubscription(stripeSubs.get(sub.id)!);
       await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(Date.now() - 21 * 86400_000).toISOString() });
-      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 1799, refunded: true });
+      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 2499, refunded: true });
       const nowS = Math.floor(Date.now() / 1000);
       // 150 in one busy hour 10 days ago (two pages of 100 in one window), 100 more spread over 20 days.
       const ids: string[] = [];
@@ -649,7 +649,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       stripeSubs.set(sub.id, { ...sub, latest_invoice: pay.invoice.id } as Stripe.Subscription);
       await syncSubscription(stripeSubs.get(sub.id)!);
       await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(Date.now() - 45 * 86400_000).toISOString() });
-      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 1799, refunded: true });
+      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 2499, refunded: true });
       const nowS = Math.floor(Date.now() / 1000);
       const old = `evt_${crypto.randomUUID()}`;
       const recent = `evt_${crypto.randomUUID()}`;
@@ -719,7 +719,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       expect(await ent()).toBe("pro");
 
       // The yearly payment is refunded in full: that period's access ends.
-      stripeCharges.set(upgrade.charge.id, { ...upgrade.charge, amount_refunded: 1799, refunded: true });
+      stripeCharges.set(upgrade.charge.id, { ...upgrade.charge, amount_refunded: 2499, refunded: true });
       await send("charge.refunded", stripeCharges.get(upgrade.charge.id));
       expect(await ent()).toBe("free");
 
@@ -752,7 +752,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       expect(await ent()).toBe("pro");
 
       // Refunding last year's payment doesn't touch the year the member has paid for now.
-      stripeCharges.set(old.charge.id, { ...old.charge, amount_refunded: 1799, refunded: true });
+      stripeCharges.set(old.charge.id, { ...old.charge, amount_refunded: 2499, refunded: true });
       await send("charge.refunded", stripeCharges.get(old.charge.id));
       expect(await ent()).toBe("pro");
 

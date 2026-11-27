@@ -32,18 +32,19 @@ describe("plans & entitlements", () => {
     expect(plans.plus.purchasable).toBe(false);
     expect(plans.pro.purchasable).toBe(true);
     expect(plans.pro.name).toBe("Pro All Access");
-    expect(APPROVED_PRO_PRICE_CENTS).toEqual({ month: 1799, year: 11999 });
+    // Founder-approved 2026-11-27: Free $0, Pro $24.99 a month or $149.99 a year.
+    expect(APPROVED_PRO_PRICE_CENTS).toEqual({ month: 2499, year: 14999 });
     expect(plans.free.priceCents).toBe(0);
-    expect(plans.pro.priceCents).toBe(1799);
-    expect(plans.pro.yearlyPriceCents).toBe(11999);
-    expect(formatPrice(plans.pro.priceCents)).toBe("$17.99");
-    expect(formatPrice(plans.pro.yearlyPriceCents!)).toBe("$119.99");
-    // Yearly saves about 44% against twelve monthly payments.
-    expect(yearlySavingsPercent(1799, 11999)).toBe(44);
-    // B7: the saving in dollars, from the approved prices: 12 × $17.99 − $119.99 = $95.89.
-    expect(yearlySavingsCents(1799, 11999)).toBe(9589);
-    expect(yearlySavingsCents(1799, 0)).toBe(0);
-    expect(yearlySavingsCents(1799, 30000)).toBe(0);
+    expect(plans.pro.priceCents).toBe(2499);
+    expect(plans.pro.yearlyPriceCents).toBe(14999);
+    expect(formatPrice(plans.pro.priceCents)).toBe("$24.99");
+    expect(formatPrice(plans.pro.yearlyPriceCents!)).toBe("$149.99");
+    // Yearly saves 49.98% against twelve monthly payments ($299.88); shown rounded down, never overstated.
+    expect(yearlySavingsPercent(2499, 14999)).toBe(49);
+    // B7: the saving in dollars, from the approved prices: 12 × $24.99 − $149.99 = $149.89.
+    expect(yearlySavingsCents(2499, 14999)).toBe(14989);
+    expect(yearlySavingsCents(2499, 0)).toBe(0);
+    expect(yearlySavingsCents(2499, 30000)).toBe(0);
     expect(plans.free.yearlyPriceCents).toBeUndefined();
     expect(plans.plus.yearlyPriceCents).toBeUndefined();
   });
@@ -105,9 +106,10 @@ describe("plans & entitlements", () => {
     expect(formatPrice(11999)).toBe("$119.99");
     expect(yearlySavingsPercent(0, 20000)).toBe(0);
   });
-  it("respects env overrides", () => {
+  it("respects env overrides of limits, but never of the approved Pro prices", () => {
     process.env.PLAN_PRO_AI_MONTHLY_LIMIT = "200";
     process.env.PLAN_PRO_YEARLY_PRICE_CENTS = "19999";
+    process.env.PLAN_PRO_PRICE_CENTS = "1799";
     process.env.PLAN_FREE_TEMPLATE_LIMIT = "8";
     try {
       expect(getPlans().pro.aiMonthlyLimit).toBe(200);
@@ -115,9 +117,15 @@ describe("plans & entitlements", () => {
       expect(getPlans().pro.aiSmartMonthlyLimit).toBe(10);
       process.env.PLAN_PRO_AI_SMART_MONTHLY_LIMIT = "15";
       expect(getPlans().pro.aiSmartMonthlyLimit).toBe(15);
-      expect(getPlans().pro.yearlyPriceCents).toBe(19999);
+      // A stale display price in the environment can't contradict checkout (which only accepts the approved price).
+      expect(getPlans().pro.yearlyPriceCents).toBe(14999);
+      expect(getPlans().pro.priceCents).toBe(2499);
       expect(getPlans().free.templateLimit).toBe(8);
+      // 0 still hides the yearly option.
+      process.env.PLAN_PRO_YEARLY_PRICE_CENTS = "0";
+      expect(getPlans().pro.yearlyPriceCents).toBeFalsy();
     } finally {
+      delete process.env.PLAN_PRO_PRICE_CENTS;
       delete process.env.PLAN_PRO_AI_MONTHLY_LIMIT;
       delete process.env.PLAN_PRO_AI_SMART_MONTHLY_LIMIT;
       delete process.env.PLAN_PRO_YEARLY_PRICE_CENTS;

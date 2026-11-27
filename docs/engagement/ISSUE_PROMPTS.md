@@ -71,7 +71,7 @@ Delete every synthetic member afterwards. Done = report updated, cleanup confirm
 
 ## P-05: App Store sandbox purchase, restore and transfer (R-02)
 
-**Agent:** payments · **Needs:** App Store Connect products at $17.99 / $119.99, a sandbox tester, a TestFlight build,
+**Agent:** payments · **Needs:** App Store Connect products at $24.99 / $149.99, a sandbox tester, a TestFlight build,
 RevenueCat project with webhook to staging. Consultant performs the taps; Claude reads results.
 
 ```

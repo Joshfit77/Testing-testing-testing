@@ -22,7 +22,7 @@ console); **Device** = needs a physical phone; **Open** = engineering work remai
 | Guideline 2.5.4 | Background location justified (run recording) | Code done / Device | O-01 resolved (web journal, then the native Swift/Java recorder, T-01). O-02: the "not yet verified on a phone" wording changes once device test 14 passes (prompt P-01) |
 | Guideline 3.1.1 | Digital subscription sold only through In-App Purchase on iOS; no web checkout links | Done (code) / Device | `56717544` adds the native notice instead of any Stripe path; device test 31 |
 | Guideline 3.1.2 | Subscription terms, price, renewal and cancellation shown before purchase; Restore button | Done (code) / Device | Paywall screen; device tests 29–30 |
-| Guideline 3.1.2 | Products in App Store Connect: $17.99 monthly, $119.99 yearly | Owner | Prices must match the approved pricing; RevenueCat offering ids per `docs/MOBILE_BILLING.md` |
+| Guideline 3.1.2 | Products in App Store Connect: $24.99 monthly, $149.99 yearly | Owner | Prices must match the approved pricing; RevenueCat offering ids per `docs/MOBILE_BILLING.md` |
 | Guideline 5.1.1(v) | In-app account deletion | Done | Tested (integration `account-deletion-closure`, browser suite) |
 | Guideline 1.4.1 | Health/fitness claims are not medical advice; disclaimers present | Done | Onboarding and legal pages |
 | Guideline 4.2 | Enough native value beyond a website | Risk | Native features: HealthKit, background GPS, barcode camera, notifications, offline Bible. Reviewers sometimes still reject web-shell apps; the device tests are the evidence |
@@ -48,4 +48,4 @@ console); **Device** = needs a physical phone; **Open** = engineering work remai
 2. Device tests in IPHONE_DEVICE_TESTING.md, especially GPS (14–15), purchases (29–31), HealthKit (17–18).
 3. O-02 wording change after those tests pass (O-01 is resolved in code; device tests 14–15c confirm it).
 4. Final privacy policy and terms published at public URLs.
-5. Store records, products at $17.99 / $119.99, reviewer account, screenshots.
+5. Store records, products at $24.99 / $149.99, reviewer account, screenshots.

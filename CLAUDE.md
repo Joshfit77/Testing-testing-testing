@@ -11,7 +11,7 @@ Read `docs/production-consolidation/MASTER_ENGINEERING_REPORT.md` for the curren
 
 ## Rules that are never negotiable
 
-- **Pricing:** Free $0, Pro **$17.99/month** and **$119.99/year**, defined only in `APPROVED_PRO_PRICE_CENTS`
+- **Pricing:** Free $0, Pro **$24.99/month** and **$149.99/year**, defined only in `APPROVED_PRO_PRICE_CENTS`
   (`src/lib/domain/plans.ts`). Never change a price without the owner's written approval.
 - **No production actions without the owner's approval:** no merge into `main`, no deploy, no live billing
   (`STRIPE_LIVE_APPROVED`), no store uploads, no changes to a hosted database, no paid AI calls beyond a capped test the

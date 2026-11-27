@@ -62,7 +62,7 @@ test("AI Coach on Free is one card with the price; Pro gets the chat", async ({ 
   await setPlan(page, "free");
   await page.goto("/coach");
   await expect(page.getByTestId("coach-upsell")).toBeVisible();
-  await expect(page.getByTestId("coach-upsell-price")).toContainText("$17.99/month or $119.99/year");
+  await expect(page.getByTestId("coach-upsell-price")).toContainText("$24.99/month or $149.99/year");
   await expect(page.getByTestId("coach-upsell-price")).toContainText("Bible and prayer journal are in Free");
   await expect(page.getByLabel("Message the AI coach")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "New chat" })).toHaveCount(0);

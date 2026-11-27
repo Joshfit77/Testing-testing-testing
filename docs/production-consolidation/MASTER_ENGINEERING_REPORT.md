@@ -49,8 +49,9 @@
     ($2,888–$4,620; up to 16 h with an escalation reserve used only if needed; docs/engagement/ENGAGEMENT_AGENDA.md).
 - **The database upgrades from `main` with all synthetic data preserved** (round 1), and a fresh install of all 89
   migration files succeeds with every post-deploy check ok.
-- **Pricing is unchanged at the approved $17.99 / $119.99.** `main` still has older prices ($30 Pro / $9.99 Plus), so
-  merging the pull request changes `main`'s pricing to the approved prices (PAYMENT_VERIFICATION.md). Real billing
+- **Pricing: Free $0, Pro $24.99 a month / $149.99 a year**, approved by the founder on 2026-11-27
+  (`docs/pro/PRICING_UPDATE_2026-11-27.md`; previously $17.99 / $119.99). `main` still has older prices ($30 Pro /
+  $9.99 Plus), so merging changes `main`'s pricing to the approved prices (PAYMENT_VERIFICATION.md). Real billing
   stays off.
 - **Nothing has been tested on a physical phone.** That is now the largest gap: iOS and Android scores are capped
   accordingly, and full checklists are ready (IPHONE_DEVICE_TESTING.md, ANDROID_DEVICE_TESTING.md).

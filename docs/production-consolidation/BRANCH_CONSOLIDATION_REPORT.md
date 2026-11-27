@@ -55,6 +55,9 @@ replaced:
 The pricing logic is unchanged here. Merging this branch into `main` changes `main`'s price from $30.00 to the approved
 $17.99 / $119.99.
 
+**Update 2026-11-27:** the founder has since approved $24.99 / $149.99, implemented on `claude/sharp-cray-8y0uuv`
+(`docs/pro/PRICING_UPDATE_2026-11-27.md`). The table above records the branches as they were on 2026-11-25.
+
 ## Database migrations across branches
 
 - `main`'s 8 migrations are identical in this branch.

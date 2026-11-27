@@ -42,7 +42,9 @@ unchanged. Both are environment settings, so the owner can restore 15 without a 
 
 ## How the per-member budget is derived
 
-Updated 2026-11-13 for the launch prices ($17.99 a month, $119.99 a year; previously $19.99 / $149.99).
+Updated 2026-11-27 for the founder-approved prices ($24.99 a month, $149.99 a year; previously $17.99 / $119.99, and
+before that $19.99 / $149.99). The AI budget, the 150 requests and the 10 larger-model requests are **unchanged**: a
+higher price never raises AI spending on its own.
 `revenueChannels()` and `channelEconomics()` in `src/lib/domain/ai-economics.ts` work out, for every way a member can pay,
 what is left after the provider's fees (provider fees as published, checked 2026-11-13):
 
@@ -63,24 +65,23 @@ Per Pro member-month, with AI at the full $1.40 budget (the most a member can be
 
 | Channel | Gross | Net after fees | Refunds (2%) | Other costs | AI (max) | Left | AI as % of net |
 |---|---|---|---|---|---|---|---|
-| Web, monthly (Stripe) | $17.99 | $17.04 | $0.36 | $1.00 | $1.40 | $14.28 | 8.2% |
-| Web, yearly (Stripe, charged once) | $10.00 | $9.61 | $0.20 | $1.00 | $1.40 | $7.01 | 14.6% |
-| Google Play, monthly (15%) | $17.99 | $15.11 | $0.36 | $1.00 | $1.40 | $12.35 | 9.3% |
-| Google Play, yearly (15%) | $10.00 | $8.40 | $0.20 | $1.00 | $1.40 | $5.80 | 16.7% |
-| App Store, monthly at 15% | $17.99 | $15.11 | $0.36 | $1.00 | $1.40 | $12.35 | 9.3% |
-| App Store, yearly at 15% | $10.00 | $8.40 | $0.20 | $1.00 | $1.40 | $5.80 | 16.7% |
-| App Store, monthly at 30% | $17.99 | $12.41 | $0.36 | $1.00 | $1.40 | $9.65 | 11.3% |
-| **App Store, yearly at 30% (lowest)** | **$10.00** | **$6.90** | $0.20 | $1.00 | $1.40 | **$4.30** | **20.3% ⚑** |
+| Web, monthly (Stripe) | $24.99 | $23.79 | $0.50 | $1.00 | $1.40 | $20.89 | 5.9% |
+| Web, yearly (Stripe, charged once) | $12.50 | $12.02 | $0.25 | $1.00 | $1.40 | $9.37 | 11.6% |
+| Google Play, monthly (15%) | $24.99 | $20.99 | $0.50 | $1.00 | $1.40 | $18.09 | 6.7% |
+| Google Play, yearly (15%) | $12.50 | $10.50 | $0.25 | $1.00 | $1.40 | $7.85 | 13.3% |
+| App Store, monthly at 15% | $24.99 | $20.99 | $0.50 | $1.00 | $1.40 | $18.09 | 6.7% |
+| App Store, yearly at 15% | $12.50 | $10.50 | $0.25 | $1.00 | $1.40 | $7.85 | 13.3% |
+| App Store, monthly at 30% | $24.99 | $17.24 | $0.50 | $1.00 | $1.40 | $14.34 | 8.1% |
+| **App Store, yearly at 30% (lowest)** | **$12.50** | **$8.62** | $0.25 | $1.00 | $1.40 | **$5.97** | **16.2%** |
 
-**Flag for the owner.** On one channel only (App Store yearly, first year, without the Small Business Program) the
-full AI budget is 20.3% of net, just over the 20% guideline; 20% of $6.90 would be $1.38. Every channel still leaves at
-least $4.30 a member-month after AI, fees, refunds and other costs, so no channel loses money even at the cap. The $1.40
-target, the 150 requests and the 10 advanced requests were **kept unchanged** (no allowance or budget was raised or
-lowered). Ways to clear the flag, for you to choose: enrol in the App Store Small Business Program (that channel's net
-becomes $8.40 and AI 16.7%), or set `AI_MEMBER_MONTHLY_BUDGET_USD=1.38`. At typical use ($0.37–0.70 a member-month)
-AI is 2–10% of net on every channel and nothing is flagged.
+**No channel is flagged any more.** At the earlier $119.99 yearly price, App Store yearly in the first year was at
+20.3% of net (just over the 20% guideline). At $149.99 it is 16.2%, and 20% of its $8.62 net would be $1.72, above the
+$1.40 target. Every channel leaves at least $5.97 a member-month after AI at the full budget, fees, refunds and other
+costs. The $1.40 target was **kept** (not raised to $1.72): raising AI spending is a separate owner decision. At typical
+use ($0.37–0.70 a member-month) AI is 2–8% of net on every channel.
 
-What this means at a typical member ($0.70 of AI): $15.31 left on web monthly, $5.00 on the lowest channel.
+What this means at a typical member ($0.70 of AI): $21.59 left on web monthly, $6.67 on the lowest channel.
+These figures come from `channelEconomics()` and are checked by `tests/unit/ai-economics.test.ts`.
 
 ## What a request costs (expected, cold cache)
 
@@ -100,17 +101,17 @@ complex questions, within the member's larger-model share and only while the bud
 
 ## Projections per Pro member-month
 
-| Member | Expected AI cost | Share of the lowest net ($6.90) | Margin on the lowest net after AI, $1.00 other costs and 2% refunds |
+| Member | Expected AI cost | Share of the lowest net ($8.62) | Margin on the lowest net after AI, $1.00 other costs and 2% refunds |
 |---|---|---|---|
-| Light (≈20 fast chats) | $0.07–0.24 | 1–3% | $5.46–5.63 |
-| Typical (≈60 fast chats, 3 larger-model) | $0.37–0.70 | 5–10% | $5.00–5.33 |
-| Heavy (all 150 requests, 10 larger-model) | about $1.28 at expected sizes | 19% | $4.42 |
-| Most a member can be charged in AI before being stopped | $1.40 budget, plus at most the overshoot of the requests already running (≤ $0.04 each on Haiku; ≤ about $0.58 each on Sonnet, which stops being used at 75% of the budget) | ≤ about 32% in the rare worst case | ≥ about $3.50 |
+| Light (≈20 fast chats) | $0.07–0.24 | 1–3% | $7.13–7.30 |
+| Typical (≈60 fast chats, 3 larger-model) | $0.37–0.70 | 4–8% | $6.67–7.00 |
+| Heavy (all 150 requests, 10 larger-model) | about $1.28 at expected sizes | 15% | $6.09 |
+| Most a member can be charged in AI before being stopped | $1.40 budget, plus at most the overshoot of the requests already running (≤ $0.04 each on Haiku; ≤ about $0.58 each on Sonnet, which stops being used at 75% of the budget) | ≤ about 26% in the rare worst case (about $2.21) | ≥ about $5.15 |
 
 Before this change the worst case (every request at the output cap) was about $22 a member-month, more than the price.
 It is now bounded by the money budget.
 
-Higher-net channels have more headroom: on web monthly ($17.04 net) a heavy member leaves about $14.40.
+Higher-net channels have more headroom: on web monthly ($23.79 net) a heavy member leaves about $21.01.
 
 Free members: **no billable AI at all** since the 2026-11-13 overhaul (the Bible study helper moved to Pro; Bible
 reading, prayer, journeys and the 40-day challenge stay free). `tests/integration/ai-access.test.ts` calls every AI entry

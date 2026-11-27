@@ -1,5 +1,7 @@
 # Pro pricing update to $17.99 / $119.99: report and owner checklist
 
+> **Superseded on 2026-11-27** by `PRICING_UPDATE_2026-11-27.md` ($24.99 / $149.99). Kept unchanged as history.
+
 This update was made on 2026-11-13 on branch `claude/pro-premium`. It has **not** been merged or deployed. **No store product,
 Stripe price, RevenueCat setting or other billing configuration was created, changed or inspected. No purchase or
 charge of any kind was made.** PR #11 was not touched.

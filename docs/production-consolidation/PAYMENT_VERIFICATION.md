@@ -1,11 +1,15 @@
 # Payment verification
 
-**Approved pricing (unchanged):**
+**Approved pricing (founder approval 2026-11-27; previously $17.99 / $119.99):**
 
 - Free: $0;
-- Pro: **$17.99 a month** or **$119.99 a year**.
+- Pro: **$24.99 a month** or **$149.99 a year**.
 
 The single source is `APPROVED_PRO_PRICE_CENTS` in `src/lib/domain/plans.ts`.
+
+**Existing subscribers keep their price.** New Stripe prices, with the old IDs in `STRIPE_PRICE_PRO_LEGACY`; in App
+Store Connect "keep the current price for existing subscribers"; in Google Play the legacy price cohort. The app and
+Play screens show the store's localized price. Store and Stripe steps: `docs/pro/PRICING_UPDATE_2026-11-27.md` §4.
 
 **Real billing is off:**
 
@@ -67,13 +71,14 @@ See also FOUNDER_ACTION_ITEMS.md.
 **App Store and RevenueCat setup:**
 
 1. Apple Paid Apps agreement, tax and banking.
-2. Subscription group with `ngf_pro_monthly` ($17.99) and `ngf_pro_yearly` ($119.99).
+2. Subscription group with `ngf_pro_monthly` ($24.99) and `ngf_pro_yearly` ($149.99) in the US storefront; review
+   Apple's localized prices for other storefronts. If products already exist, change the price for new subscribers only.
 3. RevenueCat project, entitlement `pro`, webhook with a long secret.
 4. **RevenueCat "transfer behaviour"** set to block or transfer, never share (O-10).
 
 **Web (Stripe):**
 
-5. Stripe **test-mode** prices at exactly $17.99 and $119.99; webhook; Customer Portal.
+5. Stripe **test-mode** prices at exactly $24.99 and $149.99; webhook; Customer Portal.
 
 **Testing:**
 

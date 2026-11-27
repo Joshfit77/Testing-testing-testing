@@ -79,7 +79,7 @@ References are `file:line`, counted on 2026-11-16 after the Phase 1 revision. "Ã
 
 29. **Anthropic: retention period for AI inputs and outputs; whether a zero-data-retention arrangement applies; the training terms on the owner's actual account.** P:114, P:202, P:238, P:276; T:307.
 30. **A signed or accepted data processing agreement with each processor** (Supabase, the host, Anthropic, Stripe, RevenueCat, the email provider). Attorney note at P:206; none is in the repository.
-31. **Prices as configured in Stripe, App Store Connect and Google Play Console** (code says $17.99 and $119.99). T:82.
+31. **Prices as configured in Stripe, App Store Connect and Google Play Console** (code says $24.99 and $149.99). T:82.
 32. **The App Store privacy answers and Google Play Data safety form as submitted**, for comparison with the Policy. P:360.
 
 ### A8. Third-party content licences

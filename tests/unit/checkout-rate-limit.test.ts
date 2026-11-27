@@ -12,7 +12,7 @@ const state = { rateOk: true };
 const rateLimit = vi.fn(async (_key: string, _limit: number, _windowMs: number) => ({ ok: state.rateOk, retryAfterSeconds: state.rateOk ? 0 : 60 }));
 const createCheckoutSession = vi.fn(async () => "https://checkout.stripe.com/c/pay/cs_test");
 const createPortalSession = vi.fn(async () => "https://billing.stripe.com/p/session/test");
-const stripeProPrices = vi.fn(async () => ({ month: { id: "price_m", unitAmount: 1799, currency: "usd", interval: "month", active: true } }));
+const stripeProPrices = vi.fn(async () => ({ month: { id: "price_m", unitAmount: 2499, currency: "usd", interval: "month", active: true } }));
 const recordAcceptances = vi.fn(async () => undefined);
 class Redirect extends Error {
   constructor(public url: string) {

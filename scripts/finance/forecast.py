@@ -11,8 +11,8 @@ import math
 # ---------------------------------------------------------------------------
 # 0. Approved prices (fixed by the owner; not modelled as variables)
 # ---------------------------------------------------------------------------
-PRICE_MONTHLY = 17.99      # Pro All Access, per month (launch price approved 2026-11-13; was 19.99)
-PRICE_ANNUAL = 119.99      # Pro All Access, per year (identical features; was 149.99)
+PRICE_MONTHLY = 24.99      # Pro All Access, per month (approved 2026-11-27; was 17.99, before that 19.99)
+PRICE_ANNUAL = 149.99      # Pro All Access, per year (identical features; approved 2026-11-27; was 119.99)
 ANNUAL_MRR = PRICE_ANNUAL / 12
 
 # AI allowance per Pro member per month (from the brief, matches src/lib/domain/plans.ts limits)
@@ -396,7 +396,7 @@ def scenario_row(n, monthly_share, apple_case, ai):
 def section_scenarios():
     print("## F. Forecast at 100 / 250 / 500 / 750 / 1,000 active paying subscribers (steady-state month, estimates)\n")
     print("Active subscribers are the paying base in a month; 'new subs needed' is the replacement for churn and "
-          "non-renewal only (no growth). MRR counts annual plans at $119.99/12. 'Annual cash' is the steady-state "
+          "non-renewal only (no growth). MRR counts annual plans at $" + f"{PRICE_ANNUAL:.2f}" + "/12. 'Annual cash' is the steady-state "
           "average of upfront annual payments landing per month (it is lumpy in reality, see section H).\n")
     sizes = [100, 250, 500, 750, 1000]
     for mix_name, ms in PLAN_MIXES.items():

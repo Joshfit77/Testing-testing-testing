@@ -63,8 +63,8 @@ This list describes the Free plan as it is today. It is not a promise that the F
 ### 3.2 Pro All Access
 
 Pro All Access costs:
-- **$17.99 per month**, billed every month; or
-- **$119.99 per year**, billed once a year as a single payment.
+- **$24.99 per month**, billed every month; or
+- **$149.99 per year**, billed once a year as a single payment.
 
 Both Pro options unlock exactly the same features. **No free trial is offered.** In addition to everything in Free, Pro includes:
 - the full program library and the custom program builder;
@@ -79,7 +79,7 @@ Both Pro options unlock exactly the same features. **No free trial is offered.**
 - a weekly progress report;
 - the AI Bible study helper.
 
-Prices are in U.S. dollars. They do not include any taxes, which may be added where required. Prices in the App Store or Google Play are set and displayed by the store in your local currency and may differ from these amounts. [ATTORNEY REVIEW: confirm that the prices in these Terms match the configured Stripe, App Store and Play prices on the publication date. The code is mid-migration: committed HEAD still lists Plus $11.99 and Pro $24.99, while the uncommitted working tree on 2026-10-26 implements Pro at $19.99 / $149.99. Consider stating prices only "as shown at checkout," to avoid conflicts.] [Added 2026-11-13, not part of the note above: the owner has since approved launch prices of $17.99 / $119.99, which Section 3.2 now states. The note above records the code as it stood on 2026-10-26 and is kept unchanged.] [Update 2026-11-16: $17.99 and $119.99 are the prices in code (`src/lib/domain/plans.ts`, `APPROVED_PRO_PRICE_CENTS`). Web checkout refuses to start if the configured Stripe price differs. [TO BE CONFIRMED — the prices actually configured in Stripe, App Store Connect and Google Play Console; they could not be checked from the repository.]]
+Prices are in U.S. dollars. They do not include any taxes, which may be added where required. Prices in the App Store or Google Play are set and displayed by the store in your local currency and may differ from these amounts. [ATTORNEY REVIEW: confirm that the prices in these Terms match the configured Stripe, App Store and Play prices on the publication date. The code is mid-migration: committed HEAD still lists Plus $11.99 and Pro $24.99, while the uncommitted working tree on 2026-10-26 implements Pro at $19.99 / $149.99. Consider stating prices only "as shown at checkout," to avoid conflicts.] [Added 2026-11-13, not part of the note above: the owner has since approved launch prices of $17.99 / $119.99, which Section 3.2 then stated. The note above records the code as it stood on 2026-10-26 and is kept unchanged.] [Update 2026-11-16: $17.99 and $119.99 are the prices in code (`src/lib/domain/plans.ts`, `APPROVED_PRO_PRICE_CENTS`). Web checkout refuses to start if the configured Stripe price differs. [TO BE CONFIRMED — the prices actually configured in Stripe, App Store Connect and Google Play Console; they could not be checked from the repository.]] [Update 2026-11-27: the owner approved new prices of $24.99 a month and $149.99 a year, which Section 3.2 now states and which are now the prices in code. They apply to new subscriptions; an existing subscription keeps the price it was bought at (legacy Stripe prices; in the stores, the price change is set for new subscribers only). [ATTORNEY REVIEW: confirm the notice, if any, owed to members before a price change would apply to an existing subscription; none is planned.]]
 
 ### 3.3 AI Coach allowance
 

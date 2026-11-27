@@ -46,7 +46,7 @@ test.describe("memberships", () => {
     // The AI coach is Pro only, and nothing asks for AI data sharing on Free.
     await page.goto("/coach");
     await expect(page.getByTestId("coach-upsell")).toBeVisible();
-    await expect(page.getByTestId("coach-upsell-price")).toHaveText("Pro · $17.99/month or $119.99/year · Bible and prayer journal are in Free");
+    await expect(page.getByTestId("coach-upsell-price")).toHaveText("Pro · $24.99/month or $149.99/year · Bible and prayer journal are in Free");
     await expect(page.getByLabel("Message the AI coach")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Allow and continue" })).toHaveCount(0);
 

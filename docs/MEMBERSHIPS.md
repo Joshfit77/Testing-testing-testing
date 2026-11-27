@@ -7,19 +7,32 @@ enforced on the server (and, where members write directly to the database, by da
 | Membership | Price | Who can buy it |
 |---|---|---|
 | Free | $0 | Everyone |
-| Pro All Access, monthly | $17.99 / month | New and existing members |
-| Pro All Access, yearly | $119.99 / year (saves 44% against 12 monthly payments) | New and existing members |
+| Pro All Access, monthly | $24.99 / month | New and existing members |
+| Pro All Access, yearly | $149.99 / year (saves about 50% against 12 monthly payments: 49.98%, shown as "Save 49%") | New and existing members |
 | Plus (legacy) | What the subscriber already pays | Nobody new: kept only for subscriptions that already exist |
 
 Monthly and yearly Pro unlock exactly the same features.
 
-**Price history.** The launch prices above were approved on 2026-11-13 and replace $19.99 / $149.99 (approved
-2026-10-26), which replaced $24.99 / $249.99. 12 × $17.99 = $215.88; $215.88 − $119.99 = $95.89 saved, 44.4% (shown as
-"Save 44%"); $119.99 / 12 = $9.9992 ≈ $10.00 a month, but a yearly membership is **one charge a year**, never a monthly
-charge. Dated reports and audits written before 2026-11-13 (`docs/quality/*`, `docs/audit*`, `docs/launch-audit/FINAL_*`
-reports, `VISUAL_COMPARISON_2026-11-07.md`, `LAUNCH_AUDIT_2026-11-08.md`, migration comments) record the prices in force
-when they were written and were deliberately left unchanged. No store or Stripe product has been created or changed
-by this update; see `docs/pro/PRICING_UPDATE_2026-11-13.md` for the owner checklist.
+**Price history.** The prices above were approved by the founder on 2026-11-27 and replace $17.99 / $119.99 (approved
+2026-11-13), which replaced $19.99 / $149.99 (2026-10-26), which replaced $24.99 / $249.99. 12 × $24.99 = $299.88;
+$299.88 − $149.99 = $149.89 saved, 49.98%. The app rounds the percentage **down** so a saving is never overstated: it
+shows "Save 49%" and "$149.89 less than 12 monthly payments"; "about 50%" is fine in words. $149.99 / 12 = $12.4992 ≈
+$12.50 a month, but a yearly membership is **one charge a year**, never a monthly charge.
+
+**Existing subscribers keep their price.** The change applies to new subscriptions only:
+
+- **Web (Stripe):** a Stripe price can't change amount, so the owner creates two *new* test-mode (later live) prices
+  at $24.99 / $149.99 and points `STRIPE_PRICE_PRO` / `STRIPE_PRICE_PRO_YEARLY` at them. The previous price IDs go in
+  `STRIPE_PRICE_PRO_LEGACY`, so members on them keep Pro and keep paying what they agreed to. No existing subscription is
+  moved to the new price.
+- **App Store / Google Play:** the store sets and charges the price; the app shows the store's localized price. Change
+  the price for **new subscribers only** (App Store Connect: "Keep current price for existing subscribers"; Google
+  Play: keep existing subscribers on the legacy price cohort). Product IDs don't change.
+
+Dated reports and audits (`docs/quality/*`, `docs/audit*`, `docs/launch-audit/*`, `docs/legal-audit-*`,
+`docs/launch-readiness/*`, `docs/release/RC_*`, `docs/pro/PRICING_UPDATE_2026-11-13.md`, migration comments) record the
+prices in force when they were written and are deliberately left unchanged. No store or Stripe product has been created
+or changed by this update; see `docs/pro/PRICING_UPDATE_2026-11-27.md` for the owner checklist.
 
 ## What each membership includes
 

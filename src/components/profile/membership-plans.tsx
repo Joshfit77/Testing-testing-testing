@@ -11,15 +11,15 @@ export type BillingInterval = "month" | "year";
 
 /** The prices to show. On the website they come from Stripe; in the app from the App Store or Google Play. */
 export interface MembershipPrices {
-  /** e.g. "$17.99", or null while loading / not offered. */
+  /** e.g. "$24.99", or null while loading / not offered. */
   month: string | null;
-  /** e.g. "$119.99", or null when yearly isn't offered here. */
+  /** e.g. "$149.99", or null when yearly isn't offered here. */
   year: string | null;
-  /** e.g. "$10.00" for the yearly price spread over 12 months, when known (an equivalent, never a monthly charge). */
+  /** e.g. "$12.50" for the yearly price spread over 12 months, when known (an equivalent, never a monthly charge). */
   yearPerMonth: string | null;
   /** Whole-percent saving of yearly over 12 monthly payments, when known. */
   savingsPercent: number | null;
-  /** The same saving in money, e.g. "$95.89", when known. */
+  /** The same saving in money, e.g. "$149.89", when known. */
   yearSaving?: string | null;
 }
 

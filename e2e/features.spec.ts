@@ -115,16 +115,17 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByTestId("faith-free")).toBeInViewport();
     // Only Free and Pro All Access are offered, at the approved prices; Plus is never offered.
     await expect(page.getByTestId("plan-free")).toContainText("$0");
-    await expect(page.getByTestId("pro-price")).toHaveText("$17.99 / month");
+    await expect(page.getByTestId("pro-price")).toHaveText("$24.99 / month");
     await page.getByRole("radio", { name: /Yearly|Annual/ }).click();
-    await expect(page.getByTestId("pro-price")).toHaveText("$119.99 / year");
-    await expect(page.getByText("Billed $119.99 once a year (about $10.00 a month). Save approximately 44% compared with monthly billing.")).toBeVisible();
-    await expect(page.getByTestId("annual-savings-line")).toHaveText("Save 44% with annual billing");
-    await expect(page.getByRole("radio", { name: /Save 44%/ })).toBeVisible();
+    await expect(page.getByTestId("pro-price")).toHaveText("$149.99 / year");
+    await expect(page.getByText("Billed $149.99 once a year (about $12.50 a month). Save approximately 49% compared with monthly billing.")).toBeVisible();
+    await expect(page.getByTestId("annual-savings-line")).toHaveText("Save 49% with annual billing");
+    await expect(page.getByRole("radio", { name: /Save 49%/ })).toBeVisible();
     // The full comparison is folded under "Compare Free and Pro".
     await page.getByText("Compare Free and Pro").click();
     await expect(page.getByText("150 requests / month")).toBeVisible();
-    await expect(page.getByText(/\$11\.99|\$24\.99|\$249\.99/)).toHaveCount(0);
+    // No legacy Plus price and no superseded Pro price ($17.99 / $119.99, $19.99, $249.99) appears anywhere.
+    await expect(page.getByText(/\$11\.99|\$17\.99|\$119\.99|\$19\.99|\$249\.99/)).toHaveCount(0);
     // No Stripe keys in this test environment: no checkout is offered, and nothing pretends to be one.
     await expect(page.getByText("Online checkout isn't available right now. You haven't been charged.")).toBeVisible();
     await expect(page.getByRole("button", { name: /Start Pro All Access/ })).toHaveCount(0);

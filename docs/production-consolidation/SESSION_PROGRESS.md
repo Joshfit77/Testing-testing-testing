@@ -7,7 +7,7 @@ Read this first in any new session. It records what has been done, with evidence
 
 **Rules in force (owner):**
 
-- Pricing stays Free $0 / Pro $17.99 a month / $119.99 a year.
+- Pricing: Free $0 / Pro $24.99 a month / $149.99 a year (founder approval 2026-11-27; was $17.99 / $119.99).
 - Without the owner's approval:
   - no merge into `main`;
   - no deploy;
@@ -37,6 +37,7 @@ Read this first in any new session. It records what has been done, with evidence
 | Engagement package | Done | CLAUDE.md, `.claude/agents/` (6), `npm run setup / verify / test:e2e:mocked / db:verify`, docs/engagement/ |
 | Round 3: native persistence, billing at volume, trigger-free quotas, review fixes (T-01..T-31) | Done 2026-11-26 | `77ce4060`, `ef3c9001`, `430e3758`, `5200bc09`, `d0a5f7aa` and the report commit after them; BUG_FIX_REGISTER.md (third round) |
 | Final review concerns (T-27..T-31) and founder-led engagement | Done 2026-11-27 | `8b32c103` and the report commit after it; FOUNDER_TASKS.md; ENGAGEMENT_AGENDA.md (7.5–12 consultant hours) |
+| Pricing update to $24.99 / $149.99 (founder approval 2026-11-27), from baseline `1197f96f` on `claude/sharp-cray-8y0uuv` | Done 2026-11-27 | `docs/pro/PRICING_UPDATE_2026-11-27.md`. Locally: typecheck, lint, unit 303 files (4,996 tests), integration 102 files (678 tests) after a fresh `db reset`, `db:verify` 11/11, build, browser suite (mocked) and demo suite. No store, Stripe or RevenueCat setting touched; nothing merged or deployed. Biblical AI not started |
 
 ## Next steps if continuing
 

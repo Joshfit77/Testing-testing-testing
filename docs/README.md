@@ -6,7 +6,7 @@ document win.**
 
 **Prices** are defined in exactly one place:
 
-- `APPROVED_PRO_PRICE_CENTS` in `src/lib/domain/plans.ts`: **Pro $17.99 a month, $119.99 a year; Free $0**.
+- `APPROVED_PRO_PRICE_CENTS` in `src/lib/domain/plans.ts`: **Pro $24.99 a month, $149.99 a year; Free $0**.
 
 Older reports that mention $19.99 / $149.99 or $24.99 describe earlier proposals.
 

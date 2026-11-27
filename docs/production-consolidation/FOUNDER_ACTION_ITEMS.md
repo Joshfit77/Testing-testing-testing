@@ -7,7 +7,7 @@ EXTERNAL_DEVELOPER_SCOPE.md. Ordered by what unblocks the most.
 
 | # | Decision | Context | Recommendation |
 |---|---|---|---|
-| D1 | Review and approve the pull request `release/narrow-gate-production-consolidation` → `main` | It changes `main` substantially, including pricing on `main` from $30 Pro / $9.99 Plus to the approved **$17.99 / $119.99**. Nothing is merged until you approve | Approve after reading MASTER_ENGINEERING_REPORT.md; merging does not deploy by itself unless your hosting deploys `main` automatically — **check that first** |
+| D1 | Review and approve the pull request `release/narrow-gate-production-consolidation` → `main` | It changes `main` substantially, including pricing on `main` from $30 Pro / $9.99 Plus to the approved **$24.99 / $149.99**. Nothing is merged until you approve | Approve after reading MASTER_ENGINEERING_REPORT.md; merging does not deploy by itself unless your hosting deploys `main` automatically — **check that first** |
 | D2 | Close the 10 obsolete pull requests (#3–#12) | All are older than and contained in the consolidation branch | Close them (I did not, per your rules) |
 | D3 | Delete merged branches later? | 34 branches are fully contained | Optional housekeeping; nothing was deleted |
 | D4 | Enable `AI_CHAT_RETENTION_DAYS`? | AI chat history is kept until the member deletes it; the option purges older chats | Decide a period (e.g. 365 days) with your privacy policy |
@@ -21,7 +21,7 @@ EXTERNAL_DEVELOPER_SCOPE.md. Ordered by what unblocks the most.
    `supabase db push` against **staging first**, then `npm run db:verify` (Claude prepares both; see the engagement
    agenda).
 4. **Hosting** for the Next.js app (e.g. Vercel Pro) with the environment variables listed in `.env.example`.
-5. **RevenueCat** project; App Store and Play products at $17.99 monthly / $119.99 yearly.
+5. **RevenueCat** project; App Store and Play products at $24.99 monthly / $149.99 yearly.
 6. **Stripe** account for web subscriptions — keep in test mode until you approve live billing.
 7. **Anthropic** API key with a monthly spend limit set in the Anthropic console (AI_COST_ANALYSIS.md) — do not
    enable until you approve paid AI.

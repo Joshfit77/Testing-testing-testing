@@ -12,7 +12,7 @@ import type { Plan } from "./types";
  *                     unlimited templates, scheduling, live GPS run and walk recording with route maps and splits,
  *                     recipes, meal planning and grocery lists, food comparisons and filters, advanced sleep and
  *                     recovery analytics, Body Scan, progress-photo comparisons, advanced analytics and the AI coach
- *                     (a monthly allowance). Monthly ($17.99) and yearly ($119.99) unlock exactly the same features.
+ *                     (a monthly allowance). Monthly ($24.99) and yearly ($149.99) unlock exactly the same features.
  *
  *   Plus (legacy)   — no longer sold. Kept only so that members who subscribed to Plus before the change keep exactly
  *                     the access they paid for (including live GPS, which every plan had then) until their
@@ -98,14 +98,18 @@ function envInt(name: string, fallback: number): number {
 }
 
 /**
- * Approved Pro All Access prices (US cents): $17.99 a month and $119.99 a year (owner pricing proposal of 2026-11-13,
- * replacing $19.99 / $149.99 from 2026-10-26). Changed in code and test configuration only: the live App Store, Google
- * Play and Stripe products still need the owner's approval to change, and until the Stripe price matches, web checkout
+ * THE single source of truth for what Pro All Access costs (US cents): $24.99 a month and $149.99 a year, the yearly
+ * price saving $149.89 (49.98%, about half) over 12 monthly payments. Approved by the founder on 2026-11-27, replacing
+ * $17.99 / $119.99 (2026-11-13), which replaced $19.99 / $149.99 (2026-10-26).
+ * Changed in code and test configuration only: the live App Store, Google Play and Stripe products are configured by
+ * the owner (docs/production-consolidation/PAYMENT_VERIFICATION.md), and until the Stripe price matches, web checkout
  * refuses to start (see approvedCents in src/server/services/billing.ts) rather than charge a different amount.
+ * Existing subscriptions keep the price they were bought at: earlier Stripe prices go in STRIPE_PRICE_PRO_LEGACY, and
+ * store price changes are made "for new subscribers only".
  * These are the prices shown when the store or Stripe price can't be read; the in-app paywall always shows the store's own localized price, and web
  * checkout shows the amount of the configured Stripe price (see src/server/services/billing.ts).
  */
-export const APPROVED_PRO_PRICE_CENTS = { month: 1799, year: 11999 } as const;
+export const APPROVED_PRO_PRICE_CENTS = { month: 2499, year: 14999 } as const;
 
 /** Paid plans offered to new customers. */
 export const PURCHASABLE_PLANS = ["pro"] as const;
@@ -113,14 +117,16 @@ export const PURCHASABLE_PLANS = ["pro"] as const;
 export const PUBLIC_PLAN_ORDER: Plan[] = ["free", "pro"];
 
 /**
- * Plan definitions. Prices and limits are defaults that can be overridden with environment variables without a
- * code change. Display prices must match the Stripe (and, later, App Store / Play) prices actually charged.
+ * Plan definitions. Limits are defaults that can be overridden with environment variables without a code change.
+ * Pro's prices can't: they are APPROVED_PRO_PRICE_CENTS (in the app the store's localized price is shown instead).
  */
 export function getPlans(): Record<Plan, PlanConfig> {
   const proAi = envInt("PLAN_PRO_AI_MONTHLY_LIMIT", 150);
   // Plan generations run on the larger model, so they are also bounded by aiSmartMonthlyLimit.
   const proPlans = envInt("PLAN_PRO_AI_PLAN_MONTHLY_LIMIT", 10);
-  const proYearly = envInt("PLAN_PRO_YEARLY_PRICE_CENTS", APPROVED_PRO_PRICE_CENTS.year);
+  // Pro prices are always the approved ones: an environment value can't show a different price (an old value copied
+  // from a template would contradict checkout). PLAN_PRO_YEARLY_PRICE_CENTS=0 only hides the yearly option.
+  const proYearly = envInt("PLAN_PRO_YEARLY_PRICE_CENTS", APPROVED_PRO_PRICE_CENTS.year) === 0 ? 0 : APPROVED_PRO_PRICE_CENTS.year;
   return {
     free: {
       id: "free",
@@ -166,7 +172,7 @@ export function getPlans(): Record<Plan, PlanConfig> {
     pro: {
       id: "pro",
       name: "Pro All Access",
-      priceCents: envInt("PLAN_PRO_PRICE_CENTS", APPROVED_PRO_PRICE_CENTS.month),
+      priceCents: APPROVED_PRO_PRICE_CENTS.month,
       ...(proYearly > 0 ? { yearlyPriceCents: proYearly } : {}),
       tagline: "One membership. Every premium feature.",
       purchasable: true,
@@ -302,7 +308,7 @@ export function formatPrice(cents: number): string {
 }
 
 /** Percentage saved by paying yearly instead of 12 monthly payments (rounded down). */
-/** What paying yearly saves over 12 monthly payments, in cents (0 when it saves nothing). $17.99 / $119.99 → 9589. */
+/** What paying yearly saves over 12 monthly payments, in cents (0 when it saves nothing). $24.99 / $149.99 → 14989. */
 export function yearlySavingsCents(monthlyCents: number, yearlyCents: number): number {
   if (monthlyCents <= 0 || yearlyCents <= 0) return 0;
   return Math.max(0, monthlyCents * 12 - yearlyCents);

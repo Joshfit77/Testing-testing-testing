@@ -85,7 +85,7 @@ export function stripePriceProblems(info: StripePriceInfo | null | undefined, in
   if (info.interval !== interval) out.push(`Stripe price ${info.id} renews every ${info.interval ?? "one-off"}, not every ${interval}.`);
   if (info.currency !== "usd") out.push(`Stripe price ${info.id} is in ${info.currency.toUpperCase()}, not USD.`);
   if (info.unitAmount !== approvedCents) out.push(`Stripe price ${info.id} charges ${info.unitAmount ?? "?"} cents; the approved price is ${approvedCents} cents.`);
-  // Billing review F6: $17.99 every 3 months, a metered price or extra currencies would all pass the checks above.
+  // Billing review F6: $24.99 every 3 months, a metered price or extra currencies would all pass the checks above.
   if (info.intervalCount != null && info.intervalCount !== 1) out.push(`Stripe price ${info.id} renews every ${info.intervalCount} ${interval}s, not every ${interval}.`);
   if (info.usageType != null && info.usageType !== "licensed") out.push(`Stripe price ${info.id} is metered, not a fixed price.`);
   if (info.extraCurrencies?.length) out.push(`Stripe price ${info.id} also charges in ${info.extraCurrencies.map((c) => c.toUpperCase()).join(", ")}; only USD is approved.`);
@@ -157,8 +157,8 @@ export class PriceMismatchError extends Error {
 }
 
 /**
- * The owner-approved price ($17.99 / $119.99), fixed in code. An environment override of the display price
- * (PLAN_PRO_PRICE_CENTS) can't make an unapproved Stripe price pass: changing what members pay is a code change.
+ * The owner-approved price ($24.99 / $149.99, APPROVED_PRO_PRICE_CENTS), fixed in code. No environment setting can make
+ * an unapproved Stripe price pass or change the displayed Pro price: changing what members pay is a code change.
  */
 function approvedCents(interval: BillingInterval): number {
   return APPROVED_PRO_PRICE_CENTS[interval];

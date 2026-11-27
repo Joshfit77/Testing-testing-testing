@@ -52,7 +52,7 @@ Mark a test passed **only** after doing it on a real device. Use a TestFlight bu
 | 26a | Sign-out removes recorded routes | Start a run, end the app (test 15), relaunch, sign out without reopening the run; sign in as another member | The other member is not offered the first member's run; the blue location indicator is gone |
 | 27 | Bible offline | Open a chapter, airplane mode, open another | The bundled Bible reads offline |
 | 28 | Prayer journal | Write an entry; force-quit mid-typing; reopen | The draft is kept; the saved entry is private |
-| 29 | Purchase (sandbox) | Settings → App Store → sandbox account; Profile → Plans → buy monthly | Pro within about 10 s; the price shown is Apple's ($17.99 in the US) |
+| 29 | Purchase (sandbox) | Settings → App Store → sandbox account; Profile → Plans → buy monthly | Pro within about 10 s; the price shown is Apple's ($24.99 in the US) |
 | 30 | Restore | Delete the app, reinstall, sign in, tap Restore purchases | Pro restored |
 | 31 | No web checkout in the app | Look at every plan and billing screen | No Stripe or website payment buttons or links anywhere |
 | 32 | Account deletion | Profile → delete account | Deleted; told that the App Store subscription must be cancelled in Settings |
