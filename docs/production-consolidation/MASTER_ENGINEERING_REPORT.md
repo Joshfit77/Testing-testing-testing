@@ -66,8 +66,8 @@
 | Browser suite at phone size (production build, mocks) | 168 passed, 0 failed, 101 skipped (opt-in suites, run separately below) |
 | Opt-in browser suites | Device matrix 39/39 (74 phone models, 2,964 screens, 0 problems); demo server 58/58; coach without AI 1/1; only the home-background photo checks not run (no photographs yet) |
 | Tap every safe control on every main screen | 49 screens, 281 controls, 0 problems |
-| Native run-journal stores | Java JUnit 5/5 locally and in the Android workflow; Swift XCTest in the iOS workflow: passed on `ed3c4169` |
-| GitHub CI, iOS build/archive/Simulator/WebKit, Android APK | Passed on `ed3c4169` |
+| Native run-journal stores | Java JUnit 5/5 locally and in the Android workflow; Swift XCTest (incl. backup exclusion, confirmed deletion) in the iOS workflow: passed on `1e58cec6` |
+| GitHub CI, iOS build/archive/Simulator/WebKit, Android APK | CI passed on `86b4c9fe`; iOS and Android passed on `1e58cec6` (native code unchanged since) |
 | Local load test | 0 errors up to 100 members and 25 concurrent (round 1) |
 | Physical devices | **Not tested** |
 

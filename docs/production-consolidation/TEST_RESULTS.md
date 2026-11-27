@@ -19,7 +19,9 @@ changed, the reason is given (see also BUG_FIX_REGISTER.md).
 | **Opt-in:** tap every control | This sandbox | Passed on `89260c5b` (49 screens, 281 controls, 0 findings); the final-review changes don't touch those screens' controls |
 | **Opt-in, not run:** home-background photographs | — | Needs the photographs (`HOME_BACKGROUND_PHOTOS_READY`); they don't exist yet |
 | Java run-journal store (JUnit) | This sandbox | **5 of 5 passed** (confirmed deletion) |
-| Swift XCTest (backup exclusion, confirmed deletion), Android JVM tests, iOS build | GitHub | See the PR checks on the pushed head |
+| GitHub CI on `86b4c9fe` (typecheck, lint, unit, build, integration, secret scan, dependency audit) | GitHub CI run 45940791909 | **Passed** (after the deletion-closure seed fix below) |
+| iOS on `1e58cec6` (native code unchanged since): Swift run-journal XCTest incl. backup exclusion and confirmed deletion, offline compile, device archive check, full app in the Simulator, WebKit opening/navigation | GitHub iOS run 45940047163 | **Passed** (all jobs) |
+| Android APK on `1e58cec6`: JVM tests incl. confirmed deletion, APK build | GitHub Android APK run 45940044263 | **Passed** |
 
 **Failures met in this round, and what was done:**
 
@@ -27,6 +29,7 @@ changed, the reason is given (see also BUG_FIX_REGISTER.md).
 |---|---|---|---|
 | `entitlements.test.ts` (new scale test) | 252 events listed for 250 | Window boundaries overlapped by a second, so events on a boundary second were listed twice (never applied twice) | Windows aligned to whole seconds |
 | `progress-photo-quota.test.ts` (new burst test) | 1 landed instead of 3 | The test's premise was wrong: reservations count each pending upload as a full 8 MB, so near the limit only one is granted (correct, conservative) | Reservations granted directly in the test so the real-size trigger check decides |
+| GitHub CI integration on `1e58cec6` (`account-deletion-closure.test.ts`) | faith_journey_attempts 2 rows instead of 1 after the stopped deletion | Timing: the faith-journeys-settle cron (every 15 min) ran at 04:30 between the test's before/after counts and settled the seeded journey (started 2026-10-01, missed days). Reproduced in SQL (1 attempt → 2); not a deletion defect | Seed a journey started today (nothing to settle); assertion unchanged; CI green on `86b4c9fe` |
 | Coach test without an AI provider | Timed out at sign-up | Harness: an earlier server without the e2e rate-limit setting still held the port | Server restarted with the same setting as the mocked runner: passed |
 
 ## Round 3 head: `c71e652f` and the report commit after it (T-01..T-26)
