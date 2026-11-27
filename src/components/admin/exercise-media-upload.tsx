@@ -136,7 +136,7 @@ export function ExerciseMediaUpload({ exerciseId, slug, exerciseName }: { exerci
           onChange={(e) => pick(e.target.files?.[0] ?? null)}
           className="h-auto py-2"
         />
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           MP4/WebM video or JPEG/PNG/WebP image, up to 50 MB. Short 5–8 s loops work best. Saved to {EXERCISE_MEDIA_BUCKET}/{slug}/.
           {file ? ` Selected: ${file.name} (${formatSize(file.size)}).` : ""}
         </p>
@@ -145,7 +145,7 @@ export function ExerciseMediaUpload({ exerciseId, slug, exerciseName }: { exerci
         <div className="space-y-1">
           <div className="flex items-center justify-between gap-2">
             <Label htmlFor="upload-license">License</Label>
-            <button type="button" className="text-[11px] text-gold-highlight hover:underline" onClick={() => setLicense(AI_MEDIA_LICENSE)}>
+            <button type="button" className="text-xs text-gold-highlight hover:underline" onClick={() => setLicense(AI_MEDIA_LICENSE)}>
               Use AI-generated license
             </button>
           </div>
@@ -161,7 +161,7 @@ export function ExerciseMediaUpload({ exerciseId, slug, exerciseName }: { exerci
         <Input id="upload-alt" value={altText} onChange={(e) => setAltText(e.target.value)} maxLength={200} disabled={busy} />
       </div>
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} disabled={busy} className="size-5 accent-[#C9A54C]" /> I confirm we have the right to use this media
+        <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} disabled={busy} className="size-5 accent-gold" /> I confirm we have the right to use this media
         and I&apos;ve checked it shows correct form.
       </label>
       {status.kind === "uploading" && (
@@ -178,12 +178,12 @@ export function ExerciseMediaUpload({ exerciseId, slug, exerciseName }: { exerci
         </p>
       )}
       {status.kind === "error" && (
-        <p role="alert" className="text-sm text-[#f08a8a]">
+        <p role="alert" className="text-sm text-destructive-foreground">
           {status.message}
         </p>
       )}
       {status.kind === "done" && (
-        <p role="status" className="text-sm text-[#5fc49a]">
+        <p role="status" className="text-sm text-success-foreground">
           {status.message}
         </p>
       )}

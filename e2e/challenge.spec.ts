@@ -2,30 +2,33 @@ import { expect, test } from "@playwright/test";
 import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 test.describe("40 Days Through the Narrow Gate", () => {
-  test("hidden until faith is enabled; start the challenge and check in for day 1", async ({ page }) => {
+  test("Faith is always available; start the challenge and check in for day 1", async ({ page }) => {
     await signUpAndConfirm(page, uniqueEmail("challenge"));
     await completeOnboarding(page);
 
-    // Faith is opt-in: no devotional entry on home yet.
-    await expect(page.getByText("Today's devotional")).toHaveCount(0);
-
-    await page.goto("/faith");
-    await page.getByRole("button", { name: /Turn on Faith/ }).click();
-    await expect(page.getByRole("heading", { name: "40 Days Through the Narrow Gate" })).toBeVisible();
+    // Faith is a main tab for everyone (no opt-in), reached from the bottom navigation.
+    await page.getByRole("navigation", { name: "Main sections" }).getByRole("link", { name: "Faith" }).click();
+    await page.waitForURL(/\/faith/);
+    // Not enrolled: no day number anywhere, and the challenge is one link under today's devotional.
+    await expect(page.getByRole("navigation", { name: "Faith quick actions" })).not.toContainText(/of 40/);
+    await expect(page.getByText(/^Today's devotional · Day/)).toHaveCount(0);
 
     // Start via the explanation pop-up.
-    await page.getByRole("button", { name: "Start the challenge" }).click();
+    await page.getByRole("button", { name: /^40 Days Through the Narrow Gate/ }).click();
     const startDialog = page.getByRole("dialog");
     await expect(startDialog.getByText(/Day 1 is today/)).toBeVisible();
     await startDialog.getByRole("button", { name: "Begin day 1" }).click();
-    await expect(page.getByText("Day 1 of 40", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "40 Days Through the Narrow Gate" })).toBeVisible();
+    await expect(page.locator("#challenge").getByText("Day 1 of 40", { exact: true })).toBeVisible();
+    // Enrolled: the quick action shows the member's own day.
+    await expect(page.getByRole("navigation", { name: "Faith quick actions" })).toContainText("Day 1 of 40");
     await expect(page.getByText("0 of 40 days complete")).toBeVisible();
 
     // Open today's devotional and check in.
     await page.getByRole("button", { name: "Read today's devotional" }).click();
     const day = page.getByRole("dialog");
     await expect(day.getByRole("heading", { name: "The Narrow Gate" })).toBeVisible();
-    await expect(day.getByText("Matthew 7:13–14 (KJV)")).toBeVisible();
+    await expect(day.getByText("Matthew 7:13–14 (BSB)")).toBeVisible();
     await day.getByLabel("Read today's devotional").check();
     await day.getByLabel("Trained today").check();
     await day.getByLabel("Note (optional)").fill("Choosing the narrow way today.");
@@ -42,8 +45,10 @@ test.describe("40 Days Through the Narrow Gate", () => {
     await expect(page.getByRole("dialog").getByLabel("Note (optional)")).toHaveValue("Choosing the narrow way today.");
     await page.keyboard.press("Escape");
 
-    // Home shows a small entry for faith-enabled users.
+    // Home's Scripture card opens today's devotional.
     await page.goto("/home");
-    await expect(page.getByRole("link", { name: /Today's devotional · Day 1 of 40/ })).toBeVisible();
+    await page.getByRole("link", { name: /^Verse of the day/ }).click();
+    await page.waitForURL(/\/faith/);
+    await expect(page.getByText("Today's devotional · Day 1 of 40")).toBeVisible();
   });
 });

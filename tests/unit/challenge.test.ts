@@ -1,6 +1,7 @@
 import {
   canCheckIn,
   challengeDate,
+  challengeDayLabel,
   challengeDayNumber,
   challengeDays,
   completedDayCount,
@@ -106,5 +107,20 @@ describe("devotional of the day rotation", () => {
   it("works for dates before the rotation epoch", () => {
     expect(devotionalForDate("2025-12-31").day).toBe(40);
     expect(devotionalForDate("2026-01-01").day).toBe(1);
+  });
+});
+
+describe("devotional day label (F2)", () => {
+  it("shows the member's own enrolled day", () => {
+    expect(challengeDayLabel(13)).toBe("Day 13 of 40");
+    expect(challengeDayLabel(1)).toBe("Day 1 of 40");
+    expect(challengeDayLabel(40)).toBe("Day 40 of 40");
+  });
+
+  it("shows no day number for members who are not enrolled, whatever the calendar rotation says", () => {
+    expect(devotionalForDate("2026-11-09").day).toBe(33); // the shared rotation: not anyone's progress
+    expect(challengeDayLabel(null)).toBeNull();
+    expect(challengeDayLabel(undefined)).toBeNull();
+    expect(challengeDayLabel(0)).toBeNull();
   });
 });

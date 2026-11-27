@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { EQUIPMENT_PRESETS } from "@/lib/domain/equipment-presets";
+import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
@@ -20,17 +21,22 @@ import {
   PRIMARY_GOALS,
   PROGRAM_TYPE_LABELS,
   PROGRAM_TYPES,
+  SECONDARY_GOAL_LABELS,
+  SECONDARY_GOALS,
   type DietaryPreference,
   type Equipment,
   type ExperienceLevel,
   type PrimaryGoal,
   type ProgramType,
+  type SecondaryGoal,
   type UnitSystem,
 } from "@/lib/domain/types";
+import { applyDisplayPrefs, type TextSize } from "@/components/shell/app-shell";
 import type { OnboardingInput } from "@/lib/validation/schemas";
 import { saveOnboardingAction } from "@/server/actions/onboarding";
 import { DIET_TYPES, DIETS, type DietType } from "@/lib/domain/diets";
 import type { Sex } from "@/lib/domain/nutrition";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 
 const DIET_LABELS: Record<DietaryPreference, string> = {
   no_preference: "No preference",
@@ -43,12 +49,6 @@ const DIET_LABELS: Record<DietaryPreference, string> = {
   kosher: "Kosher",
 };
 
-const EQUIPMENT_PRESETS: { label: string; items: Equipment[] }[] = [
-  { label: "Full gym", items: EQUIPMENT.filter((e) => e !== "heavy_bag" && e !== "strongman_implements") as Equipment[] },
-  { label: "Home gym", items: ["barbell", "rack", "bench", "dumbbell", "pull_up_bar", "band", "kettlebell"] },
-  { label: "Dumbbells only", items: ["dumbbell", "bench", "band"] },
-  { label: "Bodyweight only", items: ["bodyweight", "mat"] },
-];
 
 export interface OnboardingInitial extends Partial<OnboardingInput> {
   displayName?: string;
@@ -75,7 +75,7 @@ const STEPS = ["About you", "Your goal", "Your schedule", "Diet & preferences"] 
 
 export function OnboardingWizard({ initial, mode = "create" }: { initial: OnboardingInitial; mode?: "create" | "edit" }) {
   const [step, setStep] = useState(0);
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState<string | null>(null);
@@ -101,6 +101,9 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
   const [limitations, setLimitations] = useState(initial.limitations ?? "");
   const [consent, setConsent] = useState(initial.wellnessConsent ?? false);
   const [faith, setFaith] = useState(initial.faithEnabled ?? false);
+  const [secondGoal, setSecondGoal] = useState<SecondaryGoal | null>(initial.secondaryGoal ?? null);
+  const [textSize, setTextSize] = useState<TextSize>(initial.textSize ?? "default");
+  const [reduceMotion, setReduceMotion] = useState(initial.reduceMotion ?? false);
 
   const toggle = <T,>(list: T[], value: T, set: (v: T[]) => void) =>
     set(list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
@@ -172,6 +175,9 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
       sex: sex!,
       dietType,
       faithEnabled: faith,
+      secondaryGoal: secondGoal && secondGoal !== goal ? secondGoal : null,
+      textSize,
+      reduceMotion,
       rebuildProgram: mode === "create" ? true : rebuild,
     };
     setSuccess(null);
@@ -182,6 +188,7 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
         setFieldErrors(res.fieldErrors ?? {});
       } else {
         setFieldErrors({});
+        applyDisplayPrefs(textSize, reduceMotion);
         setSuccess(res.message ?? "Saved.");
       }
     });
@@ -240,7 +247,7 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
                   Prefer not to say
                 </Chip>
               </div>
-              <p className="text-xs text-muted-foreground">Only used to estimate your daily calories. Never shared.</p>
+              <p className="text-xs text-muted-foreground">Used to estimate your daily calories. Kept private to your account. If you turn on the AI Coach, your age, sex, height and weight are sent to its AI provider to personalise answers.</p>
             </div>
             {units === "imperial" ? (
               <div className="grid grid-cols-2 gap-3">
@@ -270,6 +277,20 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
                 {PRIMARY_GOALS.map((g) => (
                   <Chip key={g} selected={goal === g} onClick={() => setGoal(g)}>
                     {GOAL_LABELS[g]}
+                  </Chip>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset className="space-y-3">
+              <legend className="font-display text-xl font-bold uppercase">Second goal (optional)</legend>
+              <p className="text-sm text-muted-foreground">Noted on your plan. Your program is built around your primary goal.</p>
+              <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="Second goal">
+                <Chip selected={!secondGoal} onClick={() => setSecondGoal(null)}>
+                  None
+                </Chip>
+                {SECONDARY_GOALS.filter((g) => g !== goal).map((g) => (
+                  <Chip key={g} selected={secondGoal === g} onClick={() => setSecondGoal(g)}>
+                    {SECONDARY_GOAL_LABELS[g]}
                   </Chip>
                 ))}
               </div>
@@ -392,30 +413,55 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
               <legend className="px-1 text-sm font-semibold">Physical limitations (optional)</legend>
               <p className="text-xs text-muted-foreground">
                 Note anything you want your training to work around (e.g. &ldquo;prefer to avoid overhead pressing&rdquo;). This is
-                sensitive wellness information — we only store it with your consent, and it&apos;s never visible to administrators. This
+                sensitive wellness information — we only store it with your consent, and the app gives administrators no way to view it. This
                 app doesn&apos;t diagnose or treat injuries.
               </p>
               <Textarea value={limitations} onChange={(e) => setLimitations(e.target.value)} maxLength={1000} aria-label="Physical limitations" aria-invalid={Boolean(fieldErrors.limitations)} />
               <label className="flex items-start gap-3 text-sm">
-                <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 size-5 accent-[#C9A54C]" />
+                <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 size-5 accent-gold" />
                 <span>I consent to Narrow Gate Fitness storing this optional wellness information to personalize my training.</span>
               </label>
+            </fieldset>
+            <fieldset className="space-y-3">
+              <legend className="font-display text-xl font-bold uppercase">Display (optional)</legend>
+              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Text size">
+                {(["default", "large", "xlarge"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    role="radio"
+                    aria-checked={textSize === t}
+                    onClick={() => setTextSize(t)}
+                    className={cn(
+                      "flex min-h-11 items-center justify-center rounded-xl border px-2 text-sm font-semibold",
+                      textSize === t ? "border-gold bg-gold/12 text-gold-highlight" : "border-border bg-elevated hover:border-gold-muted",
+                    )}
+                  >
+                    {t === "default" ? "Default" : t === "large" ? "Large" : "Extra large"}
+                  </button>
+                ))}
+              </div>
+              <div className="flex min-h-11 items-center justify-between gap-4 rounded-xl border border-border bg-elevated/40 p-4">
+                <p id="ob-motion-label" className="text-sm font-semibold">
+                  Reduce motion
+                </p>
+                <Switch checked={reduceMotion} onCheckedChange={setReduceMotion} aria-labelledby="ob-motion-label" />
+              </div>
             </fieldset>
             <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-elevated/40 p-4">
               <div>
                 <p id="faith-label" className="text-sm font-semibold">
-                  Show the optional Faith &amp; Discipline section
+                  Faith-inspired coaching and reminders
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Scripture, reflection journal and discipline goals from a Christian perspective. Entirely optional and never required for
-                  workouts. You can change this any time.
+                  Let the AI coach and workout reminders draw on Scripture and faith language. The Faith tab is always available either way. You can change this any time.
                 </p>
               </div>
               <Switch checked={faith} onCheckedChange={setFaith} aria-labelledby="faith-label" />
             </div>
             {mode === "edit" && (
               <label className="flex items-start gap-3 rounded-xl border border-gold-muted/50 bg-gold/5 p-4 text-sm">
-                <input type="checkbox" checked={rebuild} onChange={(e) => setRebuild(e.target.checked)} className="mt-0.5 size-5 accent-[#C9A54C]" />
+                <input type="checkbox" checked={rebuild} onChange={(e) => setRebuild(e.target.checked)} className="mt-0.5 size-5 accent-gold" />
                 <span>Rebuild my starter program from these answers and make it my active program.</span>
               </label>
             )}
@@ -426,7 +472,7 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
       {error && <Notice tone="error">{error}</Notice>}
       {success && <Notice tone="success">{success}</Notice>}
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Button type="button" variant="ghost" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0 || pending}>
           <ArrowLeft aria-hidden /> Back
         </Button>

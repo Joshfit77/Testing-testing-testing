@@ -50,7 +50,7 @@ describe("Open Food Facts normalization", () => {
     if (r.status !== "found") return;
     const p = r.product;
     expect(p).toMatchObject({ code: "3017620422003", name: "Nutella", brand: "Nutella", quantity: "400 g", servingLabel: "15 g", servingQuantity: 15, unit: "g", missing: [] });
-    expect(p.per100).toEqual({ calories: 539, protein_g: 6.3, carbs_g: 57.5, fat_g: 30.9, fiber_g: 0 });
+    expect(p.per100).toEqual({ calories: 539, protein_g: 6.3, carbs_g: 57.5, fat_g: 30.9, fiber_g: 0, sugar_g: 56.3, sodium_mg: 43 });
     // Per serving is derived from per-100 g × serving weight so both bases agree.
     expect(p.perServing?.calories).toBeCloseTo(80.9, 0);
     expect(p.perServing?.fat_g).toBeCloseTo(4.6, 1);
@@ -97,7 +97,7 @@ describe("barcode portion math", () => {
   const r = normalizeOffProduct(nutella as OffProductResponse, "3017620422003");
   const p = r.status === "found" ? r.product : null;
   it("scales per 100 g by grams", () => {
-    expect(nutritionForAmount(p!, { grams: 30 })).toEqual({ calories: 161.7, protein_g: 1.9, carbs_g: 17.3, fat_g: 9.3, fiber_g: 0 });
+    expect(nutritionForAmount(p!, { grams: 30 })).toEqual({ calories: 161.7, protein_g: 1.9, carbs_g: 17.3, fat_g: 9.3, fiber_g: 0, sugar_g: 16.9, sodium_mg: 13 });
     expect(nutritionForAmount(p!, { grams: 100 })?.calories).toBe(539);
   });
   it("scales per serving by servings", () => {

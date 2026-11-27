@@ -3,7 +3,7 @@
 import { chromium } from "@playwright/test";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 
-const exe = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const exe = process.env.CHROMIUM || "/opt/pw-browsers/chromium";
 const browser = await chromium.launch(existsSync(exe) ? { executablePath: exe } : {});
 const page = await browser.newPage();
 const targets = [

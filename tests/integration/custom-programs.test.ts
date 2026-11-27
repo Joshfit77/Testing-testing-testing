@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, stackAvailable, type TestUser, grantPlan } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -18,6 +18,8 @@ describe.skipIf(!available)("custom program builder persistence", async () => {
 
   beforeAll(async () => {
     [owner, other] = await Promise.all([createTestUser("builder"), createTestUser("outsider")]);
+    // The program builder is a Plus feature, checked by the database too.
+    await Promise.all([grantPlan(owner, "plus"), grantPlan(other, "plus")]);
   });
   afterAll(async () => {
     await deleteTestUser(owner);

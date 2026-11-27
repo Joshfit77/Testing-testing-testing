@@ -1,11 +1,9 @@
 import "server-only";
 import { headers } from "next/headers";
+import { NATIVE_UA_TOKEN, platformFromUserAgent } from "@/lib/native-platform";
 
-/** The Capacitor shells append this token to the WebView user agent (see capacitor.config.ts). */
-export const NATIVE_UA_TOKEN = "NarrowGateApp";
+export { NATIVE_UA_TOKEN };
 
 export async function getNativePlatform(): Promise<"ios" | "android" | null> {
-  const ua = (await headers()).get("user-agent") ?? "";
-  if (!ua.includes(NATIVE_UA_TOKEN)) return null;
-  return /iPhone|iPad|iPod/i.test(ua) ? "ios" : "android";
+  return platformFromUserAgent((await headers()).get("user-agent") ?? "");
 }

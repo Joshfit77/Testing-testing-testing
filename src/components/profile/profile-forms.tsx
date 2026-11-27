@@ -1,14 +1,16 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { confirmDialog } from "@/components/ui/confirm";
 import { initialActionState } from "@/lib/action-state";
 import { cmToFeetInches, feetInchesToCm } from "@/lib/domain/units";
+import { initialTimeZoneOptions, timeZoneOptions } from "@/lib/time-zone-options";
 import type { UnitSystem } from "@/lib/domain/types";
-import { deleteAccountAction, updateProfileAction, withdrawWellnessConsentAction } from "@/server/actions/profile";
+import { deleteAccountAction, updateProfileAction, withdrawWellnessConsentAction, setAiDataConsentAction, setHealthAiShareAction, setJournalAiShareAction } from "@/server/actions/profile";
 
 export function ProfileForm({
   initial,
@@ -22,13 +24,11 @@ export function ProfileForm({
   const [inches, setInches] = useState(initial.heightCm ? String(fi.inches) : "");
   const [cm, setCm] = useState(initial.heightCm ? String(initial.heightCm) : "");
   const [faith, setFaith] = useState(initial.faithEnabled);
-  const zones = useMemo(() => {
-    try {
-      return (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.("timeZone") ?? [initial.timezone];
-    } catch {
-      return [initial.timezone];
-    }
-  }, [initial.timezone]);
+  // The first render must match the server's HTML, so it offers only the member's zone (and UTC); the device's own list
+  // of zones differs from the server's (Safari's isn't Node's: React error #418 on this page) and is added once the
+  // form is on the device. The member's zone is always in the list, so saving the form never changes it by accident.
+  const [zones, setZones] = useState(() => initialTimeZoneOptions(initial.timezone));
+  useEffect(() => setZones(timeZoneOptions(initial.timezone)), [initial.timezone]);
   const heightCm = units === "metric" ? cm : feet ? String(feetInchesToCm(Number(feet), Number(inches || 0))) : "";
   const fe = state.fieldErrors ?? {};
 
@@ -82,9 +82,9 @@ export function ProfileForm({
       <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-elevated/40 p-4">
         <div>
           <p id="faith-toggle" className="text-sm font-semibold">
-            Faith &amp; Discipline section
+            Faith-inspired coaching and reminders
           </p>
-          <p className="text-xs text-muted-foreground">Optional Christian content: scripture, reflection journal and discipline goals.</p>
+          <p className="text-sm text-muted-foreground">Let the AI coach and workout reminders draw on Scripture. The Faith tab is always available.</p>
         </div>
         <Switch checked={faith} onCheckedChange={setFaith} aria-labelledby="faith-toggle" />
       </div>
@@ -96,10 +96,84 @@ export function ProfileForm({
 
 export function WithdrawConsentForm() {
   const [state, action] = useActionState(withdrawWellnessConsentAction, initialActionState);
+  const confirmed = useRef(false);
+  return (
+    <form
+      action={action}
+      className="space-y-2"
+      onSubmit={(e) => {
+        if (confirmed.current) {
+          confirmed.current = false;
+          return;
+        }
+        e.preventDefault();
+        const form = e.currentTarget;
+        void confirmDialog({ title: "Withdraw consent and delete wellness data?", message: "Limitation notes and recovery check-ins are removed for good. Sleep entries stay until you delete them under Sleep & Recovery.", confirmLabel: "Withdraw", destructive: true }).then((ok) => {
+          if (!ok) return;
+          confirmed.current = true;
+          form.requestSubmit();
+        });
+      }}
+    >
+      <SubmitButton variant="secondary" pendingLabel="Removing…" className="h-auto w-full whitespace-normal py-2">
+        Withdraw consent &amp; delete wellness data
+      </SubmitButton>
+      <FormMessage state={state} />
+    </form>
+  );
+}
+
+/** Turn off sharing data with the AI provider (turning it on happens on the AI Coach screen, with the full list). */
+export function AiConsentOffForm() {
+  const [state, action] = useActionState(async () => setAiDataConsentAction(false), initialActionState);
   return (
     <form action={action} className="space-y-2">
-      <SubmitButton variant="secondary" pendingLabel="Removing…">
-        Withdraw consent &amp; delete wellness data
+      <SubmitButton variant="secondary" pendingLabel="Turning off…" className="h-auto min-h-11 w-full whitespace-normal py-2">
+        Turn off AI Coach data sharing
+      </SubmitButton>
+      <FormMessage state={state} />
+    </form>
+  );
+}
+
+/**
+ * The separate permission for Apple Health / Health Connect data and the AI provider (migration 079). Off by default.
+ * WORDING PENDING OWNER AND COUNSEL APPROVAL (docs/legal-audit-2026-11-16/18_HEALTH_DATA_AI_REVIEW.md).
+ */
+export function HealthAiShareForm({ on }: { on: boolean }) {
+  const [state, action] = useActionState(async () => setHealthAiShareAction(!on), initialActionState);
+  return (
+    <form action={action} className="space-y-2" data-testid="health-ai-share">
+      <p className="text-sm font-semibold">Apple Health and Health Connect data</p>
+      <p className="text-sm text-muted-foreground">
+        {on
+          ? "On. When you ask the AI Coach about sleep, recovery or activity, it can use data imported from Apple Health or Health Connect: step counts, and sleep your watch or ring recorded (time asleep, stages, overnight heart rate, heart-rate variability and breathing rate). This is sent to Anthropic, the AI provider. Your device's name is never sent."
+          : "Off. Nothing imported from Apple Health or Health Connect is sent to the AI provider. The AI Coach can still use steps and sleep you entered yourself. Turn this on if you want the coach to use your watch or ring data too."}
+      </p>
+      <SubmitButton variant="secondary" pendingLabel="Saving…" className="h-auto min-h-11 w-full whitespace-normal py-2">
+        {on ? "Stop sharing health-platform data with the AI Coach" : "Share Apple Health / Health Connect data with the AI Coach"}
+      </SubmitButton>
+      <FormMessage state={state} />
+    </form>
+  );
+}
+
+/**
+ * The separate permission before any prayer-journal entry can be shared with the AI Coach (migration 080). Off by
+ * default. WORDING PENDING OWNER AND COUNSEL APPROVAL.
+ */
+export function JournalAiShareForm({ on }: { on: boolean }) {
+  const [state, action] = useActionState(async () => setJournalAiShareAction(!on), initialActionState);
+  return (
+    <form action={action} className="space-y-2" data-testid="journal-ai-share">
+      <p className="text-sm font-semibold">Prayer journal</p>
+      <p className="text-sm text-muted-foreground">
+        {on
+          ? "On. You can mark individual journal entries \"Share with AI Coach\". Only those entries (a short excerpt of each, up to five) are sent to Anthropic, the AI provider, when you talk to the coach. Every other entry stays private."
+          : "Off. No prayer-journal entry is ever sent to the AI provider, and entries can't be marked for the AI Coach. Turn this on only if you want to choose entries for the coach to read."}
+      </p>
+      <SubmitButton variant="secondary" pendingLabel="Saving…" className="h-auto min-h-11 w-full whitespace-normal py-2">
+        {on ? "Stop sharing prayer journal entries with the AI Coach" : "Share prayer journal entries with the AI Coach"}
       </SubmitButton>
       <FormMessage state={state} />
     </form>
@@ -114,6 +188,21 @@ export function DeleteAccountForm() {
         Type <strong>DELETE</strong> to permanently delete your account and all of your data
       </Label>
       <Input id="confirm-delete" name="confirm" autoComplete="off" aria-invalid={Boolean(state.fieldErrors?.confirm)} />
+      <div className="space-y-2">
+        <Label htmlFor="delete-password">Your password</Label>
+        <Input id="delete-password" name="password" type="password" autoComplete="current-password" aria-invalid={Boolean(state.fieldErrors?.password)} />
+      </div>
+      <div className="space-y-1.5 text-xs text-muted-foreground">
+        <p>
+          This removes your workouts, runs, nutrition logs, recipes and meal plans, progress photos, AI coach conversations, prayer journal and
+          everything else in your account. It can&apos;t be undone. Export your data first if you want a copy.
+        </p>
+        <p>A membership bought on this website is cancelled for you, with no further charges.</p>
+        <p>
+          If you subscribed through the App Store or Google Play, deleting your account doesn&apos;t stop those charges: cancel in your iPhone&apos;s
+          Settings → your name → Subscriptions, or in Google Play → Payments &amp; subscriptions.
+        </p>
+      </div>
       <FormMessage state={state} />
       <SubmitButton variant="destructive" pendingLabel="Deleting…">
         Delete my account

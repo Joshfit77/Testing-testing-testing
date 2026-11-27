@@ -1,40 +1,56 @@
 import { expect, test } from "@playwright/test";
-import { completeOnboarding, getEmailLink, grantPlan, PASSWORD, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { completeOnboarding, CONFIRMATION_LINK, getEmailLink, grantPlan, PASSWORD, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 test.describe("welcome, sign-up and diets", () => {
-  test("the welcome page email carries into sign-up, and setup asks weight, age, sex and height", async ({ page }) => {
+  test("Start free on the welcome page leads to sign-up, and setup asks weight, age, sex and height", async ({ page }) => {
     const email = uniqueEmail("welcome");
     await page.goto("/");
-    await expect(page.getByText(/Welcome · Rooted in faith/)).toBeVisible();
+    await expect(page.getByText("Rooted in faith. Built for strength.")).toBeVisible();
+    await page.getByRole("link", { name: "Start free" }).click();
+    await page.waitForURL(/\/signup/);
     await page.getByLabel("Email").fill(email);
-    await page.getByRole("button", { name: "Sign up free" }).click();
-    await page.waitForURL(/\/signup\?email=/);
-    await expect(page.getByLabel("Email")).toHaveValue(email);
 
     await page.getByLabel("Name").fill("Welcome Tester");
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByLabel("I confirm I am 18 years of age or older.").check();
     await page.getByRole("checkbox", { name: /I agree to the/ }).check();
+    await page.getByRole("checkbox", { name: /I understand that exercise and outdoor activity carry a risk of injury/ }).check();
     await page.getByRole("button", { name: "Create account" }).click();
     await page.getByText("Check your inbox").waitFor();
-    await page.goto(await getEmailLink(email, /http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify[^"'\s<]+/));
+    await page.goto(await getEmailLink(email, CONFIRMATION_LINK));
 
     await page.waitForURL(/\/onboarding/);
-    await page.getByLabel(/Bodyweight/).fill("150");
+    await page.getByRole("button", { name: "Lose body fat", exact: true }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: "Under 1 year", exact: true }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click(); // schedule: the default
+    await page.getByRole("button", { name: /^Dumbbells only/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    // About you (one screen): sex is required (only used for calorie math).
+    await expect(page.getByText(/only for the calorie estimate/i)).toBeVisible();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await expect(page.getByText("Please choose male, female or prefer not to say.")).toBeVisible();
+    await page.getByRole("button", { name: /^Back/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: "Female", exact: true }).click();
     await page.getByLabel("Age").fill("29");
     await page.getByLabel("Height (ft)").fill("5");
     await page.getByLabel("Height (in)").fill("5");
-    await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.getByText("Please choose male, female or prefer not to say.")).toBeVisible();
-    await page.getByRole("button", { name: "Female", exact: true }).click();
-    await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByRole("button", { name: "Lose body fat" }).click();
-    await page.getByRole("button", { name: "Under 1 year" }).click();
-    await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByLabel(/Current weight/).fill("150");
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    // Ready: the defaults are named, and the optional questions are one tap away.
+    await expect(page.getByTestId("onboarding-defaults")).toContainText("lightly active");
+    await page.getByRole("button", { name: "Personalise more" }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click(); // optional second goal: Continue skips it too
+    await page.getByRole("button", { name: /^Continue/ }).click(); // weight goal is optional
+    await page.getByRole("button", { name: /^Not very active/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByRole("button", { name: /Mediterranean/ }).click();
-    await page.getByRole("button", { name: "Build my plan" }).click();
-    await page.waitForURL(/\/home/, { timeout: 30_000 });
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: "Build my plan" }).click(); // the display step is optional: build from here
+    await page.waitForURL(/\/plan/, { timeout: 60_000 });
+    await expect(page.getByRole("heading", { name: "Your plan is ready" })).toBeVisible();
 
     await page.goto("/nutrition/diets");
     await expect(page.getByRole("button", { name: /Mediterranean.*Your diet/ })).toBeVisible();
@@ -47,7 +63,8 @@ test.describe("welcome, sign-up and diets", () => {
     await grantPlan(email, "plus");
 
     await page.goto("/nutrition");
-    await expect(page.getByText("Your diet")).toBeVisible();
+    await page.getByTestId("group-tools").locator("summary").click();
+    await expect(page.getByText("Your diet", { exact: true })).toBeVisible();
     await expect(page.getByText("Balanced", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: /Your diet/ }).click();
     await page.waitForURL(/\/nutrition\/diets/);
@@ -57,6 +74,7 @@ test.describe("welcome, sign-up and diets", () => {
     await expect(page.getByRole("status").filter({ hasText: "Your diet is now Keto." })).toBeVisible();
 
     await page.goto("/nutrition");
+    await page.getByTestId("group-tools").locator("summary").click();
     await expect(page.getByText("Keto", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Add food" }).click();
     await page.getByPlaceholder("e.g. chicken, banana, rice").fill("salmon");

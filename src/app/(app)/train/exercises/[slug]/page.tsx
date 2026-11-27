@@ -1,50 +1,83 @@
 import Link from "next/link";
+import { EXERCISE_REVIEW_NOTES } from "@/data/exercise-review-notes";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, Lightbulb, PlayCircle } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, ChevronRight, ExternalLink, Lightbulb, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EQUIPMENT_LABELS, type Equipment } from "@/lib/domain/types";
 import type { ExerciseRow } from "@/lib/types/db";
-import { titleCase } from "@/lib/utils";
+import { cn, titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
 import { formVideoSearchUrl, videoEmbedUrl } from "@/lib/media";
 import { exerciseMediaPublicUrl } from "@/lib/exercise-media";
 import { DemoVideo } from "@/components/train/demo-video";
+import { ExerciseDemo } from "@/components/train/exercise-demo";
+import { MuscleKey } from "@/components/train/muscle-key";
+import { shownDemoAsset } from "@/lib/exercise-demos";
+import { demoCaption, demoReadiness } from "@/lib/exercise-demo-readiness";
 import { requireOnboardedUser } from "@/server/auth";
+import { activityKindFor, exerciseMilestone } from "@/lib/domain/exercise-milestones";
+import { ExerciseMilestoneCard } from "@/components/train/exercise-milestone";
+import { loadExerciseHistory, loadMilestoneActivities } from "@/server/services/exercise-history";
+import { BackLink } from "@/components/platform/back-link";
+import { exerciseDetails, LIBRARY_GROUP_LABELS } from "@/data/exercise-details";
 
 export const metadata = { title: "Exercise" };
 
-export default async function ExerciseDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ExerciseDetailPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ from?: string }> }) {
   const { slug } = await params;
-  await requireOnboardedUser();
+  // Opened from the workout logger: Back returns to the workout (its draft is kept), not to the library.
+  const fromWorkout = (await searchParams).from === "workout";
+  const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const { data } = await supabase.from("exercises").select("*").eq("slug", slug).maybeSingle();
   if (!data) notFound();
   const ex = data as ExerciseRow;
-  const [altsRes, mediaRes] = await Promise.all([
+  const actKind = activityKindFor(ex.slug);
+  const [altsRes, mediaRes, history, activities] = await Promise.all([
     supabase.from("exercise_alternatives").select("alt:exercises!exercise_alternatives_alternative_id_fkey(slug, name, difficulty)").eq("exercise_id", ex.id),
     supabase.from("exercise_media").select("id, media_type, storage_path, external_url, license, attribution, alt_text").eq("exercise_id", ex.id),
+    loadExerciseHistory(supabase, user.id, ex.id),
+    // Runs and walks: every saved activity on the Run tab counts too (GPS, treadmill or by hand).
+    actKind ? loadMilestoneActivities(supabase, user.id, actKind) : Promise.resolve([]),
   ]);
+  const milestone = exerciseMilestone(history.sessions, { slug: ex.slug, name: ex.name }, profile.unit_system, { activities });
   const alts = (altsRes.data ?? []).map((a) => a.alt as unknown as { slug: string; name: string; difficulty: string }).filter(Boolean);
   const media = mediaRes.data ?? [];
+  const hasVideo = media.some((m) => m.media_type === "video");
+  const demoMeta = { name: ex.name, pattern: ex.movement_pattern, category: ex.category, equipment: ex.equipment, timed: ex.is_timed };
+  const demo = shownDemoAsset(ex.slug);
+  const muscles = { primary: ex.primary_muscles ?? [], secondary: ex.secondary_muscles ?? [] };
+  const readiness = demoReadiness(ex.slug);
+  const details = exerciseDetails(ex.slug);
   const mediaUrl = (m: (typeof media)[number]) =>
     (m.external_url as string | null) ?? exerciseMediaPublicUrl(publicEnv.supabaseUrl, m.storage_path as string);
 
   return (
     <div className="space-y-6">
-      <Link href="/train/exercises" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Exercise library
-      </Link>
+      <BackLink href={fromWorkout ? "/train/workout" : "/train/exercises"}>{fromWorkout ? "Back to workout" : "Exercise library"}</BackLink>
 
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">{titleCase(ex.category)}</p>
         <h1 className="mt-1 font-display text-4xl font-bold uppercase md:text-5xl">{ex.name}</h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">{ex.description}</p>
+        {!ex.is_published && (
+          <p className="mt-3 max-w-2xl rounded-xl border border-border bg-elevated px-3 py-2 text-sm" role="status" data-testid="exercise-retired">
+            This exercise is no longer in the library or in any program. Your past workouts with it are kept.
+          </p>
+        )}
+        {details && details.aliases.length > 0 && (
+          <p className="mt-1 text-sm text-muted-foreground" data-testid="exercise-aliases">
+            Also called: {details.aliases.join(", ")}
+          </p>
+        )}
         <div className="mt-4 flex flex-wrap gap-2">
           <Badge variant="secondary">{titleCase(ex.difficulty)}</Badge>
           {ex.mechanics && <Badge variant="outline">{titleCase(ex.mechanics)}</Badge>}
           {ex.is_timed && <Badge variant="outline">Timed</Badge>}
           {ex.low_impact && <Badge variant="success">Low impact</Badge>}
+          {details && <Badge variant="outline">{LIBRARY_GROUP_LABELS[details.group]}</Badge>}
+          {details?.home && <Badge variant="outline">Home-friendly</Badge>}
         </div>
       </header>
 
@@ -72,37 +105,46 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={mediaUrl(m)} alt={(m.alt_text as string) || `${ex.name} demonstration`} className="w-full rounded-xl" loading="lazy" />
                   )}
-                  <figcaption className="mt-1 text-[11px] text-muted-foreground">
+                  <figcaption className="mt-1 text-xs text-muted-foreground">
                     License: {m.license as string}
                     {m.attribution ? ` · ${m.attribution as string}` : ""}
                   </figcaption>
                 </figure>
               ))}
+              {hasVideo && (
+                <details className="rounded-xl border border-border">
+                  <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-gold-highlight">{demo ? "Rendered demo" : readiness === "animated" ? "Animated demo" : "Demonstration"}</summary>
+                  <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} muscles={muscles} className={demo ? "w-full" : "aspect-[5/6] w-full rounded-b-xl sm:aspect-[4/3]"} />
+                </details>
+              )}
             </div>
-          ) : (
-            <div className="flex aspect-video flex-col items-center justify-center gap-2 bg-elevated/40 p-6 text-center">
-              <PlayCircle className="size-10 text-gold" aria-hidden />
-              <p className="text-sm font-semibold">No built-in video for this exercise yet</p>
-              <p className="max-w-xs text-xs text-muted-foreground">An admin can add a YouTube, Vimeo or uploaded video. Until then, watch a form video or follow the steps below.</p>
-            </div>
+          ) : null}
+          {!hasVideo && (
+            <figure className={media.length ? "px-3 pb-3" : undefined}>
+              <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} muscles={muscles} className={cn(!demo && "aspect-[5/6] sm:aspect-[4/3]", "w-full", media.length && "rounded-xl")} />
+              <figcaption className="px-3 pt-2 text-xs text-muted-foreground" data-testid="demo-caption">
+                {demoCaption(readiness, Boolean(demo))} Not a substitute for coaching.{readiness === "animated" || demo ? " Use 0.5× to study each phase." : ""}
+                {EXERCISE_REVIEW_NOTES[ex.slug] && <span className="mt-1 block text-gold-highlight">{EXERCISE_REVIEW_NOTES[ex.slug]}</span>}
+              </figcaption>
+            </figure>
           )}
-          <div className="border-t border-border p-3">
+          <div className="border-t border-border px-3 py-2">
             <a
               href={formVideoSearchUrl(ex.name)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-gold-muted px-4 text-sm font-semibold text-gold-highlight hover:bg-gold/10"
+              className="inline-flex min-h-11 items-center gap-1.5 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
             >
-              <PlayCircle className="size-4" aria-hidden /> Watch form videos <ExternalLink className="size-3.5" aria-hidden />
+              <Search className="size-3.5" aria-hidden /> Search YouTube for more <ExternalLink className="size-3" aria-hidden />
             </a>
-            <p className="mt-1 text-[11px] text-muted-foreground">Opens YouTube search. Videos there are made by other creators.</p>
+            <span className="text-xs text-muted-foreground"> — other creators&apos; videos, not reviewed by us.</span>
           </div>
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-5" aria-label="Muscles and equipment">
           <h2 className="font-display text-lg font-semibold uppercase">Target muscles</h2>
-          <p className="mt-1 text-sm">{ex.primary_muscles.map(titleCase).join(", ")}</p>
-          {ex.secondary_muscles.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Also works: {ex.secondary_muscles.map(titleCase).join(", ")}</p>}
+          {/* Keyed to the athlete's glow when the 2D athlete is what the page shows (not a filmed or rendered clip). */}
+          <MuscleKey className="mt-3" primary={ex.primary_muscles} secondary={ex.secondary_muscles} showColours={!hasVideo && !demo && readiness !== "placeholder"} />
           <h2 className="mt-5 font-display text-lg font-semibold uppercase">Equipment</h2>
           <div className="mt-2 flex flex-wrap gap-2">
             {ex.equipment.map((e) => (
@@ -117,7 +159,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
               <ul className="mt-2 space-y-1.5">
                 {alts.map((a) => (
                   <li key={a.slug}>
-                    <Link href={`/train/exercises/${a.slug}`} className="text-sm text-gold-highlight hover:underline">
+                    <Link href={`/train/exercises/${a.slug}`} className="inline-flex min-h-11 items-center text-sm text-gold-highlight hover:underline">
                       {a.name}
                     </Link>{" "}
                     <span className="text-xs text-muted-foreground">· {titleCase(a.difficulty)}</span>
@@ -129,10 +171,30 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
         </section>
       </div>
 
+      <ExerciseMilestoneCard milestone={milestone} name={ex.name} timeZone={profile.timezone ?? "UTC"} compact />
+
+      <Link
+        href={`/train/exercises/${ex.slug}/history`}
+        className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted"
+      >
+        <BarChart3 className="size-5 shrink-0 text-gold" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Your history</span>
+          <span className="block text-xs text-muted-foreground">Heaviest lift, estimated 1RM trend and your last sessions</span>
+        </span>
+        <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+      </Link>
+
       <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="how-title">
         <h2 id="how-title" className="font-display text-xl font-bold uppercase">
           How to do it
         </h2>
+        {details && (
+          <p className="mt-3 text-sm" data-testid="exercise-start">
+            <span className="font-semibold">Starting position: </span>
+            {details.start}
+          </p>
+        )}
         <ol className="mt-3 space-y-3">
           {ex.instructions.map((step, i) => (
             <li key={i} className="flex gap-3 text-sm">
@@ -142,6 +204,34 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
           ))}
         </ol>
       </section>
+
+      {details && (
+        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="technique-title" data-testid="exercise-technique">
+          <h2 id="technique-title" className="font-display text-lg font-semibold uppercase">
+            Breathing, range & setup
+          </h2>
+          <dl className="mt-3 space-y-3 text-sm">
+            <div>
+              <dt className="font-semibold">Breathing</dt>
+              <dd className="text-muted-foreground">{details.breathing}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold">Range of motion</dt>
+              <dd className="text-muted-foreground">{details.rangeOfMotion}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold">Setup & equipment</dt>
+              <dd>
+                <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                  {details.setup.map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+              </dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="cues-title">

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, makeAdmin, serviceClient, stackAvailable, type TestUser, reserveUpload } from "./helpers";
 
 const available = await stackAvailable();
 const BUCKET = "progress-photos";
@@ -15,8 +15,9 @@ describe.skipIf(!available)("progress photos: row and storage isolation", () => 
 
   beforeAll(async () => {
     [alice, bob, admin] = await Promise.all([createTestUser("photo-alice"), createTestUser("photo-bob"), createTestUser("photo-admin")]);
-    await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
     alicePath = `${alice.id}/${crypto.randomUUID()}.jpg`;
+    await reserveUpload(alice.client, BUCKET, alicePath);
     const { error: upErr } = await alice.client.storage.from(BUCKET).upload(alicePath, jpeg(), { contentType: "image/jpeg" });
     if (upErr) throw upErr;
     const { data, error } = await alice.client
@@ -92,7 +93,9 @@ describe.skipIf(!available)("progress photos: row and storage isolation", () => 
   it("the bucket is private and rejects non-image uploads", async () => {
     const { data: bucket } = await serviceClient().storage.getBucket(BUCKET);
     expect(bucket?.public).toBe(false);
-    const { error } = await bob.client.storage.from(BUCKET).upload(`${bob.id}/${crypto.randomUUID()}.txt`, new Blob(["hi"], { type: "text/plain" }), { contentType: "text/plain" });
+    const txt = `${bob.id}/${crypto.randomUUID()}.txt`;
+    expect(await reserveUpload(bob.client, BUCKET, txt)).toBe("ok");
+    const { error } = await bob.client.storage.from(BUCKET).upload(txt, new Blob(["hi"], { type: "text/plain" }), { contentType: "text/plain" });
     expect(error).not.toBeNull();
   });
 });

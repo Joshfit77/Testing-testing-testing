@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, exerciseIds, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, exerciseIds, makeAdmin, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -12,7 +12,7 @@ describe.skipIf(!available)("barcode foods & exercise media uploads", () => {
 
   beforeAll(async () => {
     [user, other, admin] = await Promise.all([createTestUser("barcode"), createTestUser("barcode-other"), createTestUser("media-admin")]);
-    await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
     ex = await exerciseIds(["back-squat"]);
   });
 

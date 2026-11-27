@@ -1,6 +1,7 @@
 import {
   BADGE_CATALOG,
   badgePercent,
+  badgeRemaining,
   badgesUnlockedBySession,
   computeAchievements,
   dailyStreakEarnedAt,
@@ -42,7 +43,7 @@ describe("badge catalog", () => {
   it("has ~20 unique, well-formed badges across all categories", () => {
     expect(BADGE_CATALOG.length).toBeGreaterThanOrEqual(20);
     expect(new Set(BADGE_CATALOG.map((b) => b.id)).size).toBe(BADGE_CATALOG.length);
-    expect(new Set(BADGE_CATALOG.map((b) => b.category))).toEqual(new Set(["training", "strength", "consistency", "nutrition", "faith", "milestones"]));
+    expect(new Set(BADGE_CATALOG.map((b) => b.category))).toEqual(new Set(["training", "strength", "consistency", "nutrition", "milestones"]));
     for (const b of BADGE_CATALOG) {
       expect(b.target, b.id).toBeGreaterThan(0);
       expect(["bronze", "silver", "gold"]).toContain(b.tier);
@@ -174,13 +175,18 @@ describe("weekly training streaks", () => {
   });
 });
 
-describe("discipline and food", () => {
-  it("earns a 7-day discipline streak on the 7th consecutive day; multiple goals per day count once", () => {
+describe("faith is never scored, and food", () => {
+  it("has no badges for journal entries, prayers or daily practices (SPEC §12, 12.18)", () => {
+    expect(BADGE_CATALOG.map((b) => b.id).filter((id) => /journal|discipline|prayer|practice|faith/.test(id))).toEqual([]);
+    expect(BADGE_CATALOG.map((b) => b.category as string)).not.toContain("faith");
+    expect(Object.keys(emptyStats())).not.toContain("journalDates");
+    expect(Object.keys(emptyStats())).not.toContain("disciplineDates");
+  });
+
+  it("finds the day a daily streak reaches its target (duplicates count once)", () => {
     const days = Array.from({ length: 7 }, (_, i) => addDays("2026-10-01", i));
     expect(dailyStreakEarnedAt([...days, ...days], 7)).toBe("2026-10-07");
     expect(dailyStreakEarnedAt([...days.slice(0, 3), ...days.slice(4)], 7)).toBeNull();
-    const res = computeAchievements(stats({ disciplineDates: days }), TODAY);
-    expect(badge(res, "discipline-7")).toMatchObject({ earned: true, earnedAt: "2026-10-07" });
   });
 
   it("counts distinct food-logged days", () => {
@@ -190,14 +196,13 @@ describe("discipline and food", () => {
     expect(badge(res, "food-30").current).toBe(7);
   });
 
-  it("earns milestones for programs, photos, journal and weigh-ins", () => {
+  it("earns milestones for programs, photos and weigh-ins", () => {
     const res = computeAchievements(
-      stats({ programsCompleted: ["2026-09-20"], photoDates: ["2026-10-02", "2026-09-01"], journalDates: ["2026-08-01"], weightDates: Array.from({ length: 10 }, (_, i) => addDays("2026-08-01", i)) }),
+      stats({ programsCompleted: ["2026-09-20"], photoDates: ["2026-10-02", "2026-09-01"], weightDates: Array.from({ length: 10 }, (_, i) => addDays("2026-08-01", i)) }),
       TODAY,
     );
     expect(badge(res, "program-complete")).toMatchObject({ earned: true, earnedAt: "2026-09-20" });
     expect(badge(res, "first-photo")).toMatchObject({ earned: true, earnedAt: "2026-09-01" });
-    expect(badge(res, "journal-1")).toMatchObject({ earned: true, earnedAt: "2026-08-01" });
     expect(badge(res, "weigh-ins-10")).toMatchObject({ earned: true, earnedAt: "2026-08-10" });
   });
 });
@@ -224,5 +229,35 @@ describe("badges unlocked by a workout", () => {
   it("returns nothing for an ordinary session", () => {
     const ws = workouts(12);
     expect(badgesUnlockedBySession(stats({ workouts: ws }), ws[11]!.sessionId, TODAY)).toEqual([]);
+  });
+});
+
+describe("progress toward locked badges", () => {
+  it("every count badge says what it counts, so the remaining amount reads naturally", () => {
+    for (const b of BADGE_CATALOG.filter((x) => x.unit === "count")) {
+      expect(b.counts, b.id).toBeDefined();
+      expect(b.counts![0].length).toBeGreaterThan(0);
+      expect(b.counts![1].length).toBeGreaterThan(0);
+    }
+  });
+
+  it("reports what is left: 7 of 10 workouts is 70% with 3 remaining", () => {
+    const b = badge(computeAchievements(stats({ workouts: workouts(7) }), TODAY), "workouts-10");
+    expect(b).toMatchObject({ earned: false, current: 7, target: 10 });
+    expect(badgePercent(b)).toBe(70);
+    expect(badgeRemaining(b)).toBe(3);
+    expect(b.counts).toEqual(["workout", "workouts"]);
+  });
+
+  it("nothing is left once a badge is earned, and the earned badge keeps its date", () => {
+    const b = badge(computeAchievements(stats({ workouts: workouts(12) }), TODAY), "workouts-10");
+    expect(b.earned).toBe(true);
+    expect(b.earnedAt).not.toBeNull();
+    expect(badgeRemaining(b)).toBe(0);
+    expect(badgePercent(b)).toBe(100);
+  });
+
+  it("never reports a negative remainder", () => {
+    expect(badgeRemaining({ current: 12, target: 10, earned: false })).toBe(0);
   });
 });

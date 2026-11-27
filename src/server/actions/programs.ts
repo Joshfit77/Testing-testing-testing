@@ -19,8 +19,10 @@ async function loadAccessibleProgram(programId: string) {
   const { data: program } = await supabase.from("training_programs").select("id, slug, tier, owner_id").eq("id", programId).maybeSingle();
   if (!program) return { user, supabase, program: null, allowed: false };
   const plan = await getUserPlan(user.id);
-  // Private programs are always free for their owner; library programs are gated by tier.
-  const allowed = program.owner_id === user.id || canAccessTier(plan, program.tier as Plan);
+  // Private programs are always free for their owner; library programs are gated by tier, except that a member who
+  // already enrolled in (or saved) a program keeps it after the 2026-11 change made library programs Pro-only.
+  const { data: earlier } = await supabase.from("user_programs").select("id").eq("user_id", user.id).eq("program_id", program.id).limit(1).maybeSingle();
+  const allowed = program.owner_id === user.id || canAccessTier(plan, program.tier as Plan) || Boolean(earlier);
   return { user, supabase, program, allowed };
 }
 
@@ -48,7 +50,7 @@ export async function startProgramAction(_prev: ActionState, formData: FormData)
   if (!program) return actionError("Program not found.");
   if (!allowed) return actionError("This program requires an upgraded plan.");
   try {
-    await activateProgram(supabase, user.id, program.id as string);
+    await activateProgram(supabase, user.id, program.id as string, { restart: formData.get("restart") === "1" });
   } catch (err) {
     logError("programs.start", err);
     return actionError("Couldn't start the program. Please try again.");

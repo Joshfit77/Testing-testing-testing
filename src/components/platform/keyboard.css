@@ -1,0 +1,30 @@
+/*
+ * Keyboard avoidance (see src/lib/keyboard.ts). Active only while html[data-keyboard="open"].
+ * --keyboard-inset / --vv-height / --vv-top are set by KeyboardAvoidance from window.visualViewport.
+ */
+
+/* Fixed bottom bars would sit on top of the keyboard and hide the field: get them out of the way. */
+html[data-keyboard="open"] [data-hide-with-keyboard] {
+  display: none !important;
+}
+
+/* Leave room below the last field so it can scroll above the keyboard. */
+html[data-keyboard="open"] main {
+  padding-bottom: calc(var(--keyboard-inset, 0px) + 2rem) !important;
+}
+
+@media (max-width: 767.98px) {
+  /* Bottom sheets sit directly above the keyboard and shrink to the visible area. */
+  html[data-keyboard="open"] [role="dialog"].bottom-0 {
+    bottom: var(--keyboard-inset, 0px);
+    max-height: calc(var(--vv-height, 100dvh) - 0.5rem);
+    padding-bottom: 1rem;
+  }
+}
+
+/* Centered dialogs stay centered in the part of the screen you can see. */
+html[data-keyboard="open"] [role="dialog"].top-1\/2,
+html[data-keyboard="open"] [role="alertdialog"].top-1\/2 {
+  top: calc(var(--vv-top, 0px) + var(--vv-height, 100dvh) / 2);
+  max-height: calc(var(--vv-height, 100dvh) - 1rem);
+}

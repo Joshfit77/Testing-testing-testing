@@ -62,6 +62,10 @@ The response is `{ sessionId, volumeKg, records: [{ exerciseId, recordType, valu
 
 `mode: "plan"` (Pro plan) returns a validated plan proposal on `assistantMessage.proposal`. Proposals are saved to the user's programs only after explicit approval; on the web this happens through the approval UI in `/coach`.
 
+In chat mode the coach may attach a suggested change on `assistantMessage.proposal` with a `kind` of `exercise_swap`, `nutrition_targets` or `bodyweight_log` (`proposal_status: "proposed"`). It is never applied automatically; on the web the user confirms it on the suggestion card.
+
+Streaming: send `Accept: application/x-ndjson` to receive newline-delimited JSON events instead of one JSON body: `{"type":"status","text"}`, `{"type":"tool","name","label"}` (e.g. "Checking your last 6 bench press sessions…"), `{"type":"text","delta"}`, `{"type":"reset"}` (discard the streamed text), then `{"type":"done","result":<same body as the JSON response>}` or `{"type":"error","error","message","status"}`. Errors that occur before streaming starts (below) are still plain JSON with their HTTP status.
+
 Error codes and statuses:
 
 | Code | Status |
@@ -77,11 +81,11 @@ Error codes and statuses:
 
 ### `GET /api/foods/search?q=<query>`
 
-USDA FoodData Central search (Plus and Pro). Values are per 100 g. When food is logged, the server re-fetches its nutrition values by FDC ID.
+USDA FoodData Central search (every plan). Values are per 100 g. When food is logged, the server re-fetches its nutrition values by FDC ID.
 
 ### `GET /api/foods/barcode?code=<digits>[&format=ean13|upca|upce|ean8]`
 
-Open Food Facts product lookup by EAN-13 / UPC-A / UPC-E / EAN-8 barcode (Plus and Pro, cookie session, 30 lookups/minute). The check digit is validated first (`400 invalid_code`). Returns `{ status: "found", product }` with per-100 g/ml and per-serving nutrition, `{ status: "no_nutrition", product: { code, name, brand } }`, or `{ status: "not_found", code }`, plus an `attribution` string. Data is crowd-sourced. When logged (`logFoodAction` with `source: "barcode"`), the server re-fetches the product and never uses client-supplied numbers. Errors: `401 unauthorized`, `403 upgrade_required`, `429 rate_limited`, `502 lookup_failed`.
+Open Food Facts product lookup by EAN-13 / UPC-A / UPC-E / EAN-8 barcode (every plan, cookie session, 30 lookups/minute). The check digit is validated first (`400 invalid_code`). Returns `{ status: "found", product }` with per-100 g/ml and per-serving nutrition, `{ status: "no_nutrition", product: { code, name, brand } }`, or `{ status: "not_found", code }`, plus an `attribution` string. Data is crowd-sourced. When logged (`logFoodAction` with `source: "barcode"`), the server re-fetches the product and never uses client-supplied numbers. Errors: `401 unauthorized`, `403 upgrade_required`, `429 rate_limited`, `502 lookup_failed`.
 
 ### `GET /api/account/export`
 

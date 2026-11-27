@@ -9,7 +9,18 @@ import { toKg } from "@/lib/domain/units";
 import { getProfile, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
 
-type Result = { ok: true } | { ok: false; error: string };
+/** `uncertain`: the save may have gone through (the database didn't answer clearly), so the file is kept for a retry. */
+type Result = { ok: true } | { ok: false; error: string; uncertain?: true };
+
+/**
+ * The database answered with an error, so the insert's transaction rolled back and the row was NOT written (a refused
+ * value or rule, but also a timeout, deadlock or serialization failure: each carries a Postgres or PostgREST code).
+ * Only a reply with no code (the request or its answer was lost on the way) leaves it uncertain whether the row exists,
+ * and only then must the uploaded file stay: removing it could leave a saved photo without its image.
+ */
+function definitelyNotWritten(error: { code?: string }): boolean {
+  return Boolean(error.code);
+}
 
 const savePhotoSchema = z.object({
   path: z.string().min(3).max(300),
@@ -62,13 +73,22 @@ export async function saveProgressPhotoAction(input: unknown): Promise<Result> {
     weight_kg: weightKg,
     note: v.note || null,
   });
+  // Already saved (a second tap or a retry of the same upload): the photo is there, so keep its file.
+  if (error?.code === "23505") {
+    revalidatePath("/progress", "layout");
+    return { ok: true };
+  }
   if (error) {
     logError("progress_photos.insert", error);
-    // Don't leave an orphaned object behind.
-    await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([v.path]);
+    // Uncertain (no answer from the database): the row may exist, so the file stays and a retry confirms it.
+    if (!definitelyNotWritten(error)) return { ok: false, error: "We couldn't confirm the save. Check your connection and tap Save again.", uncertain: true };
+    // Refused: don't leave an orphaned object behind, but never delete a file a saved photo already uses (an earlier
+    // attempt whose reply was lost, retried with different details).
+    const { data: inUse, error: useErr } = await supabase.from("progress_photos").select("id").eq("user_id", user.id).eq("storage_path", v.path).limit(1);
+    if (!useErr && !inUse?.length) await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([v.path]);
     return { ok: false, error: "Couldn't save your photo. Please try again." };
   }
-  revalidatePath("/progress");
+  revalidatePath("/progress", "layout");
   return { ok: true };
 }
 
@@ -77,16 +97,24 @@ export async function deleteProgressPhotoAction(id: string): Promise<Result> {
   const parsedId = z.string().uuid().safeParse(id);
   if (!parsedId.success) return { ok: false, error: "Invalid photo." };
   const supabase = await getServerSupabase();
-  const { data, error } = await supabase.from("progress_photos").delete().eq("id", parsedId.data).eq("user_id", user.id).select("storage_path");
+  // The image goes first: if removing it fails, the row stays so the member can simply try again, and no private
+  // image is ever left behind without a row pointing at it.
+  const { data: row, error: readErr } = await supabase.from("progress_photos").select("storage_path").eq("id", parsedId.data).eq("user_id", user.id).maybeSingle();
+  if (readErr) {
+    logError("progress_photos.delete", readErr);
+    return { ok: false, error: "Couldn't delete the photo. Please try again." };
+  }
+  if (!row) return { ok: false, error: "Photo not found." };
+  const { error: rmErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([row.storage_path as string]);
+  if (rmErr) {
+    logError("progress_photos.delete_object", rmErr);
+    return { ok: false, error: "Couldn't delete the photo. Please try again." };
+  }
+  const { error } = await supabase.from("progress_photos").delete().eq("id", parsedId.data).eq("user_id", user.id);
   if (error) {
     logError("progress_photos.delete", error);
     return { ok: false, error: "Couldn't delete the photo. Please try again." };
   }
-  const row = data?.[0];
-  if (!row) return { ok: false, error: "Photo not found." };
-  const { error: rmErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([row.storage_path as string]);
-  // The row is gone; a leftover object stays private and is purged with the account.
-  if (rmErr) logError("progress_photos.delete_object", rmErr);
-  revalidatePath("/progress");
+  revalidatePath("/progress", "layout");
   return { ok: true };
 }

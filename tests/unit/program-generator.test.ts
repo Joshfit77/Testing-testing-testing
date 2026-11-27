@@ -95,7 +95,9 @@ describe("program recommendations", () => {
       "free",
     );
     expect(recs[0]!.slug).toBe("daily-mobility-flow");
-    expect(recs[0]!.locked).toBe(false);
+    // Since 2026-11 every structured library program is Pro: a Free member sees them all as locked, a Pro member none.
+    expect(recs[0]!.locked).toBe(true);
     expect(recs.find((r) => r.slug === "powerlifting-base-block")!.locked).toBe(true);
+    expect(recommendPrograms({ ...base, primary_goal: "mobility", equipment: [], preferred_types: ["mobility"], experience: "new", days_per_week: 4 }, PROGRAMS, "pro").every((r) => !r.locked)).toBe(true);
   });
 });

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (API 31+) backup and device-to-device transfer rules. Everything the app keeps on the device is
+  personal and already lives in the member's account: WebView storage (sign-in cookies, drafts, a run still being
+  recorded with its GPS fixes), databases and preferences. None of it is backed up to the cloud or copied to a new
+  phone; the member signs in again there. Pre-12 devices use backup_rules.xml with the same effect.
+-->
+<data-extraction-rules>
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

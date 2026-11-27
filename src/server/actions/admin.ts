@@ -299,3 +299,15 @@ export async function toggleFlagAction(formData: FormData): Promise<void> {
   if (!error) await audit(user.id, "flag.update", "feature_flag", key.data, { enabled });
   revalidatePath("/admin/flags");
 }
+
+/** Close a member report (migration 091): record that it was acted on, or dismissed. */
+export async function resolveUserReportAction(formData: FormData): Promise<void> {
+  const { user } = await requireAdmin();
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  const status = z.enum(["actioned", "dismissed"]).safeParse(formData.get("status"));
+  if (!id.success || !status.success) return;
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.from("user_reports").update({ status: status.data, reviewed_at: new Date().toISOString() }).eq("id", id.data).eq("status", "open");
+  if (!error) await audit(user.id, "report.resolve", "user_report", id.data, { status: status.data });
+  revalidatePath("/admin/reports");
+}

@@ -2,11 +2,20 @@
 include ':capacitor-android'
 project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
 
+include ':capacitor-community-background-geolocation'
+project(':capacitor-community-background-geolocation').projectDir = new File('../node_modules/@capacitor-community/background-geolocation/android')
+
 include ':capacitor-app'
 project(':capacitor-app').projectDir = new File('../node_modules/@capacitor/app/android')
 
+include ':capacitor-barcode-scanner'
+project(':capacitor-barcode-scanner').projectDir = new File('../node_modules/@capacitor/barcode-scanner/android')
+
 include ':capacitor-haptics'
 project(':capacitor-haptics').projectDir = new File('../node_modules/@capacitor/haptics/android')
+
+include ':capacitor-keyboard'
+project(':capacitor-keyboard').projectDir = new File('../node_modules/@capacitor/keyboard/android')
 
 include ':capacitor-local-notifications'
 project(':capacitor-local-notifications').projectDir = new File('../node_modules/@capacitor/local-notifications/android')
@@ -16,3 +25,9 @@ project(':capacitor-splash-screen').projectDir = new File('../node_modules/@capa
 
 include ':capacitor-status-bar'
 project(':capacitor-status-bar').projectDir = new File('../node_modules/@capacitor/status-bar/android')
+
+include ':capgo-capacitor-health'
+project(':capgo-capacitor-health').projectDir = new File('../node_modules/@capgo/capacitor-health/android')
+
+include ':revenuecat-purchases-capacitor'
+project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/@revenuecat/purchases-capacitor/android')

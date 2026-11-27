@@ -1,0 +1,106 @@
+{
+  "label": "after",
+  "runs": 3,
+  "project": "mobile",
+  "viewport": {
+    "width": 412,
+    "height": 839
+  },
+  "checks": {
+    "startVisibleWithoutScrolling": true,
+    "firstSetVisibleWithoutScrolling": true,
+    "firstTimeTipShown": true,
+    "upNextShown": true,
+    "programProgressShown": true
+  },
+  "summary": {
+    "onboardingDone": {
+      "medianMs": 1594,
+      "taps": 16,
+      "typed": 4
+    },
+    "loggerOpen": {
+      "medianMs": 2384,
+      "taps": 17,
+      "typed": 4
+    },
+    "firstSet": {
+      "medianMs": 2695,
+      "taps": 18,
+      "typed": 4
+    },
+    "workoutDone": {
+      "medianMs": 3617,
+      "taps": 20,
+      "typed": 4
+    }
+  },
+  "raw": [
+    {
+      "onboardingDone": {
+        "ms": 1926,
+        "taps": 16,
+        "typed": 4
+      },
+      "loggerOpen": {
+        "ms": 2719,
+        "taps": 17,
+        "typed": 4
+      },
+      "firstSet": {
+        "ms": 3392,
+        "taps": 18,
+        "typed": 4
+      },
+      "workoutDone": {
+        "ms": 4582,
+        "taps": 20,
+        "typed": 4
+      }
+    },
+    {
+      "onboardingDone": {
+        "ms": 1594,
+        "taps": 32,
+        "typed": 8
+      },
+      "loggerOpen": {
+        "ms": 2384,
+        "taps": 34,
+        "typed": 8
+      },
+      "firstSet": {
+        "ms": 2695,
+        "taps": 36,
+        "typed": 8
+      },
+      "workoutDone": {
+        "ms": 3617,
+        "taps": 40,
+        "typed": 8
+      }
+    },
+    {
+      "onboardingDone": {
+        "ms": 1432,
+        "taps": 48,
+        "typed": 12
+      },
+      "loggerOpen": {
+        "ms": 2177,
+        "taps": 51,
+        "typed": 12
+      },
+      "firstSet": {
+        "ms": 2494,
+        "taps": 54,
+        "typed": 12
+      },
+      "workoutDone": {
+        "ms": 2986,
+        "taps": 60,
+        "typed": 12
+      }
+    }
+  ]
+}

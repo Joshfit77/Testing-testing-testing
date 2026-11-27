@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 360" preserveAspectRatio="xMidYMid slice">
+  <!-- Original artwork for Narrow Gate Fitness: layered mountains at sunrise in the brand palette. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a140b"/>
+      <stop offset="0.45" stop-color="#5a4320"/>
+      <stop offset="0.75" stop-color="#b48a3e"/>
+      <stop offset="1" stop-color="#e9cf8e"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.68" cy="0.62" r="0.42">
+      <stop offset="0" stop-color="#fff3cf" stop-opacity="0.95"/>
+      <stop offset="0.12" stop-color="#f1dfa8" stop-opacity="0.8"/>
+      <stop offset="0.45" stop-color="#c9a54c" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#c9a54c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="m1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a6a33"/>
+      <stop offset="1" stop-color="#5b4523"/>
+    </linearGradient>
+    <linearGradient id="m2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a4424"/>
+      <stop offset="1" stop-color="#2d2213"/>
+    </linearGradient>
+    <linearGradient id="m3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2112"/>
+      <stop offset="1" stop-color="#120e08"/>
+    </linearGradient>
+    <linearGradient id="m4" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#14100a"/>
+      <stop offset="1" stop-color="#070605"/>
+    </linearGradient>
+    <linearGradient id="mist" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f1dfa8" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#f1dfa8" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#f1dfa8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000" stop-opacity="0.75"/>
+      <stop offset="0.55" stop-color="#000" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="360" fill="url(#sky)"/>
+  <rect width="800" height="360" fill="url(#sun)"/>
+  <circle cx="544" cy="222" r="26" fill="#fff1c9" opacity="0.9"/>
+  <path d="M0 210 L70 178 L130 196 L210 150 L270 176 L340 140 L420 182 L480 160 L560 196 L640 168 L720 190 L800 170 V360 H0 Z" fill="url(#m1)" opacity="0.85"/>
+  <rect y="186" width="800" height="40" fill="url(#mist)"/>
+  <path d="M0 236 L60 214 L120 230 L190 196 L250 222 L320 186 L390 228 L460 206 L530 236 L600 214 L680 238 L740 220 L800 232 V360 H0 Z" fill="url(#m2)"/>
+  <path d="M190 196 L214 210 L232 206 L250 222 L238 222 L220 214 Z M320 186 L346 204 L360 200 L380 220 L362 218 L344 206 Z" fill="#c9a54c" opacity="0.35"/>
+  <rect y="226" width="800" height="36" fill="url(#mist)" opacity="0.7"/>
+  <path d="M0 268 L80 244 L150 262 L230 232 L300 258 L370 240 L450 268 L520 250 L600 272 L680 252 L800 270 V360 H0 Z" fill="url(#m3)"/>
+  <path d="M0 300 L50 290 L58 270 L66 290 L90 286 L98 262 L106 286 L140 296 L210 284 L218 266 L226 284 L300 300 L380 288 L460 304 L560 292 L640 306 L700 290 L708 274 L716 290 L760 296 L800 292 V360 H0 Z" fill="url(#m4)"/>
+  <rect width="800" height="360" fill="url(#shade)"/>
+</svg>

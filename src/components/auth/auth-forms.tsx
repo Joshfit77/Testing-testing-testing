@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
+import { CaptchaField } from "@/components/auth/captcha-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RISK_ACKNOWLEDGMENT } from "@/lib/legal/versions";
 import { initialActionState } from "@/lib/action-state";
 import {
   requestPasswordResetAction,
@@ -36,10 +38,20 @@ export function SignInForm({ next }: { next?: string }) {
   const [state, action] = useActionState(signInAction, initialActionState);
   const [resendState, resendAction] = useActionState(resendConfirmationAction, initialActionState);
   const [email, setEmail] = useState("");
+  // The device's time zone goes along, so a profile still on the default (UTC) takes the member's real one.
+  const [timeZone, setTimeZone] = useState("");
+  useEffect(() => {
+    try {
+      setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || "");
+    } catch {
+      /* leave it */
+    }
+  }, []);
   return (
     <div className="space-y-4">
       <form action={action} className="space-y-4" noValidate>
         <input type="hidden" name="next" value={next ?? "/home"} />
+        <input type="hidden" name="timezone" value={timeZone} />
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <Input id="email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={Boolean(state.fieldErrors?.email)} aria-describedby="email-error" />
@@ -56,6 +68,7 @@ export function SignInForm({ next }: { next?: string }) {
           <FieldError id="password-error" message={state.fieldErrors?.password} />
         </div>
         <FormMessage state={state} />
+        <CaptchaField />
         <SubmitButton className="w-full" pendingLabel="Signing in…">
           Sign in
         </SubmitButton>
@@ -63,6 +76,7 @@ export function SignInForm({ next }: { next?: string }) {
       {state.fieldErrors?.unconfirmed && (
         <form action={resendAction} className="space-y-2 rounded-xl border border-border bg-elevated p-3">
           <input type="hidden" name="email" value={email} />
+          <CaptchaField />
           <SubmitButton variant="secondary" className="w-full" pendingLabel="Sending…">
             Resend confirmation email
           </SubmitButton>
@@ -107,19 +121,30 @@ export function SignUpForm({ defaultEmail = "" }: { defaultEmail?: string }) {
         </p>
         <FieldError id="password-error" message={fe.password} />
       </div>
+      <section aria-labelledby="before-you-start" className="space-y-2 rounded-xl border border-gold-muted/50 bg-card p-4 text-xs leading-relaxed text-muted-foreground">
+        <h2 id="before-you-start" className="text-sm font-semibold text-foreground">
+          Before you start
+        </h2>
+        <ul className="list-disc space-y-1 pl-4">
+          <li>Exercise carries a risk of injury. Stop if you feel pain, dizziness or shortness of breath.</li>
+          <li>Narrow Gate Fitness and its AI Coach give general information, not medical advice, and aren&apos;t a doctor, dietitian or physical therapist.</li>
+          <li>AI suggestions and food estimates can be wrong. Review them before changing your training or diet.</li>
+          <li>See a qualified professional first if you have a medical condition or injury, are pregnant, or have a history of disordered eating.</li>
+        </ul>
+      </section>
       <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="ageConfirmed" className="mt-0.5 size-5 accent-[#C9A54C]" aria-describedby="age-error" />
+        <input type="checkbox" name="ageConfirmed" className="mt-0.5 size-5 accent-gold" aria-describedby="age-error" />
         <span>I confirm I am 18 years of age or older.</span>
       </label>
       <FieldError id="age-error" message={fe.ageConfirmed} />
       <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="termsAccepted" className="mt-0.5 size-5 accent-[#C9A54C]" aria-describedby="terms-error" />
+        <input type="checkbox" name="termsAccepted" className="mt-0.5 size-5 accent-gold" aria-describedby="terms-error" />
         <span>
           I agree to the{" "}
           <Link href="/legal/terms" className="text-gold-highlight underline" target="_blank">
-            Terms
+            Terms of Service
           </Link>{" "}
-          and{" "}
+          and have read the{" "}
           <Link href="/legal/privacy" className="text-gold-highlight underline" target="_blank">
             Privacy Policy
           </Link>
@@ -127,7 +152,13 @@ export function SignUpForm({ defaultEmail = "" }: { defaultEmail?: string }) {
         </span>
       </label>
       <FieldError id="terms-error" message={fe.termsAccepted} />
+      <label className="flex items-start gap-3 text-sm">
+        <input type="checkbox" name="riskAcknowledged" className="mt-0.5 size-5 accent-gold" aria-describedby="risk-error" />
+        <span>{RISK_ACKNOWLEDGMENT.text}</span>
+      </label>
+      <FieldError id="risk-error" message={fe.riskAcknowledged} /> 
       <FormMessage state={state} />
+      <CaptchaField />
       <SubmitButton className="w-full" pendingLabel="Creating account…">
         Create account
       </SubmitButton>
@@ -145,6 +176,7 @@ export function ForgotPasswordForm() {
         <FieldError message={state.fieldErrors?.email} />
       </div>
       <FormMessage state={state} />
+      <CaptchaField />
       <SubmitButton className="w-full" pendingLabel="Sending…">
         Send reset link
       </SubmitButton>

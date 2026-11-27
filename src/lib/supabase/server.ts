@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env";
@@ -8,12 +8,14 @@ import { serverEnv } from "@/server/env";
 /** Supabase client bound to the current user's cookie session (RLS applies). */
 export async function getServerSupabase() {
   const cookieStore = await cookies();
+  // Over HTTPS (Vercel says so in x-forwarded-proto) the session cookies are marked Secure (F-14).
+  const httpsOnly = (await headers()).get("x-forwarded-proto") === "https";
   return createServerClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
     cookies: {
       getAll: () => cookieStore.getAll(),
       setAll: (toSet) => {
         try {
-          for (const { name, value, options } of toSet) cookieStore.set(name, value, options);
+          for (const { name, value, options } of toSet) cookieStore.set(name, value, { ...options, secure: httpsOnly || options?.secure });
         } catch {
           // Called from a Server Component — middleware refreshes the session instead.
         }

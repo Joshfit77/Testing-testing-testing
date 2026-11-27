@@ -26,7 +26,7 @@ function Fields({ c }: { c?: Item }) {
       </div>
       <Textarea name="body" defaultValue={c?.body} placeholder="Body" aria-label="Body" required className="min-h-24" />
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="isPublished" defaultChecked={c?.is_published ?? false} className="size-5 accent-[#C9A54C]" /> Published
+        <input type="checkbox" name="isPublished" defaultChecked={c?.is_published ?? false} className="size-5 accent-gold" /> Published
       </label>
     </>
   );
@@ -55,7 +55,7 @@ export default async function AdminContentPage() {
                 <Fields c={c} />
               </ActionForm>
             </div>
-            <ActionButton action={deleteContentAction} fields={{ id: c.id }} variant="ghost" size="icon-sm" aria-label={`Delete ${c.title}`}>
+            <ActionButton action={deleteContentAction} fields={{ id: c.id }} variant="ghost" size="icon-sm" aria-label={`Delete ${c.title}`} confirmMessage={`Delete “${c.title}”?`} confirmLabel="Delete">
 <Trash2 aria-hidden />
             </ActionButton>
           </li>

@@ -76,3 +76,12 @@ export function devotionalForDate(isoDate: string): Devotional {
   const idx = ((n % CHALLENGE_DAYS) + CHALLENGE_DAYS) % CHALLENGE_DAYS;
   return DEVOTIONALS[idx]!;
 }
+
+/**
+ * The day label beside "Today's devotional": the member's own day in the challenge ("Day 13 of 40"), or null when they
+ * aren't enrolled. Never the shared calendar rotation from devotionalForDate, which is not anyone's progress.
+ */
+export function challengeDayLabel(currentDay: number | null | undefined): string | null {
+  if (!currentDay || !Number.isInteger(currentDay) || currentDay < 1) return null;
+  return `Day ${Math.min(currentDay, CHALLENGE_DAYS)} of ${CHALLENGE_DAYS}`;
+}

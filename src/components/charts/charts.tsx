@@ -1,25 +1,40 @@
 "use client";
 
-import { useId, useState } from "react";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Component, useId, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { Table2, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CATEGORICAL, formatters, type SeriesDef, type XFormat } from "./chart-format";
+import type { PlotProps } from "./chart-plots";
+
+export { CATEGORICAL, SERIES_GOLD, shortDate, weekdayShort, type SeriesDef } from "./chart-format";
 
 /**
- * Chart palette. Single-series charts use brand gold. Multi-series categorical slots were
- * validated (dataviz validate_palette.js, dark mode on #171717): lightness band, chroma,
- * CVD separation, normal-vision floor and contrast all pass. Assign in this fixed order.
+ * The plots themselves (recharts) are a separate chunk, fetched after the page is interactive: the frame below (title,
+ * description, legend, table view, empty state) renders at once, with a placeholder of the plot's exact size so
+ * nothing moves when the plot arrives. The table view never needs the chunk, so the numbers are always reachable.
  */
-export const SERIES_GOLD = "#C9A54C";
-export const CATEGORICAL = ["#B08D3A", "#4A86C0", "#C46658"] as const;
+const PlotPlaceholder = () => <div className="h-full w-full animate-pulse rounded-xl bg-elevated/40" data-testid="chart-loading" aria-hidden />;
+const BarPlot = dynamic(() => import("./chart-plots").then((m) => m.BarPlot), { ssr: false, loading: PlotPlaceholder });
+const LinePlot = dynamic(() => import("./chart-plots").then((m) => m.LinePlot), { ssr: false, loading: PlotPlaceholder });
 
-const AXIS = { stroke: "#6b6b6b", fontSize: 11, tickLine: false, axisLine: false } as const;
-const GRID = "#262626";
-
-export interface SeriesDef {
-  key: string;
-  label: string;
-  color?: string;
+/** If the plot's chunk can't load (offline after the page was cached, a deploy in between), say so and offer the table. */
+class PlotBoundary extends Component<{ children: ReactNode; onShowTable: () => void }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 rounded-xl bg-elevated/40 px-4 text-center text-sm text-muted-foreground" role="status">
+        <p>The chart couldn&apos;t load. Check your connection.</p>
+        <button type="button" onClick={this.props.onShowTable} className="min-h-11 font-semibold text-gold-highlight underline-offset-4 hover:underline">
+          Show the numbers as a table
+        </button>
+      </div>
+    );
+  }
 }
 
 interface ChartFrameProps {
@@ -29,19 +44,12 @@ interface ChartFrameProps {
   xKey: string;
   series: SeriesDef[];
   /** Serializable formatting options (props may come from server components). */
-  xFormat?: "date" | "weekday" | "raw";
+  xFormat?: XFormat;
   valueSuffix?: string;
   decimals?: number;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
   emptyMessage?: string;
-}
-
-function formatters(xFormat: ChartFrameProps["xFormat"], valueSuffix = "", decimals = 1) {
-  const formatX = xFormat === "date" ? shortDate : xFormat === "weekday" ? weekdayShort : (v: string) => v;
-  const f = 10 ** decimals;
-  const formatValue = (v: number) => `${(Math.round(v * f) / f).toLocaleString("en-US")}${valueSuffix}`;
-  return { formatX, formatValue };
 }
 
 function ChartFrame({ title, description, data, xKey, series, xFormat, valueSuffix, decimals, children, className, emptyMessage }: ChartFrameProps) {
@@ -62,7 +70,7 @@ function ChartFrame({ title, description, data, xKey, series, xFormat, valueSuff
           <button
             type="button"
             onClick={() => setTable((t) => !t)}
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-elevated hover:text-foreground"
+            className="flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-elevated hover:text-foreground"
             aria-label={table ? `Show ${title} as chart` : `Show ${title} as table`}
             aria-pressed={table}
           >
@@ -112,131 +120,37 @@ function ChartFrame({ title, description, data, xKey, series, xFormat, valueSuff
           </table>
         </div>
       ) : (
-        <div className="h-56 w-full">{children}</div>
+        <div className="h-56 w-full">
+          <PlotBoundary onShowTable={() => setTable(true)}>{children}</PlotBoundary>
+        </div>
       )}
     </figure>
   );
 }
 
-function ChartTooltip({
-  active,
-  payload,
-  label,
-  formatX,
-  formatValue,
-}: {
-  active?: boolean;
-  payload?: { name?: string | number; value?: number | string; color?: string; dataKey?: string | number }[];
-  label?: string | number;
-  formatX?: (v: string) => string;
-  formatValue?: (v: number) => string;
-}) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-xl border border-border bg-elevated px-3 py-2 text-xs shadow-xl">
-      <p className="mb-1 font-semibold text-foreground">{formatX ? formatX(String(label)) : label}</p>
-      {payload.map((p) => (
-        <p key={String(p.dataKey)} className="flex items-center gap-2 text-muted-foreground">
-          <span className="inline-block size-2 rounded-sm" style={{ background: p.color }} aria-hidden />
-          {p.name}: <span className="font-semibold tabular-nums text-foreground">{formatValue ? formatValue(Number(p.value)) : p.value}</span>
-        </p>
-      ))}
-    </div>
-  );
-}
-
-type ChartProps = Omit<ChartFrameProps, "children"> & { yDomain?: [number | string, number | string] };
+type ChartProps = Omit<ChartFrameProps, "children"> & Pick<PlotProps, "yDomain" | "referenceLine">;
 
 export function BarSeriesChart(props: ChartProps) {
-  const { data, xKey, series } = props;
-  const { formatX, formatValue } = formatters(props.xFormat, props.valueSuffix, props.decimals);
   return (
     <ChartFrame {...props}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barGap={2}>
-          <CartesianGrid vertical={false} stroke={GRID} />
-          <XAxis dataKey={xKey} {...AXIS} tickFormatter={formatX} minTickGap={8} />
-          <YAxis {...AXIS} allowDecimals={false} tickFormatter={(v: number) => formatValue(v)} width={48} />
-          <Tooltip cursor={{ fill: "rgba(201,165,76,0.08)" }} content={<ChartTooltip formatX={formatX} formatValue={formatValue} />} />
-          {series.map((s, i) => (
-            <Bar
-              key={s.key}
-              dataKey={s.key}
-              name={s.label}
-              fill={s.color ?? (series.length === 1 ? SERIES_GOLD : CATEGORICAL[i % CATEGORICAL.length])}
-              radius={[4, 4, 0, 0]}
-              maxBarSize={28}
-              stackId={undefined}
-            />
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
+      <BarPlot data={props.data} xKey={props.xKey} series={props.series} xFormat={props.xFormat} valueSuffix={props.valueSuffix} decimals={props.decimals} referenceLine={props.referenceLine} />
     </ChartFrame>
   );
 }
 
 export function LineSeriesChart(props: ChartProps & { connectNulls?: boolean }) {
-  const { data, xKey, series, yDomain, connectNulls = true } = props;
-  const { formatX, formatValue } = formatters(props.xFormat, props.valueSuffix, props.decimals);
   return (
     <ChartFrame {...props}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-          <CartesianGrid vertical={false} stroke={GRID} />
-          <XAxis dataKey={xKey} {...AXIS} tickFormatter={formatX} minTickGap={16} />
-          <YAxis {...AXIS} domain={yDomain ?? ["auto", "auto"]} tickFormatter={formatValue} width={52} />
-          <Tooltip cursor={{ stroke: "#8C7139", strokeWidth: 1 }} content={<ChartTooltip formatX={formatX} formatValue={formatValue} />} />
-          {series.map((s, i) => (
-            <Line
-              key={s.key}
-              type="monotone"
-              dataKey={s.key}
-              name={s.label}
-              stroke={s.color ?? (series.length === 1 ? SERIES_GOLD : CATEGORICAL[i % CATEGORICAL.length])}
-              strokeWidth={2}
-              dot={{ r: 3, strokeWidth: 2, stroke: "#171717" }}
-              activeDot={{ r: 5, strokeWidth: 2, stroke: "#171717" }}
-              connectNulls={connectNulls}
-            />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+      <LinePlot
+        data={props.data}
+        xKey={props.xKey}
+        series={props.series}
+        xFormat={props.xFormat}
+        valueSuffix={props.valueSuffix}
+        decimals={props.decimals}
+        yDomain={props.yDomain}
+        connectNulls={props.connectNulls}
+      />
     </ChartFrame>
   );
 }
-
-export function AreaSeriesChart(props: ChartProps) {
-  const { data, xKey, series, yDomain } = props;
-  const { formatX, formatValue } = formatters(props.xFormat, props.valueSuffix, props.decimals);
-  const gid = useId().replace(/:/g, "");
-  const s = series[0]!;
-  return (
-    <ChartFrame {...props}>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-          <defs>
-            <linearGradient id={`area-${gid}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={SERIES_GOLD} stopOpacity={0.35} />
-              <stop offset="100%" stopColor={SERIES_GOLD} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid vertical={false} stroke={GRID} />
-          <XAxis dataKey={xKey} {...AXIS} tickFormatter={formatX} minTickGap={16} />
-          <YAxis {...AXIS} domain={yDomain ?? ["dataMin - 2", "dataMax + 2"]} tickFormatter={formatValue} width={52} />
-          <Tooltip cursor={{ stroke: "#8C7139", strokeWidth: 1 }} content={<ChartTooltip formatX={formatX} formatValue={formatValue} />} />
-          <Area type="monotone" dataKey={s.key} name={s.label} stroke={SERIES_GOLD} strokeWidth={2} fill={`url(#area-${gid})`} connectNulls dot={{ r: 3, strokeWidth: 2, stroke: "#171717", fill: SERIES_GOLD }} />
-        </AreaChart>
-      </ResponsiveContainer>
-    </ChartFrame>
-  );
-}
-
-export const shortDate = (iso: string): string => {
-  const d = new Date(`${iso}T00:00:00Z`);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-};
-
-export const weekdayShort = (iso: string) => {
-  const d = new Date(`${iso}T00:00:00Z`);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
-};

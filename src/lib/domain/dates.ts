@@ -1,11 +1,32 @@
 /** Date helpers operating on ISO calendar dates (YYYY-MM-DD) in the user's time zone. */
 
+/** An IANA time zone name the runtime knows (what the device reports), e.g. "America/New_York". */
+export function isValidTimeZone(tz: unknown): tz is string {
+  if (typeof tz !== "string" || !tz || tz.length > 64) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function isoDateInTz(date: Date, timeZone = "UTC"): string {
   try {
     return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
   } catch {
     return date.toISOString().slice(0, 10);
   }
+}
+
+/**
+ * True only for a real calendar date written YYYY-MM-DD. Use it on dates read from a URL: "2026-13-45" would make
+ * addDays throw (RangeError), and "2026-02-30" would silently become March 2.
+ */
+export function isValidIsoDate(value: string | null | undefined): value is string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const t = Date.parse(`${value}T00:00:00Z`);
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === value;
 }
 
 export function addDays(isoDate: string, days: number): string {

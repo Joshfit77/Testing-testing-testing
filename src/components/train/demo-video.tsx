@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { prefersReducedMotion } from "@/lib/keyboard";
 
 /**
  * Short exercise demo clip: muted, looping and inline (so iOS doesn't jump to fullscreen), with controls.
@@ -11,8 +12,8 @@ export function DemoVideo({ src, label }: { src: string; label: string }) {
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) return;
+    // Respect both the phone's Reduce Motion and the app's own setting: no autoplay, the controls still work.
+    if (prefersReducedMotion()) return;
     video.muted = true; // React doesn't reliably reflect the muted attribute, which autoplay requires.
     void video.play().catch(() => {
       /* autoplay blocked (e.g. low-power mode) — controls remain available */

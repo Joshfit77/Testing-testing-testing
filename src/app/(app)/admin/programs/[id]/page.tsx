@@ -46,7 +46,7 @@ export default async function AdminProgramEditPage({ params, searchParams }: { p
               <Label htmlFor="tier">Tier</Label>
               <NativeSelect id="tier" name="tier" defaultValue={p.tier as string}>
                 <option value="free">Free</option>
-                <option value="plus">Plus</option>
+                <option value="plus">Paid library (Pro; legacy Plus)</option>
                 <option value="pro">Pro</option>
               </NativeSelect>
             </div>
@@ -71,7 +71,7 @@ export default async function AdminProgramEditPage({ params, searchParams }: { p
             <Textarea id="description" name="description" defaultValue={p.description as string} className="min-h-32" />
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="isPublished" defaultChecked={p.is_published as boolean} className="size-5 accent-[#C9A54C]" /> Published
+            <input type="checkbox" name="isPublished" defaultChecked={p.is_published as boolean} className="size-5 accent-gold" /> Published
           </label>
         </ActionForm>
       </section>

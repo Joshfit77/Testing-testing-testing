@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Clock, HeartPulse, Leaf, ShieldAlert } from "lucide-react";
+import { BookOpen, ChevronDown, Clock, HeartPulse, Leaf, ShieldAlert } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { CheckinForm } from "@/components/recovery/checkin-form";
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,15 @@ import { STANDARD_COOLDOWN, STANDARD_WARMUP } from "@/data/programs";
 import { readinessBand, readinessNote } from "@/lib/domain/readiness";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
+import { isoDateInTz } from "@/lib/domain/dates";
+import { getActiveProgram } from "@/server/services/training";
 
 export const metadata = { title: "Recovery & mobility" };
 
 const ROUTINES = [
-  { slug: "daily-mobility-flow", title: "Daily Mobility Flow", body: "Four 15–20 minute routines for hips, spine, shoulders and ankles." },
+  { slug: "full-body-mobility-6-week", title: "Full-Body Mobility", body: "Short routines for hips, spine, shoulders and ankles, with holds that grow every week." },
   { slug: "recovery-deload-week", title: "Recovery & Deload Week", body: "A planned easy week of light lifting, easy cardio and mobility." },
-  { slug: "active-aging-low-impact", title: "Low-Impact Strength & Balance", body: "Joint-friendly sessions you can do next to a sturdy support." },
+  { slug: "active-aging-strength-and-balance", title: "Low-Impact Strength & Balance", body: "Joint-friendly sessions you can do next to a sturdy support." },
 ];
 
 export default async function RecoveryPage() {
@@ -28,13 +30,15 @@ export default async function RecoveryPage() {
     .limit(7);
   const latest = checkins?.[0];
   const band = latest ? readinessBand(latest.readiness_score as number) : null;
+  // After a low or moderate check-in today, offer today's program session in a lighter form (that session only).
+  const checkedToday = latest?.checked_on === isoDateInTz(new Date(), profile.timezone);
+  const active = checkedToday && band !== "high" ? await getActiveProgram(supabase, user.id).catch(() => null) : null;
+  const lighterHref = active?.today ? `/train/workout?day=${active.today.id}&up=${active.userProgramId}&lighter=1` : null;
 
   return (
     <div className="space-y-6">
-      <Link href="/train" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Train
-      </Link>
       <PageHeader
+        back={{ href: "/train", label: "Train" }}
         eyebrow="Recovery"
         title="Recovery & mobility"
         description="Check in on how you feel, then choose the right amount of training. Guidance here is general and not medical treatment."
@@ -61,6 +65,15 @@ export default async function RecoveryPage() {
                   <span className="text-muted-foreground"> / 100 · {latest.checked_on as string}</span>
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">{readinessNote(band)}</p>
+                {lighterHref && (
+                  <div className="mt-3 flex flex-wrap gap-2" data-testid="lighter-session">
+                    <Button asChild size="sm">
+                      <Link href={lighterHref}>Start today&apos;s session lighter</Link>
+                    </Button>
+                    <span className="self-center text-xs text-muted-foreground">One set fewer per exercise, effort up to RPE 7. Your program stays as it is.</span>
+                  </div>
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">Worked out from your four answers (sleep quality, energy, soreness, stress), not from any measurement.</p>
               </>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">No check-ins yet. Your readiness note will appear here.</p>
@@ -70,7 +83,7 @@ export default async function RecoveryPage() {
                 {[...checkins].reverse().map((c) => (
                   <li key={c.checked_on as string} className="flex-1 rounded-lg bg-elevated/60 px-1 py-2 text-center">
                     <span className="block font-display text-lg font-semibold">{c.readiness_score as number}</span>
-                    <span className="block text-[10px] text-muted-foreground">{(c.checked_on as string).slice(5)}</span>
+                    <span className="block text-xs text-muted-foreground">{(c.checked_on as string).slice(5)}</span>
                   </li>
                 ))}
               </ul>
@@ -95,71 +108,83 @@ export default async function RecoveryPage() {
         </div>
       </div>
 
-      <section aria-labelledby="rest-title">
-        <h2 id="rest-title" className="mb-3 font-display text-xl font-bold uppercase">
-          Rest-day activities
-        </h2>
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {REST_DAY_ACTIVITIES.map((a) => (
-            <li key={a.title} className="rounded-2xl border border-border bg-card p-4">
-              <p className="font-semibold">{a.title}</p>
-              {a.minutes > 0 && (
-                <p className="mt-1 flex items-center gap-1 text-xs text-gold">
-                  <Clock className="size-3" aria-hidden /> {a.minutes} min
-                </p>
-              )}
-              <p className="mt-2 text-xs text-muted-foreground">{a.description}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {/* Reference reading, one tap away, so the check-in and today's readiness lead the page. */}
+      <details className="group rounded-2xl border border-border bg-card" data-testid="recovery-guides">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 px-5 font-display text-lg font-bold uppercase [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-2">
+            <BookOpen className="size-5 text-gold" aria-hidden /> Guides
+            <span className="font-sans text-sm font-normal normal-case text-muted-foreground">rest days, warm-up, cooldown, modifications</span>
+          </span>
+          <ChevronDown className="size-5 shrink-0 text-gold transition-transform group-open:rotate-180" aria-hidden />
+        </summary>
+        <div className="space-y-6 px-5 pb-5">
+          <section aria-labelledby="rest-title">
+            <h2 id="rest-title" className="mb-3 font-display text-xl font-bold uppercase">
+              Rest-day activities
+            </h2>
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {REST_DAY_ACTIVITIES.map((a) => (
+                <li key={a.title} className="rounded-2xl border border-border bg-card p-4">
+                  <p className="font-semibold">{a.title}</p>
+                  {a.minutes > 0 && (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-gold">
+                      <Clock className="size-3" aria-hidden /> {a.minutes} min
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-muted-foreground">{a.description}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="warmup-title">
-          <h2 id="warmup-title" className="font-display text-lg font-semibold uppercase">
-            General warm-up
-          </h2>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-            {STANDARD_WARMUP.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ol>
-        </section>
-        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="cooldown-title">
-          <h2 id="cooldown-title" className="font-display text-lg font-semibold uppercase">
-            General cooldown
-          </h2>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-            {STANDARD_COOLDOWN.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ol>
-        </section>
-      </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="warmup-title">
+              <h2 id="warmup-title" className="font-display text-lg font-semibold uppercase">
+                General warm-up
+              </h2>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+                {STANDARD_WARMUP.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ol>
+            </section>
+            <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="cooldown-title">
+              <h2 id="cooldown-title" className="font-display text-lg font-semibold uppercase">
+                General cooldown
+              </h2>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+                {STANDARD_COOLDOWN.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ol>
+            </section>
+          </div>
 
-      <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="mods-title">
-        <h2 id="mods-title" className="flex items-center gap-2 font-display text-xl font-bold uppercase">
-          <ShieldAlert className="size-5 text-gold" aria-hidden /> Exercise modifications
-        </h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          You can skip any exercise that causes pain — the workout logger has a &ldquo;Causes pain&rdquo; skip option. These suggestions are not a
-          rehabilitation plan.
-        </p>
-        <dl className="mt-4 grid gap-4 md:grid-cols-2">
-          {EXERCISE_MODIFICATIONS.map((m) => (
-            <div key={m.situation} className="rounded-xl bg-elevated/50 p-4">
-              <dt className="font-semibold">{m.situation}</dt>
-              <dd>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                  {m.options.map((o) => (
-                    <li key={o}>{o}</li>
-                  ))}
-                </ul>
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+          <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="mods-title">
+            <h2 id="mods-title" className="flex items-center gap-2 font-display text-xl font-bold uppercase">
+              <ShieldAlert className="size-5 text-gold" aria-hidden /> Exercise modifications
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              You can skip any exercise that causes pain — the workout logger has a &ldquo;Causes pain&rdquo; skip option. These suggestions are not a
+              rehabilitation plan.
+            </p>
+            <dl className="mt-4 grid gap-4 md:grid-cols-2">
+              {EXERCISE_MODIFICATIONS.map((m) => (
+                <div key={m.situation} className="rounded-xl bg-elevated/50 p-4">
+                  <dt className="font-semibold">{m.situation}</dt>
+                  <dd>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                      {m.options.map((o) => (
+                        <li key={o}>{o}</li>
+                      ))}
+                    </ul>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
+      </details>
 
       <div className="flex justify-center">
         <Button asChild variant="secondary">

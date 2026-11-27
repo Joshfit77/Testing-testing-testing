@@ -13,6 +13,14 @@ export interface CatalogItem {
   isTimed: boolean;
   category: string;
   primary: string[];
+  /** Needs a weight before a set is logged (T8; src/lib/domain/load.ts). */
+  loaded?: boolean;
+  /** Muscles worked secondarily (they glow softly on the demonstration). */
+  secondary?: string[];
+  /** Set-up steps, form cues and common mistakes, shown on the workout's current-set card and its demonstration. */
+  steps?: string[];
+  cues?: string[];
+  mistakes?: string[];
 }
 
 export function ExercisePicker({
@@ -61,7 +69,7 @@ export function ExercisePicker({
           <span className="block text-sm font-semibold">{item.name}</span>
           <span className="block text-xs text-muted-foreground">{item.primary.slice(0, 3).map(titleCase).join(", ")}</span>
         </span>
-        <span className="shrink-0 text-[11px] uppercase tracking-wider text-muted-foreground">{item.isTimed ? "Timed" : titleCase(item.category)}</span>
+        <span className="shrink-0 text-xs uppercase tracking-wider text-muted-foreground">{item.isTimed ? "Timed" : titleCase(item.category)}</span>
       </button>
     </li>
   );

@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid slice">
+  <!-- Original artwork for Narrow Gate Fitness: a cross on a rocky summit at sunrise, mountains behind, in the brand palette. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#060504"/>
+      <stop offset="0.3" stop-color="#1c1208"/>
+      <stop offset="0.55" stop-color="#5a3312"/>
+      <stop offset="0.72" stop-color="#b86f26"/>
+      <stop offset="0.84" stop-color="#e9a94a"/>
+      <stop offset="1" stop-color="#f5d27e"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.66" cy="0.66" r="0.34">
+      <stop offset="0" stop-color="#fff6d6" stop-opacity="1"/>
+      <stop offset="0.08" stop-color="#ffe9a8" stop-opacity="0.95"/>
+      <stop offset="0.3" stop-color="#f0b45a" stop-opacity="0.55"/>
+      <stop offset="0.7" stop-color="#b86f26" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#b86f26" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="far" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7a4f26"/>
+      <stop offset="1" stop-color="#3a2512"/>
+    </linearGradient>
+    <linearGradient id="mid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a2f16"/>
+      <stop offset="1" stop-color="#1f140a"/>
+    </linearGradient>
+    <linearGradient id="near" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e150b"/>
+      <stop offset="1" stop-color="#0a0705"/>
+    </linearGradient>
+    <linearGradient id="rock" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a1d10"/>
+      <stop offset="0.5" stop-color="#140e07"/>
+      <stop offset="1" stop-color="#050403"/>
+    </linearGradient>
+    <linearGradient id="cross" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0b0804"/>
+      <stop offset="0.72" stop-color="#1a120a"/>
+      <stop offset="1" stop-color="#7a5a26"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f5d27e" stop-opacity="0"/>
+      <stop offset="1" stop-color="#f5d27e" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#070707" stop-opacity="0.7"/>
+      <stop offset="0.3" stop-color="#070707" stop-opacity="0"/>
+      <stop offset="0.75" stop-color="#070707" stop-opacity="0"/>
+      <stop offset="1" stop-color="#070707" stop-opacity="0.92"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="520" fill="url(#sky)"/>
+  <rect width="800" height="520" fill="url(#sun)"/>
+  <!-- light rays -->
+  <g stroke="#fff0c0" stroke-opacity="0.07" stroke-width="3">
+    <line x1="528" y1="343" x2="150" y2="60"/>
+    <line x1="528" y1="343" x2="330" y2="0"/>
+    <line x1="528" y1="343" x2="610" y2="0"/>
+    <line x1="528" y1="343" x2="790" y2="110"/>
+  </g>
+  <!-- far mountains with sunlit ridges -->
+  <path d="M0 340 L70 300 L130 322 L200 268 L260 300 L330 262 L400 300 L450 280 L510 310 L570 272 L640 304 L720 262 L800 296 V520 H0 Z" fill="url(#far)"/>
+  <path d="M200 268 L260 300 L240 296 Z M330 262 L400 300 L372 294 Z M570 272 L640 304 L612 298 Z M720 262 L800 296 L770 290 Z" fill="#f0b45a" opacity="0.35"/>
+  <!-- middle mountains -->
+  <path d="M0 400 L60 366 L120 388 L190 352 L250 380 L320 356 L390 390 L440 372 L490 398 L540 376 L600 402 L670 370 L740 396 L800 378 V520 H0 Z" fill="url(#mid)"/>
+  <path d="M190 352 L250 380 L222 376 Z M320 356 L390 390 L356 382 Z M670 370 L740 396 L706 390 Z" fill="#e9a94a" opacity="0.22"/>
+  <!-- near ridge -->
+  <path d="M0 450 L80 426 L160 444 L240 420 L330 446 L400 432 L470 452 L800 436 V520 H0 Z" fill="url(#near)"/>
+  <!-- the summit rock -->
+  <path d="M330 520 L390 456 L430 436 L470 420 L505 404 L540 398 L585 408 L625 430 L665 462 L700 520 Z" fill="url(#rock)"/>
+  <path d="M470 420 L505 404 L540 398 L585 408 L574 414 L540 406 L508 410 Z" fill="#f0b45a" opacity="0.5"/>
+  <!-- the cross -->
+  <g>
+    <rect x="512" y="208" width="18" height="204" rx="2" fill="url(#cross)"/>
+    <rect x="474" y="250" width="94" height="18" rx="2" fill="url(#cross)"/>
+    <rect x="527" y="210" width="3" height="200" fill="url(#rim)"/>
+    <rect x="476" y="251" width="92" height="3" fill="#f5d27e" opacity="0.55"/>
+  </g>
+  <rect width="800" height="520" fill="url(#fade)"/>
+</svg>

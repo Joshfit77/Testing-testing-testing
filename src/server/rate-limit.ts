@@ -1,12 +1,22 @@
 import "server-only";
+import { createHash, createHmac } from "node:crypto";
+import { headers } from "next/headers";
+import { getServiceSupabase } from "@/lib/supabase/server";
+import { isServiceRoleConfigured } from "@/server/env";
+import { logError, logInfo } from "@/server/log";
+
+export interface RateLimitResult {
+  ok: boolean;
+  retryAfterSeconds: number;
+}
 
 /**
- * Simple in-memory sliding-window limiter for burst protection. It is per server instance;
- * durable quotas (e.g. monthly AI usage) are enforced in the database instead.
+ * Per-instance sliding-window limiter. Only the fallback for when the shared limiter below can't be reached (no
+ * service-role key, or a database error): on serverless hosting each instance counts only its own requests.
  */
 const buckets = new Map<string, number[]>();
 
-export function rateLimit(key: string, limit: number, windowMs: number): { ok: boolean; retryAfterSeconds: number } {
+export function rateLimitLocal(key: string, limit: number, windowMs: number): RateLimitResult {
   const now = Date.now();
   const hits = (buckets.get(key) ?? []).filter((t) => now - t < windowMs);
   if (hits.length >= limit) {
@@ -19,4 +29,73 @@ export function rateLimit(key: string, limit: number, windowMs: number): { ok: b
     for (const [k, v] of buckets) if (!v.some((t) => now - t < windowMs)) buckets.delete(k);
   }
   return { ok: true, retryAfterSeconds: 0 };
+}
+
+/**
+ * Burst limiter shared by every server instance: an atomic sliding-window counter in Postgres
+ * (`rate_limit_hit`, service role only). If the database can't be used the per-instance limiter takes over, so an
+ * outage weakens burst protection rather than blocking every member; the durable limits that protect money (the
+ * monthly AI quota, reserved in the database before any provider call) fail closed on their own.
+ *
+ * Keys name the action and the member (or a hashed client address), never personal data in clear.
+ */
+export async function rateLimit(key: string, limit: number, windowMs: number): Promise<RateLimitResult> {
+  if (!isServiceRoleConfigured()) return rateLimitLocal(key, limit, windowMs);
+  try {
+    const { data, error } = await getServiceSupabase().rpc("rate_limit_hit", {
+      p_key: key.slice(0, 200),
+      p_limit: limit,
+      p_window_seconds: Math.max(1, Math.round(windowMs / 1000)),
+    });
+    if (error) throw error;
+    const row = (Array.isArray(data) ? data[0] : data) as { allowed: boolean; retry_after_seconds: number } | undefined;
+    if (!row) throw new Error("rate_limit_hit returned no row");
+    if (!row.allowed) logInfo("rate_limit.refused", { action: key.split(":")[0] ?? "unknown" });
+    return { ok: Boolean(row.allowed), retryAfterSeconds: row.allowed ? 0 : Math.max(1, Number(row.retry_after_seconds) || 1) };
+  } catch (err) {
+    logError("rate_limit.shared", err);
+    return rateLimitLocal(key, limit, windowMs);
+  }
+}
+
+/** Checks several limits in order and returns the first one that is exceeded. */
+export async function rateLimitAll(checks: { key: string; limit: number; windowMs: number }[]): Promise<RateLimitResult> {
+  for (const c of checks) {
+    const r = await rateLimit(c.key, c.limit, c.windowMs);
+    if (!r.ok) return r;
+  }
+  return { ok: true, retryAfterSeconds: 0 };
+}
+
+/** Best-effort client address from the hosting platform's proxy headers (for limits on signed-out requests). */
+export async function clientIp(): Promise<string> {
+  return clientIpFrom(await headers());
+}
+
+/** The same, from a route handler's own request headers. */
+export function clientIpFrom(h: Headers): string {
+  const forwarded = h.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return (forwarded || h.get("x-real-ip") || "unknown").slice(0, 64);
+}
+
+/**
+ * The secret that keys {@link hashKey}: derived from the service-role key (server-only, already required wherever the
+ * shared limiter runs), so no extra setting is needed. Without it (local development without Supabase) the plain hash
+ * is used. Rotating the service-role key only restarts the short rate-limit windows.
+ */
+function hashSecret(): string | null {
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return service ? createHash("sha256").update(`ngf-rate-limit-key:${service}`).digest("hex") : null;
+}
+
+/**
+ * Stable, non-reversible key part for an identifier such as an email address or IP (counters never store it). Keyed
+ * with a server secret (HMAC-SHA-256), so a copy of the rate-limit table can't be matched against a list of known
+ * email addresses by hashing them.
+ */
+export function hashKey(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  const secret = hashSecret();
+  const digest = secret ? createHmac("sha256", secret).update(normalized) : createHash("sha256").update(normalized);
+  return digest.digest("hex").slice(0, 32);
 }

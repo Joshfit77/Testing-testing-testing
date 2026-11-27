@@ -1,0 +1,12 @@
+# Not needed to build or run the web app on Vercel (the native projects, tests and design sources).
+android
+ios
+e2e
+tests
+docs
+playwright-report
+test-results
+assets/badge-masters
+scripts/badge-art
+scripts/ios-verify
+.demo-credentials*

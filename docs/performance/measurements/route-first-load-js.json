@@ -1,0 +1,147 @@
+{
+  "method": "gzip -9 of every JS file the route loads on first visit (root + app layouts + page), from .next/app-build-manifest.json",
+  "before": {
+    "/progress/overview": {
+      "key": "/(app)/progress/overview/page",
+      "files": 24,
+      "rawKB": 1509.2,
+      "gzipKB": 448.4,
+      "top": [
+        "static/chunks/2337-51e80ffbc4e6996a.js 112.7 KB gz",
+        "static/chunks/6140-007f6472feaf0435.js 53.4 KB gz",
+        "static/chunks/9631-88e242a128a18a37.js 53.3 KB gz",
+        "static/chunks/4bd1b696-100b9d70ed4e49c1.js 53.0 KB gz",
+        "static/chunks/226-3c0dc29235f0e235.js 49.0 KB gz",
+        "static/chunks/9727-cafb3d15d76b7dde.js 23.9 KB gz"
+      ]
+    },
+    "/nutrition": {
+      "key": "/(app)/nutrition/page",
+      "files": 26,
+      "rawKB": 1326.9,
+      "gzipKB": 406,
+      "top": [
+        "static/chunks/2337-51e80ffbc4e6996a.js 112.7 KB gz",
+        "static/chunks/9631-88e242a128a18a37.js 53.3 KB gz",
+        "static/chunks/4bd1b696-100b9d70ed4e49c1.js 53.0 KB gz",
+        "static/chunks/226-3c0dc29235f0e235.js 49.0 KB gz",
+        "static/chunks/9727-cafb3d15d76b7dde.js 23.9 KB gz",
+        "static/chunks/7431-cd6f7118524beb13.js 17.0 KB gz"
+      ]
+    },
+    "/run": {
+      "key": "/(app)/run/page",
+      "files": 23,
+      "rawKB": 1247.6,
+      "gzipKB": 380.4,
+      "top": [
+        "static/chunks/2337-51e80ffbc4e6996a.js 112.7 KB gz",
+        "static/chunks/9631-88e242a128a18a37.js 53.3 KB gz",
+        "static/chunks/4bd1b696-100b9d70ed4e49c1.js 53.0 KB gz",
+        "static/chunks/226-3c0dc29235f0e235.js 49.0 KB gz",
+        "static/chunks/9727-cafb3d15d76b7dde.js 23.9 KB gz",
+        "static/chunks/2458-86247a0bd0775f32.js 11.0 KB gz"
+      ]
+    },
+    "/progress": {
+      "key": "/(app)/progress/page",
+      "files": 21,
+      "rawKB": 853.7,
+      "gzipKB": 266.5,
+      "top": [
+        "static/chunks/9631-88e242a128a18a37.js 53.3 KB gz",
+        "static/chunks/4bd1b696-100b9d70ed4e49c1.js 53.0 KB gz",
+        "static/chunks/226-3c0dc29235f0e235.js 49.0 KB gz",
+        "static/chunks/9727-cafb3d15d76b7dde.js 23.9 KB gz",
+        "static/chunks/2458-86247a0bd0775f32.js 11.0 KB gz",
+        "static/chunks/5986-33f0ede467eafd99.js 9.9 KB gz"
+      ]
+    },
+    "/home": {
+      "key": "/(app)/home/page",
+      "files": 19,
+      "rawKB": 634.5,
+      "gzipKB": 199.8,
+      "top": [
+        "static/chunks/4bd1b696-100b9d70ed4e49c1.js 53.0 KB gz",
+        "static/chunks/226-3c0dc29235f0e235.js 49.0 KB gz",
+        "static/chunks/9727-cafb3d15d76b7dde.js 23.9 KB gz",
+        "static/chunks/2458-86247a0bd0775f32.js 11.0 KB gz",
+        "static/chunks/5986-33f0ede467eafd99.js 9.9 KB gz",
+        "static/chunks/2895-66707c59f430a87b.js 8.1 KB gz"
+      ]
+    }
+  },
+  "after": {
+    "/progress/overview": {
+      "key": "/(app)/progress/overview/page",
+      "files": 24,
+      "rawKB": 1121.6,
+      "gzipKB": 336.6,
+      "top": [
+        "static/chunks/6140-007f6472feaf0435.js 53.4 KB gz",
+        "static/chunks/9631-88e242a128a18a37.js 53.3 KB gz",
+        "static/chunks/4bd1b696-100b9d70ed4e49c1.js 53.0 KB gz",
+        "static/chunks/226-3c0dc29235f0e235.js 49.0 KB gz",
+        "static/chunks/9727-cafb3d15d76b7dde.js 23.9 KB gz",
+        "static/chunks/44530001-0be73d50aff2989d.js 13.9 KB gz"
+      ]
+    },
+    "/nutrition": {
+      "key": "/(app)/nutrition/page",
+      "files": 25,
+      "rawKB": 939.3,
+      "gzipKB": 294.1,
+      "top": [
+        "static/chunks/9631-88e242a128a18a37.js 53.3 KB gz",
+        "static/chunks/4bd1b696-100b9d70ed4e49c1.js 53.0 KB gz",
+        "static/chunks/226-3c0dc29235f0e235.js 49.0 KB gz",
+        "static/chunks/9727-cafb3d15d76b7dde.js 23.9 KB gz",
+        "static/chunks/7431-ac710cf607e7e374.js 17.0 KB gz",
+        "static/chunks/2458-86247a0bd0775f32.js 11.0 KB gz"
+      ]
+    },
+    "/run": {
+      "key": "/(app)/run/page",
+      "files": 23,
+      "rawKB": 859.9,
+      "gzipKB": 268.7,
+      "top": [
+        "static/chunks/9631-88e242a128a18a37.js 53.3 KB gz",
+        "static/chunks/4bd1b696-100b9d70ed4e49c1.js 53.0 KB gz",
+        "static/chunks/226-3c0dc29235f0e235.js 49.0 KB gz",
+        "static/chunks/9727-cafb3d15d76b7dde.js 23.9 KB gz",
+        "static/chunks/2458-86247a0bd0775f32.js 11.0 KB gz",
+        "static/chunks/5986-33f0ede467eafd99.js 9.9 KB gz"
+      ]
+    },
+    "/progress": {
+      "key": "/(app)/progress/page",
+      "files": 21,
+      "rawKB": 853.8,
+      "gzipKB": 266.5,
+      "top": [
+        "static/chunks/9631-88e242a128a18a37.js 53.3 KB gz",
+        "static/chunks/4bd1b696-100b9d70ed4e49c1.js 53.0 KB gz",
+        "static/chunks/226-3c0dc29235f0e235.js 49.0 KB gz",
+        "static/chunks/9727-cafb3d15d76b7dde.js 23.9 KB gz",
+        "static/chunks/2458-86247a0bd0775f32.js 11.0 KB gz",
+        "static/chunks/5986-33f0ede467eafd99.js 9.9 KB gz"
+      ]
+    },
+    "/home": {
+      "key": "/(app)/home/page",
+      "files": 19,
+      "rawKB": 634.6,
+      "gzipKB": 199.8,
+      "top": [
+        "static/chunks/4bd1b696-100b9d70ed4e49c1.js 53.0 KB gz",
+        "static/chunks/226-3c0dc29235f0e235.js 49.0 KB gz",
+        "static/chunks/9727-cafb3d15d76b7dde.js 23.9 KB gz",
+        "static/chunks/2458-86247a0bd0775f32.js 11.0 KB gz",
+        "static/chunks/5986-33f0ede467eafd99.js 9.9 KB gz",
+        "static/chunks/2895-b117d741a81a2781.js 8.1 KB gz"
+      ]
+    }
+  }
+}

@@ -233,10 +233,17 @@ export interface MacroSplit {
   fat_g: number;
 }
 
+/** The most a saved target can hold (the nutrition_goals check constraints and the targets form). */
+export const MACRO_TARGET_MAX = { protein_g: 500, carbs_g: 1000, fat_g: 400 } as const;
+
 /**
  * Split a calorie target into protein, carbs and fat for a diet style. Protein is set per kg of
  * bodyweight, carbs are fixed for the low-carb styles, and fat fills the rest (never below
  * 0.6 g/kg). Rounded grams always add back up to within a few kcal of the target.
+ *
+ * Protein and the fat minimum are set per kg while the calorie target is not, so at a high bodyweight with a low
+ * budget they could ask for more energy than the target itself (a 1,280 kcal budget with 1,420 kcal of macros).
+ * Protein then gives way, so the three always fit inside the calories, and each stays within what can be saved.
  */
 export function macroSplitForDiet(calories: number, weightKg: number, diet: DietType, baseProteinPerKg: number): MacroSplit {
   const proteinPerKg: Partial<Record<DietType, number>> = {
@@ -248,8 +255,9 @@ export function macroSplitForDiet(calories: number, weightKg: number, diet: Diet
     vegan: Math.max(baseProteinPerKg, 1.6),
     daniel_fast: 1.2,
   };
-  const protein_g = Math.round(weightKg * (proteinPerKg[diet] ?? baseProteinPerKg));
-  const fatFloor = Math.round(weightKg * 0.6);
+  const fatFloor = Math.min(MACRO_TARGET_MAX.fat_g, Math.round(weightKg * 0.6));
+  let protein_g = Math.min(MACRO_TARGET_MAX.protein_g, Math.round(weightKg * (proteinPerKg[diet] ?? baseProteinPerKg)));
+  if (protein_g * 4 + fatFloor * 9 > calories) protein_g = Math.max(0, Math.floor((calories - fatFloor * 9) / 4));
   const fixedCarbs: Partial<Record<DietType, number>> = { keto: 25, carnivore: 10, low_carb: 100 };
   const fatPct: Partial<Record<DietType, number>> = { mediterranean: 0.35, paleo: 0.4, daniel_fast: 0.25, dash: 0.27, high_protein: 0.25 };
 
@@ -257,11 +265,12 @@ export function macroSplitForDiet(calories: number, weightKg: number, diet: Diet
   let fat_g: number;
   const remaining = Math.max(0, calories - protein_g * 4);
   if (fixedCarbs[diet] !== undefined) {
-    carbs_g = Math.min(fixedCarbs[diet]!, Math.round(remaining / 4));
-    fat_g = Math.max(fatFloor, Math.round((remaining - carbs_g * 4) / 9));
+    // The fixed carbs come out of what is left after protein and the fat minimum.
+    carbs_g = Math.min(fixedCarbs[diet]!, Math.max(0, Math.round((remaining - fatFloor * 9) / 4)));
+    fat_g = Math.min(MACRO_TARGET_MAX.fat_g, Math.max(fatFloor, Math.round((remaining - carbs_g * 4) / 9)));
   } else {
-    fat_g = Math.max(fatFloor, Math.round((calories * (fatPct[diet] ?? 0.3)) / 9));
-    carbs_g = Math.max(0, Math.round((remaining - fat_g * 9) / 4));
+    fat_g = Math.max(fatFloor, Math.min(Math.round((calories * (fatPct[diet] ?? 0.3)) / 9), Math.floor(remaining / 9)));
+    carbs_g = Math.min(MACRO_TARGET_MAX.carbs_g, Math.max(0, Math.round((remaining - fat_g * 9) / 4)));
   }
   return { protein_g, carbs_g, fat_g };
 }

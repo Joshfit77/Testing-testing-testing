@@ -8,6 +8,21 @@ export const PHOTO_NOTE_MAX = 280;
 export const PHOTO_MAX_DIMENSION = 1600;
 /** Matches the bucket's file_size_limit. */
 export const PHOTO_MAX_BYTES = 8 * 1024 * 1024;
+/**
+ * Per-member upload limits, enforced by the storage rule (migration 20261124000086, can_add_progress_photo()).
+ * Only new uploads are refused; nothing stored is removed, and deleting photos frees room.
+ */
+export const PHOTO_LIMITS = { total: 500, perDay: 30, totalBytes: 1024 * 1024 * 1024 } as const;
+export const PHOTO_LIMIT_MESSAGE =
+  "You've reached the progress photo limit (500 photos, 30 a day, 1 GB in total). Your photos are all still here: delete some older ones to add new ones, or try again tomorrow.";
+
+/** What to tell the member when the upload itself is refused: the storage rule (a limit) or anything else. */
+export function photoUploadErrorMessage(error: { message?: string; statusCode?: string | number } | null | undefined): string {
+  const message = String(error?.message ?? "").toLowerCase();
+  const status = String(error?.statusCode ?? "");
+  if (message.includes("row-level security") || message.includes("row level security") || status === "403") return PHOTO_LIMIT_MESSAGE;
+  return "Upload failed. Check your connection and try again.";
+}
 
 export interface ProgressPhotoView {
   id: string;

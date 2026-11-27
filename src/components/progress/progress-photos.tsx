@@ -1,20 +1,24 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Check, Columns2, ImageOff, ImagePlus, Loader2, Lock, Trash2, X } from "lucide-react";
 import { EmptyState } from "@/components/common/states";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
+import { useDraft } from "@/lib/use-draft";
 import { Label } from "@/components/ui/label";
 import { compressImage } from "@/lib/image-compress";
 import {
   comparePhotos,
   PHOTO_MAX_BYTES,
+  photoUploadErrorMessage,
   PHOTO_NOTE_MAX,
   PHOTO_POSES,
   photoPathFor,
+  PHOTO_LIMIT_MESSAGE,
   PROGRESS_PHOTO_BUCKET,
   type PhotoPose,
   type ProgressPhotoView,
@@ -22,6 +26,7 @@ import {
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, formatWeight, weightUnit } from "@/lib/domain/units";
 import { getBrowserSupabase } from "@/lib/supabase/client";
+import { alreadyUploaded, reserveUpload, UPLOAD_RETRY_MESSAGE } from "@/lib/storage-reservation";
 import { cn, titleCase } from "@/lib/utils";
 import { deleteProgressPhotoAction, saveProgressPhotoAction } from "@/server/actions/progress-photos";
 
@@ -29,7 +34,7 @@ function formatDate(iso: string): string {
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
 }
 
-function PhotoImage({ photo, className, alt }: { photo: ProgressPhotoView; className?: string; alt: string }) {
+function PhotoImage({ photo, className, alt, style }: { photo: ProgressPhotoView; className?: string; alt: string; style?: React.CSSProperties }) {
   if (!photo.url) {
     return (
       <span className={cn("flex items-center justify-center bg-elevated text-muted-foreground", className)}>
@@ -40,7 +45,7 @@ function PhotoImage({ photo, className, alt }: { photo: ProgressPhotoView; class
   }
   // Signed, short-lived URLs to a private bucket — next/image optimisation doesn't apply.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={photo.url} alt={alt} className={className} loading="lazy" decoding="async" />;
+  return <img src={photo.url} alt={alt} className={className} style={style} loading="lazy" decoding="async" />;
 }
 
 type Stage = "idle" | "compressing" | "uploading" | "saving";
@@ -53,8 +58,11 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
   const [preview, setPreview] = useState<string | null>(null);
   const [takenOn, setTakenOn] = useState(today);
   const [pose, setPose] = useState<PhotoPose>("front");
-  const [weight, setWeight] = useState("");
-  const [note, setNote] = useState("");
+  // The note and weight are kept as a draft on this device until the photo is saved (the image isn't).
+  const draft = useDraft("progress.photo", { weight: "", note: "" });
+  const { weight, note } = draft.value;
+  const setWeight = (w: string) => draft.setValue((d) => ({ ...d, weight: w }));
+  const setNote = (n: string) => draft.setValue((d) => ({ ...d, note: n }));
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
   const busy = stage !== "idle";
@@ -66,18 +74,25 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  const reset = () => {
+  /** Closing keeps the typed note/weight as a draft; `saved` also forgets it. */
+  const reset = (saved = false) => {
     setFile(null);
     setTakenOn(today);
     setPose("front");
-    setWeight("");
-    setNote("");
+    if (saved) draft.clear();
     setError(null);
   };
 
+  // An upload whose save we couldn't confirm (connection lost): retries reuse the same file, and the server treats a
+  // second save of the same file as already done, so a retry never makes a second entry or loses the image.
+  // `unconfirmed` marks a file whose earlier save may have succeeded on the server: it is never deleted from here, since
+  // a saved photo may already point at it (the server only removes a file that no saved photo uses).
+  const pending = useRef<{ file: File; path: string; unconfirmed: boolean } | null>(null);
+  const reserved = useRef<{ file: File; path: string } | null>(null);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return setError("Choose a photo first.");
+    if (pending.current?.file !== file) pending.current = null;
     setError(null);
     setStage("compressing");
     let blob: Blob;
@@ -93,21 +108,48 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
     }
     setStage("uploading");
     const supabase = getBrowserSupabase();
-    const path = photoPathFor(userId, crypto.randomUUID());
-    const { error: upErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "3600" });
-    if (upErr) {
-      setStage("idle");
-      return setError("Upload failed. Check your connection and try again.");
+    // A retry of the same photo keeps its file name, so it reuses its reservation instead of holding a second one.
+    if (reserved.current?.file !== file) reserved.current = { file, path: photoPathFor(userId, crypto.randomUUID()) };
+    const path = pending.current?.path ?? reserved.current.path;
+    if (!pending.current) {
+      const reservation = await reserveUpload(supabase, PROGRESS_PHOTO_BUCKET, path, blob.size);
+      if (reservation === "limit" || reservation === "error") {
+        setStage("idle");
+        return setError(reservation === "limit" ? PHOTO_LIMIT_MESSAGE : photoUploadErrorMessage(null));
+      }
+      const { error: upErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "3600" });
+      // Already there: an earlier attempt uploaded it and only the reply was lost.
+      if (upErr && !alreadyUploaded(upErr)) {
+        setStage("idle");
+        // The reservation said there was room, so a refusal now isn't the limit (the upload took too long, or was cut).
+        const message = photoUploadErrorMessage(upErr);
+        return setError(message === PHOTO_LIMIT_MESSAGE && reservation === "ok" ? UPLOAD_RETRY_MESSAGE : message);
+      }
+      pending.current = { file, path, unconfirmed: false };
     }
     setStage("saving");
-    const res = await saveProgressPhotoAction({ path, takenOn, pose, note, weight }).catch(() => ({ ok: false as const, error: "You appear to be offline. Please try again." }));
+    const res = await saveProgressPhotoAction({ path, takenOn, pose, note, weight }).catch(() => null);
+    if (!res || (!res.ok && res.uncertain)) {
+      // The server may have saved it: keep the file and let a retry confirm (no second entry).
+      if (pending.current) pending.current.unconfirmed = true;
+      setStage("idle");
+      return setError("We couldn't confirm the save. Check your connection and tap Save again.");
+    }
     if (!res.ok) {
+      if (pending.current?.unconfirmed) {
+        // An earlier attempt may have saved this photo; keep the file and the upload so a corrected retry confirms it.
+        setStage("idle");
+        return setError(res.error);
+      }
       await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([path]).catch(() => null);
+      pending.current = null;
       setStage("idle");
       return setError(res.error);
     }
+    pending.current = null;
+    reserved.current = null;
     setStage("idle");
-    reset();
+    reset(true);
     onOpenChange(false);
     router.refresh();
   };
@@ -124,7 +166,7 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
       <DialogContent side="bottom">
         <DialogHeader>
           <DialogTitle>Add progress photo</DialogTitle>
-          <DialogDescription>Only you can see your photos. They&apos;re resized on this device before upload and location data is removed.</DialogDescription>
+          <DialogDescription>Stored privately with our hosting provider; only your account can open them. Never sent to the AI Coach or to anyone else. They&apos;re resized on this device before upload and location data is removed.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div>
@@ -210,7 +252,7 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
           </div>
           {!weight && <p className="text-xs text-muted-foreground">Leave weight blank to use your logged bodyweight for that day, if any.</p>}
           {error && (
-            <p role="alert" className="text-sm text-[#f08a8a]">
+            <p role="alert" className="text-sm text-destructive-foreground">
               {error}
             </p>
           )}
@@ -265,12 +307,12 @@ function ViewerDialog({ photo, units, onClose }: { photo: ProgressPhotoView | nu
               <PhotoImage photo={photo} alt={`Progress photo, ${photo.pose} pose, ${formatDate(photo.takenOn)}`} className="max-h-[65dvh] min-h-48 w-full rounded-xl bg-black object-contain" />
               {photo.note && <p className="mt-3 whitespace-pre-wrap text-sm">{photo.note}</p>}
               {error && (
-                <p role="alert" className="mt-3 text-sm text-[#f08a8a]">
+                <p role="alert" className="mt-3 text-sm text-destructive-foreground">
                   {error}
                 </p>
               )}
               <div className="mt-4 flex justify-end">
-                <Button variant="ghost" className="text-[#f08a8a]" onClick={() => setConfirmOpen(true)}>
+                <Button variant="ghost" className="text-destructive-foreground" onClick={() => setConfirmOpen(true)}>
                   <Trash2 aria-hidden /> Delete photo
                 </Button>
               </div>
@@ -285,7 +327,7 @@ function ViewerDialog({ photo, units, onClose }: { photo: ProgressPhotoView | nu
             <DialogDescription>It will be permanently removed. This can&apos;t be undone.</DialogDescription>
           </DialogHeader>
           {error && (
-            <p role="alert" className="mb-3 text-sm text-[#f08a8a]">
+            <p role="alert" className="mb-3 text-sm text-destructive-foreground">
               {error}
             </p>
           )}
@@ -306,9 +348,27 @@ function ViewerDialog({ photo, units, onClose }: { photo: ProgressPhotoView | nu
   );
 }
 
+/** Alignment guides over a comparison photo: thirds and a centre line, to check both photos were framed the same way. */
+function AlignmentGuides() {
+  return (
+    <span aria-hidden className="pointer-events-none absolute inset-0" data-testid="photo-guides">
+      {[33.333, 66.666].map((y) => (
+        <span key={`h${y}`} className="absolute inset-x-0 border-t border-dashed border-gold/60" style={{ top: `${y}%` }} />
+      ))}
+      {[33.333, 50, 66.666].map((x) => (
+        <span key={`v${x}`} className={cn("absolute inset-y-0 border-l border-dashed", x === 50 ? "border-gold" : "border-gold/60")} style={{ left: `${x}%` }} />
+      ))}
+    </span>
+  );
+}
+
 function CompareDialog({ pair, units, onClose }: { pair: [ProgressPhotoView, ProgressPhotoView] | null; units: UnitSystem; onClose: () => void }) {
   const cmp = pair ? comparePhotos(pair[0], pair[1]) : null;
   const delta = cmp?.weightDeltaKg;
+  const [mode, setMode] = useState<"side" | "overlay">("side");
+  const [afterOpacity, setAfterOpacity] = useState(50);
+  const [guides, setGuides] = useState(false);
+  const differentPose = Boolean(cmp && cmp.before.pose !== cmp.after.pose);
   return (
     <Dialog open={Boolean(cmp)} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-4xl">
@@ -322,23 +382,80 @@ function CompareDialog({ pair, units, onClose }: { pair: [ProgressPhotoView, Pro
                   ` · ${delta === 0 ? "no weight change" : `${delta > 0 ? "+" : "−"}${displayWeight(Math.abs(delta), units)} ${weightUnit(units)}`}`}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Comparison view">
               {(
                 [
-                  ["Before", cmp.before],
-                  ["After", cmp.after],
+                  ["side", "Side by side"],
+                  ["overlay", "Overlay"],
                 ] as const
-              ).map(([label, p]) => (
-                <figure key={label} className="space-y-2">
-                  <PhotoImage photo={p} alt={`${label}: ${p.pose} pose, ${formatDate(p.takenOn)}`} className="aspect-[3/4] w-full rounded-xl bg-black object-contain" />
-                  <figcaption className="text-center text-xs sm:text-sm">
-                    <span className="block font-semibold uppercase tracking-wider text-gold-highlight">{label}</span>
-                    <span className="block text-muted-foreground">{formatDate(p.takenOn)}</span>
-                    <span className="block text-muted-foreground">{p.weightKg != null ? formatWeight(p.weightKg, units) : "No weight"}</span>
-                  </figcaption>
-                </figure>
+              ).map(([m, label]) => (
+                <Button key={m} size="sm" variant={mode === m ? "default" : "secondary"} aria-pressed={mode === m} onClick={() => setMode(m)}>
+                  {label}
+                </Button>
               ))}
+              <label className="ml-auto inline-flex min-h-11 items-center gap-2 text-sm">
+                <input type="checkbox" checked={guides} onChange={(e) => setGuides(e.target.checked)} className="size-5 accent-[var(--gold)]" />
+                Alignment guides
+              </label>
             </div>
+            {differentPose && (
+              <p className="text-xs text-gold">
+                These photos are different poses ({cmp.before.pose} and {cmp.after.pose}), so they won&apos;t line up.
+              </p>
+            )}
+            {mode === "overlay" ? (
+              <div className="space-y-2" data-testid="photo-overlay">
+                <div className="relative mx-auto aspect-[3/4] w-full max-w-md overflow-hidden rounded-xl bg-black">
+                  <PhotoImage photo={cmp.before} alt={`Before: ${cmp.before.pose} pose, ${formatDate(cmp.before.takenOn)}`} className="absolute inset-0 size-full object-contain" />
+                  <PhotoImage
+                    photo={cmp.after}
+                    alt={`After: ${cmp.after.pose} pose, ${formatDate(cmp.after.takenOn)}`}
+                    className="absolute inset-0 size-full object-contain"
+                    style={{ opacity: afterOpacity / 100 }}
+                  />
+                  {guides && <AlignmentGuides />}
+                </div>
+                <label className="mx-auto block max-w-md text-sm">
+                  <span className="flex justify-between text-xs text-muted-foreground">
+                    <span>Before {formatDate(cmp.before.takenOn)}</span>
+                    <span>After {formatDate(cmp.after.takenOn)}</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={afterOpacity}
+                    onChange={(e) => setAfterOpacity(Number(e.target.value))}
+                    aria-label="Blend between before and after"
+                    className="mt-1 h-11 w-full accent-[var(--gold)]"
+                  />
+                </label>
+                <p className="mx-auto max-w-md text-center text-xs text-muted-foreground">
+                  The photos only line up as well as they were taken: same distance, height, pose and lighting. Nothing is measured from them.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                {(
+                  [
+                    ["Before", cmp.before],
+                    ["After", cmp.after],
+                  ] as const
+                ).map(([label, p]) => (
+                  <figure key={label} className="space-y-2">
+                    <span className="relative block">
+                      <PhotoImage photo={p} alt={`${label}: ${p.pose} pose, ${formatDate(p.takenOn)}`} className="aspect-[3/4] w-full rounded-xl bg-black object-contain" />
+                      {guides && <AlignmentGuides />}
+                    </span>
+                    <figcaption className="text-center text-xs sm:text-sm">
+                      <span className="block font-semibold uppercase tracking-wider text-gold-highlight">{label}</span>
+                      <span className="block text-muted-foreground">{formatDate(p.takenOn)}</span>
+                      <span className="block text-muted-foreground">{p.weightKg != null ? formatWeight(p.weightKg, units) : "No weight"}</span>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
             {delta == null && <p className="mt-3 text-center text-xs text-muted-foreground">Add a weight to both photos (or log bodyweight on those days) to see the change.</p>}
           </>
         )}
@@ -347,7 +464,20 @@ function CompareDialog({ pair, units, onClose }: { pair: [ProgressPhotoView, Pro
   );
 }
 
-export function ProgressPhotos({ photos, userId, units, today }: { photos: ProgressPhotoView[]; userId: string; units: UnitSystem; today: string }) {
+export function ProgressPhotos({
+  photos,
+  userId,
+  units,
+  today,
+  canCompare,
+}: {
+  photos: ProgressPhotoView[];
+  userId: string;
+  units: UnitSystem;
+  today: string;
+  /** Side-by-side comparisons are a Pro feature; adding and viewing photos is free. */
+  canCompare: boolean;
+}) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
@@ -375,13 +505,20 @@ export function ProgressPhotos({ photos, userId, units, today }: { photos: Progr
             <Camera className="size-5 text-gold" aria-hidden /> Progress photos
           </h2>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Lock className="size-3.5 text-gold" aria-hidden /> Only you can see your photos.
+            <Lock className="size-3.5 text-gold" aria-hidden /> Stored privately; only your account can open them.
           </p>
         </div>
         <div className="flex gap-2">
-          {photos.length >= 2 && !comparing && (
+          {photos.length >= 2 && !comparing && canCompare && (
             <Button variant="secondary" onClick={() => setComparing(true)}>
               <Columns2 aria-hidden /> Compare
+            </Button>
+          )}
+          {photos.length >= 2 && !canCompare && (
+            <Button asChild variant="secondary">
+              <Link href="/profile/billing">
+                <Columns2 aria-hidden /> Compare with Pro
+              </Link>
             </Button>
           )}
           {!comparing && (
@@ -426,7 +563,7 @@ export function ProgressPhotos({ photos, userId, units, today }: { photos: Progr
                   )}
                 >
                   <PhotoImage photo={p} alt="" className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
-                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 pb-1.5 pt-5 text-left text-[11px] leading-tight text-white">
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 pb-1.5 pt-5 text-left text-xs leading-tight text-white">
                     <span className="block font-semibold">{formatDate(p.takenOn)}</span>
                     <span className="block text-white/70">{titleCase(p.pose)}</span>
                   </span>

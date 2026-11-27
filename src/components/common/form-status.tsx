@@ -8,7 +8,8 @@ import { useActionToast } from "@/components/ui/toaster";
 export function SubmitButton({ children, pendingLabel, ...props }: ButtonProps & { pendingLabel?: string }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending || props.disabled} aria-busy={pending} {...props}>
+    // The pending lock comes last, so a caller's own `disabled` can't re-enable the button while it submits.
+    <Button type="submit" {...props} disabled={pending || props.disabled} aria-busy={pending}>
       {pending && <Loader2 className="animate-spin" aria-hidden />}
       {pending ? (pendingLabel ?? "Saving…") : children}
     </Button>
@@ -20,7 +21,7 @@ export function FormMessage({ state }: { state: ActionState }) {
   useActionToast(state);
   if (!state.message || state.ok) return null;
   return (
-    <p role="alert" className="animate-fade-in text-sm text-[#f08a8a]">
+    <p role="alert" className="animate-fade-in text-sm text-destructive-foreground">
       {state.message}
     </p>
   );
@@ -29,7 +30,7 @@ export function FormMessage({ state }: { state: ActionState }) {
 export function FieldError({ message, id }: { message?: string; id?: string }) {
   if (!message) return null;
   return (
-    <p id={id} className="text-xs text-[#f08a8a]">
+    <p id={id} className="text-xs text-destructive-foreground">
       {message}
     </p>
   );

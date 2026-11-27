@@ -6,6 +6,8 @@ export const publicEnv = {
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
   siteUrl: (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, ""),
+  /** Cloudflare Turnstile site key (public): set together with CAPTCHA protection in Supabase (F-7); unset, no check. */
+  turnstileSiteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "",
 };
 
 export function isSupabaseConfigured(): boolean {

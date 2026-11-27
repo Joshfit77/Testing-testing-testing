@@ -5,6 +5,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
 import { isoDateInTz } from "@/lib/domain/dates";
 import { readinessBand, readinessNote, readinessScore } from "@/lib/domain/readiness";
+import { sleepJournalFromRecoveryCheckin } from "@/lib/domain/sleep-checkins";
 import { recoveryCheckinSchema } from "@/lib/validation/schemas";
 import { getProfile, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
@@ -26,10 +27,11 @@ export async function recoveryCheckinAction(_prev: ActionState, formData: FormDa
 
   const v = parsed.data;
   const score = readinessScore(v);
+  const checkedOn = isoDateInTz(new Date(), profile?.timezone ?? "UTC");
   const { error } = await supabase.from("recovery_checkins").upsert(
     {
       user_id: user.id,
-      checked_on: isoDateInTz(new Date(), profile?.timezone ?? "UTC"),
+      checked_on: checkedOn,
       sleep_quality: v.sleepQuality,
       energy: v.energy,
       soreness: v.soreness,
@@ -43,7 +45,14 @@ export async function recoveryCheckinAction(_prev: ActionState, formData: FormDa
     logError("recovery.checkin", error);
     return actionError("Couldn't save your check-in. Please try again.");
   }
+  // One daily check-in: the same answers feed the sleep insights, so the sleep journal never asks them again.
+  // Only these three columns are written; anything else in that day's sleep journal is kept.
+  const mirror = await supabase
+    .from("sleep_checkins")
+    .upsert(sleepJournalFromRecoveryCheckin(user.id, checkedOn, v), { onConflict: "user_id,day" });
+  if (mirror.error) logError("recovery.checkin.sleep_mirror", mirror.error);
   revalidatePath("/train/recovery");
   revalidatePath("/home");
+  revalidatePath("/progress/sleep");
   return actionOk(`Readiness ${score}/100. ${readinessNote(readinessBand(score))}`);
 }

@@ -84,18 +84,32 @@ export async function getStrengthSeries(supabase: SupabaseClient, userId: string
   return out;
 }
 
+/**
+ * Calories and macros per diary day from `start` to `end` (inclusive). Paged: the API returns at most 1,000 rows per
+ * request, and a member who logs a dozen foods a day passes that inside three months, so one request silently dropped
+ * the newest days of the 90-day and 1-year charts (they read as nothing logged).
+ */
 export async function getNutritionDaily(supabase: SupabaseClient, userId: string, start: string, end: string) {
-  const { data, error } = await supabase
-    .from("meal_items")
-    .select("calories, protein_g, carbs_g, fat_g, meal:meals!inner(eaten_on, status, is_template)")
-    .eq("user_id", userId)
-    .eq("meal.is_template", false)
-    .eq("meal.status", "logged")
-    .gte("meal.eaten_on", start)
-    .lte("meal.eaten_on", end);
-  if (error) throw error;
+  type Row = { calories: number; protein_g: number; carbs_g: number; fat_g: number; meal: { eaten_on: string } };
+  const PAGE = 1000;
+  const data: Row[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data: page, error } = await supabase
+      .from("meal_items")
+      .select("calories, protein_g, carbs_g, fat_g, meal:meals!inner(eaten_on, status, is_template)")
+      .eq("user_id", userId)
+      .eq("meal.is_template", false)
+      .eq("meal.status", "logged")
+      .gte("meal.eaten_on", start)
+      .lte("meal.eaten_on", end)
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    data.push(...((page ?? []) as unknown as Row[]));
+    if (!page || page.length < PAGE) break;
+  }
   const days = new Map(eachDay(start, end).map((d) => [d, { date: d, calories: 0, protein: 0, carbs: 0, fat: 0 }]));
-  for (const i of (data ?? []) as unknown as { calories: number; protein_g: number; carbs_g: number; fat_g: number; meal: { eaten_on: string } }[]) {
+  for (const i of data) {
     const d = days.get(i.meal.eaten_on);
     if (!d) continue;
     d.calories += Number(i.calories);
@@ -124,15 +138,23 @@ export interface BestRow {
 }
 
 export async function getPersonalBests(supabase: SupabaseClient, userId: string): Promise<BestRow[]> {
-  const { data, error } = await supabase
-    .from("personal_records")
-    .select("exercise_id, record_type, value, achieved_at, exercise:exercises(name, slug)")
-    .eq("user_id", userId)
-    .order("achieved_at", { ascending: false })
-    .limit(1000);
-  if (error) throw error;
+  // Paged (the API returns at most 1,000 rows per request): reading only the newest 1,000 dropped the exercises a
+  // member with a long history hadn't set a record on lately.
+  const data: { exercise_id: unknown; record_type: unknown; value: unknown; achieved_at: unknown; exercise: unknown }[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data: page, error } = await supabase
+      .from("personal_records")
+      .select("exercise_id, record_type, value, achieved_at, exercise:exercises(name, slug)")
+      .eq("user_id", userId)
+      .order("achieved_at", { ascending: false })
+      .order("id")
+      .range(from, from + 999);
+    if (error) throw error;
+    data.push(...(page ?? []));
+    if (!page || page.length < 1000) break;
+  }
   const map = new Map<string, BestRow>();
-  for (const r of data ?? []) {
+  for (const r of data) {
     const ex = r.exercise as unknown as { name: string; slug: string } | null;
     const row =
       map.get(r.exercise_id as string) ??
