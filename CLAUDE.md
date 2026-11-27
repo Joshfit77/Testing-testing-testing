@@ -54,7 +54,7 @@ go through `npm run test:e2e:mocked`; plain `npx playwright test` fails AI tests
 | `src/lib/domain` | Pure domain logic (plans, GPS track, calorie budget, sleep alarm, ...): unit-test here first |
 | `src/lib/native*`, `src/lib/native/` | Capacitor bridges (location, notifications, alarm, back button, app links). Safe no-ops in a browser |
 | `src/lib/ai`, `src/lib/coach`, `src/server/coach` | AI prompts, tools, budgets; `src/lib/ai/bible-ai.ts` + `src/server/actions/bible-ai.ts` is the Bible study helper |
-| `supabase/migrations` | Ordered SQL migrations, `YYYYMMDD000NNN_name.sql` (NNN = the next number after the highest, 098 so far) |
+| `supabase/migrations` | Ordered SQL migrations, `YYYYMMDD000NNN_name.sql` (NNN = the next number after the highest, 099 so far) |
 | `tests/unit`, `tests/integration`, `e2e` | Vitest unit (jsdom), Vitest integration (real DB), Playwright |
 | `ios/`, `android/`, `native-shell/` | Native projects and the offline shell (offline page, bundled Bible) |
 | `.claude/agents/` | Specialist agents: native-mobile, security, backend, database, payments, qa-testing |

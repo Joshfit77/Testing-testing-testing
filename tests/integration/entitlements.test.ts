@@ -13,6 +13,8 @@ const stripeDisputes = new Map<string, unknown>();
 const stripeInvoiceByIntent = new Map<string, string>();
 /** Stripe's event log (GET /v1/events), newest first, for reconciliation to re-read. */
 const stripeEventLog: Record<string, unknown>[] = [];
+/** How many pages of the event log were requested (pagination is exercised, not assumed). */
+let stripeEventPages = 0;
 
 /** A paid invoice for a subscription, its PaymentIntent and charge, as Stripe would hold them. */
 function fakePayment(subscriptionId: string, over: { refunded?: boolean; amount_refunded?: number; created?: number } = {}) {
@@ -68,11 +70,16 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
         const gte = Number(url.searchParams.get("created[gte]") ?? 0);
         const lt = Number(url.searchParams.get("created[lt]") ?? Number.MAX_SAFE_INTEGER);
         const types = url.searchParams.getAll("types[]");
-        // Newest first, like Stripe.
-        const data = stripeEventLog
+        // Newest first, in pages of `limit` (at most 100) continued with starting_after, like Stripe.
+        const all = stripeEventLog
           .filter((e) => (e.created as number) >= gte && (e.created as number) < lt && (!types.length || types.includes(e.type as string)))
-          .sort((x, y) => (y.created as number) - (x.created as number));
-        return json(200, { object: "list", has_more: false, url: "/v1/events", data });
+          .sort((x, y) => (y.created as number) - (x.created as number) || String(y.id).localeCompare(String(x.id)));
+        const pageSize = Math.min(100, Number(url.searchParams.get("limit") ?? 10));
+        const after = url.searchParams.get("starting_after");
+        const from = after ? all.findIndex((e) => e.id === after) + 1 : 0;
+        const data = all.slice(from, from + pageSize);
+        stripeEventPages++;
+        return json(200, { object: "list", has_more: from + pageSize < all.length, url: "/v1/events", data });
       }
       if (url.pathname === "/v1/subscriptions" && req.method === "GET") {
         // Listing (reconciliation's sweep for subscriptions never stored): only those the test marks as listed.
@@ -547,6 +554,115 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       expect(stored?.filter((r) => r.status === "processed").map((r) => r.id).sort()).toEqual([...ids].sort());
       const state = (await svc.from("billing_reconcile_state").select("stripe_events_through").eq("id", 1).single()).data!;
       expect(Date.now() - Date.parse(state.stripe_events_through as string)).toBeLessThan(60_000);
+    } finally {
+      stripeEventLog.length = 0;
+      await deleteTestUser(u);
+    }
+  });
+
+  it("at scale: 250 lost events over 20 days are read across pages and windows, each applied exactly once", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    const u = await createTestUser("replay-scale");
+    const svc = serviceClient();
+    const ent = async () => (await svc.from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si_1", price: { id: "price_test_pro" }, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400 }] } });
+      const pay = fakePayment(sub.id);
+      stripeSubs.set(sub.id, { ...sub, latest_invoice: pay.invoice.id } as Stripe.Subscription);
+      await syncSubscription(stripeSubs.get(sub.id)!);
+      await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(Date.now() - 21 * 86400_000).toISOString() });
+      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 1799, refunded: true });
+      const nowS = Math.floor(Date.now() / 1000);
+      // 150 in one busy hour 10 days ago (two pages of 100 in one window), 100 more spread over 20 days.
+      const ids: string[] = [];
+      for (let i = 0; i < 150; i++) ids.push(`evt_busy_${i}_${crypto.randomUUID().slice(0, 8)}`);
+      ids.forEach((id, i) => stripeEventLog.push({ id, object: "event", type: "charge.refunded", created: nowS - 10 * 86400 + i * 20, data: { object: stripeCharges.get(pay.charge.id) } }));
+      for (let i = 0; i < 100; i++) {
+        const id = `evt_spread_${i}_${crypto.randomUUID().slice(0, 8)}`;
+        ids.push(id);
+        stripeEventLog.push({ id, object: "event", type: "charge.refunded", created: nowS - 20 * 86400 + i * 17_000, data: { object: stripeCharges.get(pay.charge.id) } });
+      }
+      stripeEventPages = 0;
+      const report = await reconcileBilling();
+      expect(report.stripeEvents.complete).toBe(true);
+      expect(report.stripeEvents.failed).toBe(0);
+      expect(report.stripeEvents.listed).toBe(250);
+      expect(stripeEventPages).toBeGreaterThan(80); // 6-hour windows over 21 days, plus the second page of the busy hour
+      expect(await ent()).toBe("free");
+      const { data: stored } = await svc.from("stripe_events").select("id, status, attempts").in("id", ids);
+      expect(stored).toHaveLength(250);
+      expect(stored!.every((r) => r.status === "processed" && r.attempts === 1)).toBe(true);
+      // A second run re-reads the last 3 days only and applies nothing again.
+      const again = await reconcileBilling();
+      expect(again.stripeEvents.applied).toBe(0);
+      expect((await svc.from("stripe_events").select("attempts").in("id", ids)).data!.every((r) => r.attempts === 1)).toBe(true);
+    } finally {
+      stripeEventLog.length = 0;
+      await deleteTestUser(u);
+    }
+  });
+
+  it("a run that runs out of time keeps its place and the next runs finish the backlog in order (processing limits)", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    const svc = serviceClient();
+    const u = await createTestUser("replay-budget");
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id } });
+      stripeSubs.set(sub.id, sub);
+      await syncSubscription(sub);
+      const start = Date.now() - 12 * 86400_000;
+      await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(start).toISOString() });
+      const nowS = Math.floor(Date.now() / 1000);
+      const ids = Array.from({ length: 40 }, (_, i) => `evt_budget_${i}_${crypto.randomUUID().slice(0, 8)}`);
+      ids.forEach((id, i) => stripeEventLog.push({ id, object: "event", type: "customer.subscription.updated", created: nowS - 11 * 86400 + i * 6 * 3600, data: { object: sub } }));
+      // A budget too small for everything: the run stops part-way, reports itself incomplete, and the starting point
+      // never moves past an unfinished window.
+      const first = await reconcileBilling({ budgetMs: 150 });
+      expect(first.stripeEvents.complete).toBe(false);
+      const through = Date.parse((await svc.from("billing_reconcile_state").select("stripe_events_through").eq("id", 1).single()).data!.stripe_events_through as string);
+      const done = (await svc.from("stripe_events").select("id").in("id", ids).eq("status", "processed")).data!.map((r) => r.id as string);
+      // Everything before the saved starting point was handled (nothing skipped).
+      const before = ids.filter((_, i) => (nowS - 11 * 86400 + i * 6 * 3600) * 1000 < through);
+      expect(before.every((id) => done.includes(id))).toBe(true);
+      // Later runs with a normal budget finish the rest, each event exactly once.
+      for (let i = 0; i < 3; i++) {
+        const r = await reconcileBilling();
+        if (r.stripeEvents.complete) break;
+      }
+      const { data: stored } = await svc.from("stripe_events").select("status, attempts").in("id", ids);
+      expect(stored).toHaveLength(40);
+      expect(stored!.every((r) => r.status === "processed" && r.attempts === 1)).toBe(true);
+    } finally {
+      stripeEventLog.length = 0;
+      await deleteTestUser(u);
+    }
+  });
+
+  it("an outage longer than 30 days: replay starts 30 days back (Stripe keeps 30 days of events) and repairs what it can", async () => {
+    const { reconcileBilling } = await import("@/server/services/billing-reconcile");
+    const svc = serviceClient();
+    const u = await createTestUser("replay-45-days");
+    const ent = async () => (await svc.from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si_1", price: { id: "price_test_pro" }, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400 }] } });
+      const pay = fakePayment(sub.id);
+      stripeSubs.set(sub.id, { ...sub, latest_invoice: pay.invoice.id } as Stripe.Subscription);
+      await syncSubscription(stripeSubs.get(sub.id)!);
+      await svc.from("billing_reconcile_state").upsert({ id: 1, stripe_events_through: new Date(Date.now() - 45 * 86400_000).toISOString() });
+      stripeCharges.set(pay.charge.id, { ...pay.charge, amount_refunded: 1799, refunded: true });
+      const nowS = Math.floor(Date.now() / 1000);
+      const old = `evt_${crypto.randomUUID()}`;
+      const recent = `evt_${crypto.randomUUID()}`;
+      stripeEventLog.push(
+        { id: old, object: "event", type: "charge.refunded", created: nowS - 40 * 86400, data: { object: stripeCharges.get(pay.charge.id) } },
+        { id: recent, object: "event", type: "charge.refunded", created: nowS - 29 * 86400, data: { object: stripeCharges.get(pay.charge.id) } },
+      );
+      const report = await reconcileBilling();
+      expect(Date.now() - Date.parse(report.stripeEvents.since!)).toBeLessThanOrEqual(30 * 86400_000 + 60_000);
+      expect(report.stripeEvents.complete).toBe(true);
+      expect(await ent()).toBe("free");
+      expect((await svc.from("stripe_events").select("id").eq("id", old)).data).toEqual([]); // beyond Stripe's 30 days: not read
+      expect((await svc.from("stripe_events").select("status").eq("id", recent).single()).data).toEqual({ status: "processed" });
     } finally {
       stripeEventLog.length = 0;
       await deleteTestUser(u);

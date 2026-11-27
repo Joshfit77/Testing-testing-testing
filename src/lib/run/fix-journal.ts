@@ -229,17 +229,71 @@ export function replayFixes(track: TrackState, fixes: GpsFix[]): TrackState {
   return t;
 }
 
+/** Native journal deletions asked for but not yet confirmed by the phone ("*" = all), retried at the next app start. */
+const PENDING_NATIVE_CLEAR_KEY = "ngf.runjournal.pendingClear";
+
+function pendingNativeClears(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(PENDING_NATIVE_CLEAR_KEY) ?? "[]") as unknown;
+    return Array.isArray(v) ? v.filter((k): k is string => typeof k === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function setPendingNativeClears(keys: string[]): void {
+  try {
+    if (keys.length) localStorage.setItem(PENDING_NATIVE_CLEAR_KEY, JSON.stringify([...new Set(keys)]));
+    else localStorage.removeItem(PENDING_NATIVE_CLEAR_KEY);
+  } catch {
+    /* storage blocked: the deletion is still attempted now */
+  }
+}
+
+/**
+ * Ask the phone to delete one recording's native journal (`"*"` = all), remembering the request until the phone
+ * confirms it, so a deletion cut short (the app closed, the page left) is finished at the next app start. Used when a
+ * recording is saved, discarded or replaced, and at sign-out and account deletion.
+ */
+export async function clearNativeConfirmed(target: string): Promise<boolean> {
+  setPendingNativeClears([...pendingNativeClears(), target]);
+  let ok = false;
+  try {
+    const { clearNativeRunJournal } = await import("@/lib/native/run-journal");
+    ok = await clearNativeRunJournal(target === "*" ? undefined : target);
+  } catch {
+    ok = false;
+  }
+  // Confirmed: that request is done (deleting everything also covers every single-key request).
+  if (ok) setPendingNativeClears(target === "*" ? [] : pendingNativeClears().filter((k) => k !== target));
+  return ok;
+}
+
 /**
  * Remove recorded routes from this device (sign-out, account deletion): the web journal and the native journal of
- * `userId`'s recording, or all of them without a user.
+ * `userId`'s recording, or all of them without a user. Resolves true once the phone has confirmed the native deletion.
+ * The request is remembered first, so if the app is closed, or the page leaves, before the phone answers, the next app
+ * start finishes it (retryPendingNativeClears).
  */
-export function clearRunJournalData(userId?: string): void {
+export async function clearRunJournalData(userId?: string): Promise<boolean> {
   const stored = mem ?? read();
   if (!userId || !stored || stored.key === `${RECORDING_PREFIX}${userId}`) clearJournal();
   // Signing out removes only that member's native journal (another member's unrecovered run on a shared phone isn't
   // theirs to delete); without a user (account deletion, forgetting the device) every native journal goes.
-  const key = userId ? `${RECORDING_PREFIX}${userId}` : undefined;
-  void import("@/lib/native/run-journal").then((m) => m.clearNativeRunJournal(key)).catch(() => undefined);
+  return clearNativeConfirmed(userId ? `${RECORDING_PREFIX}${userId}` : "*");
+}
+
+/** At app start: finish native journal deletions that weren't confirmed before the app closed. True when none remain. */
+export async function retryPendingNativeClears(): Promise<boolean> {
+  const pending = pendingNativeClears();
+  if (!pending.length) return true;
+  const { clearNativeRunJournal } = await import("@/lib/native/run-journal");
+  const left: string[] = [];
+  // Deleting everything covers every single-key request too.
+  const targets = pending.includes("*") ? ["*"] : pending;
+  for (const t of targets) if (!(await clearNativeRunJournal(t === "*" ? undefined : t).catch(() => false))) left.push(t);
+  setPendingNativeClears(left);
+  return left.length === 0;
 }
 
 /** For tests: reset module state. */

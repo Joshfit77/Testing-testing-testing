@@ -89,7 +89,7 @@ export function ScanCapture({ userId, units, previous, lastWeight }: { userId: s
         setSaving(`Uploading photo ${i + 1} of ${poses.length}…`);
         // A retry of the same shot keeps its file name, so it reuses its reservation instead of holding another.
         const path = (reservedPaths.current[pose] ??= scanPhotoPath(userId, scanId, pose, crypto.randomUUID()));
-        const reservation = await reserveUpload(supabase, BODY_SCAN_BUCKET, path);
+        const reservation = await reserveUpload(supabase, BODY_SCAN_BUCKET, path, shots[pose]!.blob.size);
         if (reservation === "limit" || reservation === "error") {
           setSaving(null);
           return setError(reservation === "limit" ? SCAN_PHOTO_LIMIT_MESSAGE : scanUploadErrorMessage(null, navigator.onLine));

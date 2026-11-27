@@ -33,12 +33,16 @@ import {
   type TrackState,
 } from "@/lib/domain/gps-track";
 import { buildScript, completedSets, phaseAt, scriptSeconds, type RunPrescription } from "@/lib/domain/run-session";
-import { clearJournal, pruneJournal, replayFixes, replayJournal } from "@/lib/run/fix-journal";
-import { clearNativeRunJournal, readNativeRunJournal } from "@/lib/native/run-journal";
+import { clearJournal, clearNativeConfirmed, pruneJournal, replayFixes, replayJournal } from "@/lib/run/fix-journal";
+import { readNativeRunJournal } from "@/lib/native/run-journal";
 import { canOpenLocationSettings, hasNativeBackgroundLocation, keepScreenOn, locationSourceLabel, openLocationSettings, watchLocation, type LocationError } from "@/lib/native/location";
 import { attachScreen, keepRecording, routeError, routeFix, shouldKeep, takeBack } from "@/lib/run/live-recording";
 import { saveGpsActivityAction } from "@/server/actions/gps-activities";
 import { vibrate } from "@/lib/native";
+import { withTimeout } from "@/lib/with-timeout";
+
+/** How long Continue waits for the native journal to be read (a local file; normally milliseconds). */
+const NATIVE_READ_TIMEOUT_MS = 5000;
 
 export interface GuidedSession {
   userProgramId: string;
@@ -139,6 +143,11 @@ export function GpsRecorder({
   const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState<LocationError | null>(null);
   const [recoverable, setRecoverable] = useState<Saved | null>(null);
+  // The native journal's fixes for the recoverable recording, read once when it is offered. Continue waits for them,
+  // so a tap before the read finishes can't drop them (they would otherwise be deleted with the journal on save).
+  const nativeFixesRef = useRef<Promise<GpsFix[]> | null>(null);
+  const continuingRef = useRef(false);
+  const [continuing, setContinuing] = useState(false);
   // A finished recording that was never saved and is now older than the server accepts: shown, not silently removed.
   const [tooOld, setTooOld] = useState<TrackState | null>(null);
   const [voice, setVoice] = useState(false);
@@ -208,7 +217,9 @@ export function GpsRecorder({
       if (isRecoverable(saved.track, Date.now()) && (saved.guidedDayId ?? null) === (guided?.programDayId ?? null)) {
         setRecoverable(saved);
         // In the phone app, fixes written natively while the web view was suspended or the app had been ended.
-        void readNativeRunJournal(storageKey).then((fixes) => {
+        const nativeFixes = readNativeRunJournal(storageKey).catch(() => [] as GpsFix[]);
+        nativeFixesRef.current = nativeFixes;
+        void nativeFixes.then((fixes) => {
           if (!fixes.length) return;
           setRecoverable((cur) => (cur && cur.track.id === saved.track.id ? { ...cur, track: replayFixes(cur.track, fixes) } : cur));
         });
@@ -226,7 +237,7 @@ export function GpsRecorder({
         if (!t) {
           localStorage.removeItem(storageKey);
           clearJournal();
-          void clearNativeRunJournal(storageKey);
+          void clearNativeConfirmed(storageKey);
           return;
         }
         if (!force && Date.now() - lastSaveRef.current < 5000) return;
@@ -334,7 +345,7 @@ export function GpsRecorder({
   const start = async () => {
     const t = startTrack({ id: crypto.randomUUID(), kind, unit, now: Date.now() });
     clearJournal(); // a new recording never inherits fixes journalled for an earlier one
-    await clearNativeRunJournal(storageKey);
+    await clearNativeConfirmed(storageKey);
     lastPhaseRef.current = -1;
     setTrack(t);
     setNow(Date.now());
@@ -343,13 +354,26 @@ export function GpsRecorder({
   };
 
   const continueRecording = async () => {
-    if (!recoverable) return;
-    const t = recoverTrack(recoverable.track);
-    setKind(t.kind);
-    setTrack(t);
-    setRecoverable(null);
-    // A finished recording goes straight back to the review screen; location is not needed for that.
-    if (t.status !== "paused" && t.status !== "finished") await beginWatching();
+    if (!recoverable || continuingRef.current) return;
+    continuingRef.current = true;
+    setContinuing(true);
+    try {
+      // Merge the native journal first, even if its read is still in flight (a fast tap), so its fixes are in the
+      // track before live fixes move the track past them. Applying them twice is harmless (replayFixes skips fixes
+      // the track already has). If the read never answers, continue after a few seconds: the fixes stay in the
+      // native journal on the device until this recording is saved or discarded.
+      const fixes = nativeFixesRef.current ? await withTimeout(nativeFixesRef.current, NATIVE_READ_TIMEOUT_MS).catch(() => [] as GpsFix[]) : [];
+      const t = recoverTrack(replayFixes(recoverable.track, fixes));
+      nativeFixesRef.current = null;
+      setKind(t.kind);
+      setTrack(t);
+      setRecoverable(null);
+      // A finished recording goes straight back to the review screen; location is not needed for that.
+      if (t.status !== "paused" && t.status !== "finished") await beginWatching();
+    } finally {
+      continuingRef.current = false;
+      setContinuing(false);
+    }
   };
 
   const discard = async () => {
@@ -451,7 +475,7 @@ export function GpsRecorder({
             </p>
             <div className="mt-2 flex gap-2">
               {canRecord && (
-                <Button size="sm" onClick={continueRecording}>
+                <Button size="sm" onClick={continueRecording} disabled={continuing}>
                   {recoverable.track.status === "finished" ? "Review and save" : "Continue recording"}
                 </Button>
               )}

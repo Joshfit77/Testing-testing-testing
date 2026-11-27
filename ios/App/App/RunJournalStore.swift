@@ -32,7 +32,8 @@ public final class RunJournalStore {
         self.directory = directory
     }
 
-    /// Application Support/run-journal: not shown to the user, included in device backups only as iOS decides.
+    /// Application Support/run-journal: not shown to the user, and excluded from iCloud and computer backups (the
+    /// folder is marked when it is first written to): a route recorded on this phone never leaves it in a backup.
     public static func defaultDirectory() -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("run-journal", isDirectory: true)
@@ -90,20 +91,35 @@ public final class RunJournalStore {
         }
     }
 
-    /// Remove one recording's journal, or every journal when `key` is nil (sign-out, account deletion).
-    public func clear(key: String?) {
+    /// Remove one recording's journal, or every journal when `key` is nil (sign-out, account deletion). Returns true
+    /// only when it is confirmed gone afterwards, so the caller can try again later if it isn't.
+    @discardableResult
+    public func clear(key: String?) -> Bool {
         queue.sync {
             let fm = FileManager.default
-            if let key = key {
-                try? fm.removeItem(at: url(for: key))
-            } else {
-                try? fm.removeItem(at: directory)
-            }
+            let target = key.map { url(for: $0) } ?? directory
+            if fm.fileExists(atPath: target.path) { try? fm.removeItem(at: target) }
+            return !fm.fileExists(atPath: target.path)
         }
     }
 
+    /// Whether the journal folder is excluded from backups (false before anything has been written).
+    public func isExcludedFromBackup() -> Bool {
+        (try? directory.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup) == true
+    }
+
+    private var markedExcluded = false
+
     private func ensureDirectory() throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: Self.fileAttributes)
+        if !markedExcluded {
+            // Recorded routes are sensitive: keep them out of iCloud and computer backups (the whole folder).
+            var url = directory
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            try url.setResourceValues(values)
+            markedExcluded = true
+        }
     }
 
     /// Readable and writable while the phone is locked (after the first unlock since it started): a run recorded with

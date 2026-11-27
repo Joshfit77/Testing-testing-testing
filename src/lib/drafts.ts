@@ -91,7 +91,8 @@ export function clearAllDrafts(userId?: string): number {
   // A run still recording in the background of the app stops first, so it can't write its key back.
   stopKept();
   // Recorded routes kept for recovery (the web journal and the phone app's native journal) go too (O-01 clean-up).
-  clearRunJournalData(userId);
+  // The phone confirms the native deletion; until it does, the request is remembered and retried at the next start.
+  void clearRunJournalData(userId);
   const s = storage();
   if (!s) return 0;
   const perUser = [GPS_RECORDING_PREFIX, WORKOUT_DRAFT_PREFIX, WORKOUT_DISCARDED_PREFIX];

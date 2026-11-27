@@ -67,10 +67,13 @@ public class RunJournalStoreTest {
     public void clearOneAndClearAll() throws Exception {
         store.append("a", fix(1));
         store.append("b", fix(2));
-        store.clear("a");
+        // Deletion is confirmed, not assumed.
+        assertTrue(store.clear("a"));
         assertTrue(store.read("a").isEmpty());
+        assertFalse(store.fileFor("a").exists());
         assertEquals(1, store.read("b").size());
-        store.clear(null);
+        assertTrue(store.clear("a")); // nothing left to delete: still confirmed
+        assertTrue(store.clear(null));
         assertTrue(store.read("b").isEmpty());
         assertFalse(dir.exists());
     }

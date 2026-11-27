@@ -5,8 +5,8 @@
 select check_name, case when passed then 'ok' else 'FAILED: ' || detail end as result
 from (
   select 'migrations applied' as check_name,
-         (select count(*) from supabase_migrations.schema_migrations) >= 88 as passed,
-         (select count(*)::text || ' applied; expected at least 88 (through 098)' from supabase_migrations.schema_migrations) as detail
+         (select count(*) from supabase_migrations.schema_migrations) >= 89 as passed,
+         (select count(*)::text || ' applied; expected at least 89 (through 099)' from supabase_migrations.schema_migrations) as detail
   union all
   select 'row-level security on every public table',
          not exists (select 1 from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and not c.relrowsecurity),
@@ -30,6 +30,12 @@ from (
             and policyname in ('progress_photos_owner_insert', 'body_scans_owner_insert')
             and with_check like '%has_upload_reservation(bucket_id, name)%') = 2,
          'a photo insert policy does not require a reservation: re-run migration 097'
+  union all
+  select 'photo byte limits count the new file (099)',
+         pg_get_functiondef('public.enforce_progress_photo_quota()'::regprocedure) like '%v_size%'
+           and pg_get_functiondef('public.enforce_body_scan_photo_quota()'::regprocedure) like '%v_size%'
+           and exists (select 1 from pg_proc where proname = 'reserve_storage_upload' and pronargs = 3),
+         'the quota functions or the sized reservation are from before migration 099'
   union all
   select 'stored photos cannot be replaced (097)',
          not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and cmd in ('UPDATE', 'ALL')

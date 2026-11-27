@@ -132,7 +132,7 @@ export async function makeAdmin(user: TestUser): Promise<{ factorId: string; sec
  * Reserve a photo upload the way the app does before sending a file (migration 20261127000097): the progress-photos and
  * body-scans buckets only accept a file the member reserved. Returns 'ok', 'limit', or null when the call was refused.
  */
-export async function reserveUpload(client: SupabaseClient, bucket: string, path: string): Promise<string | null> {
-  const { data, error } = await client.rpc("reserve_storage_upload", { p_bucket: bucket, p_name: path });
+export async function reserveUpload(client: SupabaseClient, bucket: string, path: string, bytes?: number): Promise<string | null> {
+  const { data, error } = await client.rpc("reserve_storage_upload", bytes == null ? { p_bucket: bucket, p_name: path } : { p_bucket: bucket, p_name: path, p_bytes: bytes });
   return error ? null : (data as string);
 }

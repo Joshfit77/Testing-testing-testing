@@ -64,4 +64,22 @@ final class RunJournalStoreTests: XCTestCase {
     func testMissingJournalReadsEmpty() {
         XCTAssertTrue(store.read(key: "never-written").isEmpty)
     }
+
+    func testJournalFolderIsExcludedFromBackups() throws {
+        XCTAssertFalse(store.isExcludedFromBackup())
+        XCTAssertTrue(try store.append(key: "run.recording.a", fix: fix(0)))
+        XCTAssertTrue(store.isExcludedFromBackup())
+    }
+
+    func testClearConfirmsTheJournalIsGone() throws {
+        XCTAssertTrue(try store.append(key: "run.recording.a", fix: fix(0)))
+        XCTAssertTrue(try store.append(key: "run.recording.b", fix: fix(0)))
+        XCTAssertTrue(store.clear(key: "run.recording.a"))
+        XCTAssertTrue(store.read(key: "run.recording.a").isEmpty)
+        XCTAssertEqual(store.read(key: "run.recording.b").count, 1)
+        // Clearing what isn't there is also confirmed.
+        XCTAssertTrue(store.clear(key: "run.recording.a"))
+        XCTAssertTrue(store.clear(key: nil))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dir.path))
+    }
 }

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { NAVIGATE_EVENT } from "@/lib/in-app-navigation";
 import { reconcileNativeRunJournal } from "@/lib/native/run-journal";
+import { retryPendingNativeClears } from "@/lib/run/fix-journal";
 import { isRecoverable } from "@/lib/domain/gps-track";
 import { initNativeShell } from "@/lib/native";
 import { installSleepAlarmActions, syncSleepAlarmFromAccount } from "@/lib/native-alarm";
@@ -46,7 +47,11 @@ export function NativeInit() {
     // A GPS watcher left running by an earlier page (the web view reloaded mid-run) is stopped (O-03).
     void removeOrphanedWatchers();
     // A native run journal left recording with nothing to continue (a recording abandoned after a crash) is stopped.
-    void reconcileNativeRunJournal(canContinueRecording);
+    // Recorded routes whose deletion the phone hadn't confirmed (sign-out or account deletion just before the app was
+    // closed) are deleted first; then a journal left recording with nothing to continue is stopped.
+    void retryPendingNativeClears()
+      .catch(() => false)
+      .then(() => reconcileNativeRunJournal(canContinueRecording));
     return () => cleanups.forEach((c) => c());
   }, []);
   return null;

@@ -132,7 +132,10 @@ export async function reconcileBilling(
       let complete = true;
       let cursorFrozen = false;
       const windows: [number, number][] = [];
-      for (let a = since.getTime(); a < now.getTime(); a += WINDOW_MS) windows.push([a, Math.min(a + WINDOW_MS, now.getTime())]);
+      // Whole seconds (Stripe's `created` is in seconds), so consecutive windows meet exactly: no event is listed twice.
+      const first = Math.floor(since.getTime() / 1000) * 1000;
+      const end = Math.ceil(now.getTime() / 1000) * 1000;
+      for (let a = first; a < end; a += WINDOW_MS) windows.push([a, Math.min(a + WINDOW_MS, end)]);
       while (windows.length) {
         const [a, b] = windows.shift()!;
         if (!timeLeft()) {
@@ -141,7 +144,7 @@ export async function reconcileBilling(
         }
         const collected: Stripe.Event[] = [];
         let truncated = false;
-        for await (const event of stripe.events.list({ created: { gte: Math.floor(a / 1000), lt: Math.ceil(b / 1000) }, types: [...REPLAYED_STRIPE_EVENTS], limit: 100 })) {
+        for await (const event of stripe.events.list({ created: { gte: a / 1000, lt: b / 1000 }, types: [...REPLAYED_STRIPE_EVENTS], limit: 100 })) {
           if (collected.length >= maxEvents) {
             truncated = true;
             break;

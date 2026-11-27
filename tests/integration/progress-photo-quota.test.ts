@@ -125,6 +125,52 @@ describe.skipIf(!available)("progress photo upload limits", () => {
     expect(stored(total.id)).toBe(PHOTO_LIMITS.total);
   });
 
+  describe("exact byte limit at the boundary (migration 099; triggers installed)", () => {
+    const jpegOf = (bytes: number) => {
+      const b = Buffer.alloc(bytes);
+      b[0] = 0xff;
+      b[1] = 0xd8;
+      return b;
+    };
+    const send = async (u: TestUser, bytes: number, declare = bytes) => {
+      const name = `${u.id}/${crypto.randomUUID()}.jpg`;
+      await reserveUpload(u.client, BUCKET, name, declare);
+      return !(await u.client.storage.from(BUCKET).upload(name, jpegOf(bytes), { contentType: "image/jpeg", upsert: false })).error;
+    };
+    const used = (u: TestUser) => Number(sql(`select coalesce(sum((metadata->>'size')::bigint), 0) from storage.objects where bucket_id = '${BUCKET}' and name like '${u.id}/%'`)[0]![0]);
+
+    it("a file that lands exactly on the limit is accepted; one byte more is refused", async () => {
+      const m = await make("photos-exact");
+      seed(m.id, 1, { bytes: PHOTO_LIMITS.totalBytes - 1000 });
+      expect(await send(m, 1001)).toBe(false); // would pass the limit by one byte
+      expect(used(m)).toBe(PHOTO_LIMITS.totalBytes - 1000);
+      expect(await send(m, 1000)).toBe(true); // exactly at the limit
+      expect(used(m)).toBe(PHOTO_LIMITS.totalBytes);
+      expect(await send(m, 1)).toBe(false); // full
+    });
+
+    it("a client that declares a smaller size than it sends is still refused by the real size (no overshoot)", async () => {
+      const m = await make("photos-liar");
+      seed(m.id, 1, { bytes: PHOTO_LIMITS.totalBytes - 1000 });
+      expect(await send(m, 5000, 10)).toBe(false);
+      expect(used(m)).toBe(PHOTO_LIMITS.totalBytes - 1000);
+    });
+
+    it("simultaneous uploads near the limit: exactly as many land as fit, and the total never passes it", async () => {
+      const m = await make("photos-exact-burst");
+      seed(m.id, 1, { bytes: PHOTO_LIMITS.totalBytes - 3000 });
+      // 10 at once, all holding a reservation (granted here directly: reservations alone would allow only one this
+      // close to the limit, counting each pending upload as a full 8 MB), so the real-size check on the row written
+      // decides under contention.
+      const names = Array.from({ length: 10 }, () => `${m.id}/${crypto.randomUUID()}.jpg`);
+      sql(`insert into public.storage_upload_reservations (bucket_id, name, user_id, expires_at)
+           select '${BUCKET}', n, '${m.id}', now() + interval '15 minutes' from unnest(array[${names.map((n) => `'${n}'`).join(",")}]) n`);
+      const results = await Promise.all(names.map(async (n) => !(await m.client.storage.from(BUCKET).upload(n, jpegOf(1000), { contentType: "image/jpeg", upsert: false })).error));
+      expect(results.filter(Boolean)).toHaveLength(3);
+      expect(used(m)).toBe(PHOTO_LIMITS.totalBytes);
+    });
+  });
+
   it("one member at the limit doesn't affect another member", async () => {
     const full = await make("photos-full");
     const other = await make("photos-other");

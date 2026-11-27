@@ -168,8 +168,9 @@ public class RunJournalPlugin extends Plugin {
     public void clear(PluginCall call) {
         String key = call.getString("key");
         if (key == null || key.equals(activeKey)) stopUpdates();
-        store.clear(key);
-        call.resolve();
+        JSObject result = new JSObject();
+        result.put("cleared", store.clear(key));
+        call.resolve(result);
     }
 
     @Override

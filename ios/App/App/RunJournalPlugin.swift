@@ -133,8 +133,8 @@ public class RunJournalPlugin: CAPPlugin, CAPBridgedPlugin {
         let key = call.getString("key")
         DispatchQueue.main.async {
             if key == nil || key == self.recorder.activeKey { self.recorder.stop() }
-            self.recorder.store.clear(key: key)
-            call.resolve()
+            let cleared = self.recorder.store.clear(key: key)
+            call.resolve(["cleared": cleared])
         }
     }
 }

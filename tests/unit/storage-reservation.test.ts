@@ -12,6 +12,22 @@ describe("reserveUpload", () => {
     expect(c.rpc).toHaveBeenCalledWith("reserve_storage_upload", { p_bucket: "progress-photos", p_name: "u1/a.jpg" });
   });
 
+  it("sends the file's size when known (exact byte limit), and asks again without it on a database that predates sizes", async () => {
+    const c = client(async () => ({ data: "ok", error: null }));
+    expect(await reserveUpload(c, "progress-photos", "u1/a.jpg", 123456.4)).toBe("ok");
+    expect(c.rpc).toHaveBeenCalledWith("reserve_storage_upload", { p_bucket: "progress-photos", p_name: "u1/a.jpg", p_bytes: 123457 });
+    const older = client(async (_fn: unknown, args: unknown) =>
+      "p_bytes" in (args as object) ? { data: null, error: { code: "PGRST202", message: "Could not find the function" } } : { data: "ok", error: null },
+    );
+    expect(await reserveUpload(older, "progress-photos", "u1/a.jpg", 1000)).toBe("ok");
+    expect(older.rpc).toHaveBeenCalledTimes(2);
+    expect(older.rpc).toHaveBeenLastCalledWith("reserve_storage_upload", { p_bucket: "progress-photos", p_name: "u1/a.jpg" });
+    // A real refusal of the sized call is not retried without the size.
+    const refused = client(async () => ({ data: null, error: { code: "22023", message: "file larger than this bucket accepts" } }));
+    expect(await reserveUpload(refused, "progress-photos", "u1/a.jpg", 9_000_000)).toBe("error");
+    expect(refused.rpc).toHaveBeenCalledTimes(1);
+  });
+
   it("reports a reached limit, so the screen shows the limit message instead of uploading", async () => {
     expect(await reserveUpload(client(async () => ({ data: "limit", error: null })), "body-scans", "u1/s/front.jpg")).toBe("limit");
   });
@@ -46,6 +62,8 @@ describe("the photo screens reserve before every upload", () => {
     const reserve = src.indexOf("await reserveUpload(");
     const upload = src.indexOf(".upload(path");
     expect(reserve).toBeGreaterThan(0);
+    // The file's size goes with the reservation (exact byte limit, migration 099).
+    expect(src).toMatch(/await reserveUpload\(supabase, [A-Z_]+, path, [a-zA-Z.!\[\]]+\.size\)/);
     expect(upload).toBeGreaterThan(reserve);
     expect(src.match(/\.upload\(/g)?.length).toBe(1);
     // A file already there from a lost reply counts as uploaded; a refusal after a granted reservation isn't the limit.

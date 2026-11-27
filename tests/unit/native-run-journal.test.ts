@@ -11,6 +11,8 @@ let native = true;
 let platform = "ios";
 let status: { active: boolean; key?: string } = { active: false };
 let granted = true;
+/** What the phone answers to clear: confirmed, refused, or (old build) nothing. */
+let clearAnswer: unknown = { cleared: true };
 vi.mock("@capacitor/core", () => ({
   Capacitor: { isNativePlatform: () => native, isPluginAvailable: () => native, getPlatform: () => platform },
   registerPlugin: (name: string) =>
@@ -24,6 +26,7 @@ vi.mock("@capacitor/core", () => ({
           if (name === "RunJournal" && method === "read") return { fixes: nativeFixes };
           if (name === "RunJournal" && method === "status") return status;
           if (name === "RunJournal" && method === "ensurePermission") return { granted };
+          if (name === "RunJournal" && method === "clear") return clearAnswer;
           return undefined;
         },
       },
@@ -37,6 +40,7 @@ beforeEach(() => {
   platform = "ios";
   status = { active: false };
   granted = true;
+  clearAnswer = { cleared: true };
   localStorage.clear();
   vi.resetModules();
 });
@@ -148,5 +152,80 @@ describe("navigation started by native code", () => {
     } finally {
       Object.defineProperty(window, "location", { configurable: true, value: original });
     }
+  });
+
+  it("deletion is confirmed by the phone; an unconfirmed one is remembered and finished at the next app start", async () => {
+    const fj = await import("@/lib/run/fix-journal");
+    // Confirmed straight away: nothing left pending.
+    expect(await fj.clearRunJournalData("u1")).toBe(true);
+    expect(localStorage.getItem("ngf.runjournal.pendingClear")).toBeNull();
+    // The phone couldn't delete it (or the reply never came): remembered.
+    clearAnswer = { cleared: false };
+    expect(await fj.clearRunJournalData("u2")).toBe(false);
+    expect(JSON.parse(localStorage.getItem("ngf.runjournal.pendingClear")!)).toEqual(["run.recording.u2"]);
+    // An older app build that answers nothing counts as unconfirmed too.
+    clearAnswer = undefined;
+    expect(await fj.clearRunJournalData()).toBe(false);
+    expect(JSON.parse(localStorage.getItem("ngf.runjournal.pendingClear")!)).toEqual(["run.recording.u2", "*"]);
+    // Next app start: deleting everything covers both requests; once confirmed, nothing is pending.
+    clearAnswer = { cleared: true };
+    calls.length = 0;
+    expect(await fj.retryPendingNativeClears()).toBe(true);
+    expect(calls.filter((c) => c.method === "clear")).toEqual([{ plugin: "RunJournal", method: "clear", args: {} }]);
+    expect(localStorage.getItem("ngf.runjournal.pendingClear")).toBeNull();
+  });
+
+  it("a deletion cut short by leaving the page (sign-out navigates away) is still finished at the next start", async () => {
+    let answer: (v: unknown) => void = () => undefined;
+    clearAnswer = new Promise((r) => (answer = r)); // the phone never answers before the page goes
+    const { clearAllDrafts } = await import("@/lib/drafts");
+    clearAllDrafts("u5");
+    await flush();
+    expect(JSON.parse(localStorage.getItem("ngf.runjournal.pendingClear")!)).toEqual(["run.recording.u5"]);
+    // New page, fresh modules (the old promise is gone with the old page).
+    answer({ cleared: false });
+    vi.resetModules();
+    clearAnswer = { cleared: true };
+    calls.length = 0;
+    const { retryPendingNativeClears } = await import("@/lib/run/fix-journal");
+    expect(await retryPendingNativeClears()).toBe(true);
+    expect(calls).toContainEqual({ plugin: "RunJournal", method: "clear", args: { key: "run.recording.u5" } });
+    expect(localStorage.getItem("ngf.runjournal.pendingClear")).toBeNull();
+  });
+
+  it("discarding a recording asks for a confirmed deletion of its native journal", async () => {
+    const { clearNativeConfirmed } = await import("@/lib/run/fix-journal");
+    clearAnswer = { cleared: false };
+    expect(await clearNativeConfirmed("run.recording.u7")).toBe(false);
+    expect(JSON.parse(localStorage.getItem("ngf.runjournal.pendingClear")!)).toEqual(["run.recording.u7"]);
+    clearAnswer = { cleared: true };
+    expect(await clearNativeConfirmed("run.recording.u7")).toBe(true);
+    expect(localStorage.getItem("ngf.runjournal.pendingClear")).toBeNull();
+  });
+
+  it("in a browser there is no native journal: deletion is trivially complete and nothing is left pending", async () => {
+    native = false;
+    const { clearRunJournalData } = await import("@/lib/run/fix-journal");
+    expect(await clearRunJournalData("u1")).toBe(true);
+    expect(localStorage.getItem("ngf.runjournal.pendingClear")).toBeNull();
+  });
+});
+
+describe("recorded routes are kept out of device backups", () => {
+  it("Android: backups and device transfer are off, and the native journal is in the no-backup folder", async () => {
+    const { readFileSync } = await import("node:fs");
+    const manifest = readFileSync("android/app/src/main/AndroidManifest.xml", "utf8");
+    expect(manifest).toContain('android:allowBackup="false"');
+    const rules = readFileSync("android/app/src/main/res/xml/data_extraction_rules.xml", "utf8");
+    for (const section of ["cloud-backup", "device-transfer"]) expect(rules).toMatch(new RegExp(`<${section}[^>]*>[\\s\\S]*<exclude domain="root" />[\\s\\S]*</${section}>`));
+    expect(readFileSync("android/app/src/main/java/com/narrowgatefitness/app/runjournal/RunJournalPlugin.java", "utf8")).toContain("getNoBackupFilesDir()");
+  });
+
+  it("iOS: the journal folder is marked excluded from iCloud and computer backups (checked by XCTest in CI)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const store = readFileSync("ios/App/App/RunJournalStore.swift", "utf8");
+    expect(store).toContain("values.isExcludedFromBackup = true");
+    const tests = readFileSync("ios/RunJournalCore/Tests/RunJournalCoreTests/RunJournalStoreTests.swift", "utf8");
+    expect(tests).toContain("testJournalFolderIsExcludedFromBackups");
   });
 });

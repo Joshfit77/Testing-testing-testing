@@ -13,15 +13,24 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  */
 export type ReserveResult = "ok" | "limit" | "error" | "unchecked";
 
-export async function reserveUpload(supabase: SupabaseClient, bucket: "progress-photos" | "body-scans", path: string): Promise<ReserveResult> {
+export async function reserveUpload(supabase: SupabaseClient, bucket: "progress-photos" | "body-scans", path: string, bytes?: number): Promise<ReserveResult> {
   try {
+    // With the file's size the byte limit is checked exactly (migration 099).
+    if (bytes != null) {
+      const sized = await supabase.rpc("reserve_storage_upload", { p_bucket: bucket, p_name: path, p_bytes: Math.ceil(bytes) });
+      if (!sized.error) return answer(sized.data);
+      // A database with reservations (097) but not yet sizes (099): ask again without the size.
+      if (!isMissingFunction(sized.error)) return "error";
+    }
     const { data, error } = await supabase.rpc("reserve_storage_upload", { p_bucket: bucket, p_name: path });
     if (error) return isMissingFunction(error) ? "unchecked" : "error";
-    return data === "limit" ? "limit" : data === "ok" ? "ok" : "error";
+    return answer(data);
   } catch {
     return "error";
   }
 }
+
+const answer = (data: unknown): ReserveResult => (data === "limit" ? "limit" : data === "ok" ? "ok" : "error");
 
 function isMissingFunction(error: { code?: string; message?: string }): boolean {
   return error.code === "PGRST202" || error.code === "42883" || /could not find the function/i.test(error.message ?? "");

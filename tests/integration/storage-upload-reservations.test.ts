@@ -163,6 +163,29 @@ describe.skipIf(!available)("photo upload limits without storage triggers (uploa
     expect(MB8).toBe(Number(sql(`select file_size_limit from storage.buckets where id = 'progress-photos'`)[0]![0]));
   });
 
+  it("without triggers: a reservation knows the file's size, so the app's uploads stop exactly at the byte limit", async () => {
+    const m = await make("resv-exact");
+    seed("progress-photos", m.id, 1, { bytes: PHOTO_LIMITS.totalBytes - 1000 });
+    expect(await reserveUpload(m.client, "progress-photos", `${m.id}/${crypto.randomUUID()}.jpg`, 1001)).toBe("limit");
+    expect(await reserveUpload(m.client, "progress-photos", `${m.id}/${crypto.randomUUID()}.jpg`, 1000)).toBe("ok");
+    // A size larger than the bucket accepts is refused outright.
+    expect(await reserveUpload(m.client, "progress-photos", `${m.id}/${crypto.randomUUID()}.jpg`, 9 * 1024 * 1024)).toBeNull();
+  });
+
+  it("without triggers: a client lying about the size can end at most one file over, once, and is refused after", async () => {
+    const m = await make("resv-liar");
+    seed("progress-photos", m.id, 1, { bytes: PHOTO_LIMITS.totalBytes - 1000 });
+    const name = `${m.id}/${crypto.randomUUID()}.jpg`;
+    expect(await reserveUpload(m.client, "progress-photos", name, 10)).toBe("ok");
+    const big = Buffer.alloc(5000);
+    big[0] = 0xff;
+    big[1] = 0xd8;
+    expect((await m.client.storage.from("progress-photos").upload(name, big, { contentType: "image/jpeg" })).error).toBeNull();
+    const total = Number(sql(`select sum((metadata->>'size')::bigint) from storage.objects where bucket_id = 'progress-photos' and name like '${m.id}/%'`)[0]![0]);
+    expect(total - PHOTO_LIMITS.totalBytes).toBeLessThanOrEqual(8 * 1024 * 1024); // the documented bound: one file
+    expect(await reserveUpload(m.client, "progress-photos", `${m.id}/${crypto.randomUUID()}.jpg`, 1)).toBe("limit");
+  });
+
   it("Body Scan: a burst of 60 with none today: exactly 30 land", async () => {
     const m = await make("resv-scan-day", { scans: true });
     expect(await burst(m, "body-scans", 60, scanName(m))).toBe(SCAN_PHOTO_LIMITS.perDay);

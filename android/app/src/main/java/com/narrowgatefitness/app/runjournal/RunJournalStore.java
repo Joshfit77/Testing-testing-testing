@@ -104,14 +104,20 @@ public final class RunJournalStore {
     }
 
     /** Remove one recording's journal, or every journal when `key` is null (sign-out, account deletion). */
-    public synchronized void clear(String key) {
+    /**
+     * Remove one recording's journal, or every journal when {@code key} is null (sign-out, account deletion). Returns
+     * true only when it is confirmed gone afterwards, so the caller can try again later if it isn't. (The journal is
+     * in the app's no-backup folder, so it is never in a cloud backup or a device transfer either.)
+     */
+    public synchronized boolean clear(String key) {
         if (key != null) {
             File f = fileFor(key);
-            if (f.exists() && !f.delete()) f.deleteOnExit();
-            return;
+            if (f.exists()) f.delete();
+            return !f.exists();
         }
         File[] files = directory.listFiles();
-        if (files != null) for (File f : files) if (!f.delete()) f.deleteOnExit();
-        if (!directory.delete() && directory.exists()) directory.deleteOnExit();
+        if (files != null) for (File f : files) f.delete();
+        if (directory.exists()) directory.delete();
+        return !directory.exists();
     }
 }

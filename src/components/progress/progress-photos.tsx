@@ -112,7 +112,7 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
     if (reserved.current?.file !== file) reserved.current = { file, path: photoPathFor(userId, crypto.randomUUID()) };
     const path = pending.current?.path ?? reserved.current.path;
     if (!pending.current) {
-      const reservation = await reserveUpload(supabase, PROGRESS_PHOTO_BUCKET, path);
+      const reservation = await reserveUpload(supabase, PROGRESS_PHOTO_BUCKET, path, blob.size);
       if (reservation === "limit" || reservation === "error") {
         setStage("idle");
         return setError(reservation === "limit" ? PHOTO_LIMIT_MESSAGE : photoUploadErrorMessage(null));

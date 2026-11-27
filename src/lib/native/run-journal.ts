@@ -18,7 +18,7 @@ interface RunJournalNative {
   ensurePermission(): Promise<{ granted: boolean }>;
   stop(): Promise<void>;
   read(options: { key: string }): Promise<{ fixes: GpsFix[] }>;
-  clear(options: { key?: string }): Promise<void>;
+  clear(options: { key?: string }): Promise<{ cleared?: boolean } | void>;
 }
 
 const RunJournal = registerPlugin<RunJournalNative>("RunJournal");
@@ -58,13 +58,18 @@ export async function readNativeRunJournal(key: string): Promise<GpsFix[]> {
   }
 }
 
-/** Remove one recording's native journal, or all of them (sign-out, account deletion). Never throws. */
-export async function clearNativeRunJournal(key?: string): Promise<void> {
-  if (!hasNativeRunJournal()) return;
+/**
+ * Remove one recording's native journal, or all of them (sign-out, account deletion). Resolves true only when the
+ * phone confirmed it is gone (or there is no native journal here); false when it couldn't be confirmed, so the caller
+ * can try again. Never throws.
+ */
+export async function clearNativeRunJournal(key?: string): Promise<boolean> {
+  if (!hasNativeRunJournal()) return true;
   try {
-    await RunJournal.clear(key ? { key } : {});
+    const result = await RunJournal.clear(key ? { key } : {});
+    return Boolean(result && result.cleared === true);
   } catch {
-    /* nothing stored */
+    return false;
   }
 }
 
