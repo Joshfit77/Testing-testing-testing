@@ -229,9 +229,12 @@ describe.skipIf(!available)("account deletion closure: nothing that names the me
     await seed("bible_ai_messages", { user_id: u, thread_id: crypto.randomUUID(), role: "user", content: "Private Bible question" });
     await seed("bible_ai_usage", { user_id: u });
     await seed("faith_daily_goals", { user_id: u, goal_date: todayUtc, kind: "fitness" });
-    const journey = await seed("faith_journeys", { user_id: u, plan_kind: "gospels", duration_days: 30, start_on: "2026-10-01" });
-    await seed("faith_journey_attempts", { journey_id: journey.id, user_id: u, attempt_number: 1, started_on: "2026-10-01" });
-    await seed("faith_journey_checkins", { journey_id: journey.id, user_id: u, check_date: "2026-10-01", prayer_completed_at: "2026-10-01T12:00:00Z", prayer_source: "online" });
+    // Started today: the every-15-minutes settle job (faith-journeys-settle) has nothing to settle, so it can't add an
+    // attempt between this test's before/after row counts (a journey with missed days got a second attempt mid-test).
+    const today = new Date().toISOString().slice(0, 10);
+    const journey = await seed("faith_journeys", { user_id: u, plan_kind: "gospels", duration_days: 30, start_on: today });
+    await seed("faith_journey_attempts", { journey_id: journey.id, user_id: u, attempt_number: 1, started_on: today });
+    await seed("faith_journey_checkins", { journey_id: journey.id, user_id: u, check_date: today, prayer_completed_at: new Date().toISOString(), prayer_source: "online" });
     await seed("faith_reminder_prefs", { user_id: u, quiet_start: "22:00", quiet_end: "06:00" });
     const goal = await seed("discipline_goals", { user_id: u, title: "Daily prayer" });
     await seed("discipline_checkins", { goal_id: goal.id, user_id: u, checked_on: "2026-10-01" });
