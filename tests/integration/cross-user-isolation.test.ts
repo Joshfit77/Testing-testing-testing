@@ -213,11 +213,13 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
 
     // Accountability partners (migration 067). Alice must be user_a (the lower id of the pair) so that the probes
     // below, which filter on USER_TABLES' first column, reach her partnership.
-    for (let i = 0; i < 20 && !(carol && carol.id > u); i++) {
-      if (carol) await deleteTestUser(carol);
-      carol = await createTestUser("iso-carol");
-    }
-    if (!carol || carol.id <= u) throw new Error("couldn't create a partner with a higher id than Alice");
+    // Carol's id is chosen above Alice's up front. (Creating random accounts until one sorted higher failed when
+    // Alice's random id happened to start high, e.g. "f…": 20 tries were not always enough.)
+    let carolId = "";
+    for (let i = 0; i < 100_000 && !(carolId > u); i++) carolId = crypto.randomUUID();
+    if (!(carolId > u)) carolId = "ffffffff-ffff-4fff-bfff-ffffffffffff";
+    if (!(carolId > u)) throw new Error("Alice's id is the highest possible; no partner id can sort above it");
+    carol = await createTestUser("iso-carol", { id: carolId });
     await seed("accountability_invites", { inviter_id: u, code: generateInviteCode() });
     const partnership = await seed("accountability_partnerships", { user_a: u, user_b: carol.id });
     parents.accountability_partnerships = partnership.id!;
