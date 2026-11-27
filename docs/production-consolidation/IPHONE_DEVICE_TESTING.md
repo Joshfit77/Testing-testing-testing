@@ -20,7 +20,7 @@ Mark a test passed **only** after doing it on a real device. Use a TestFlight bu
 |---|---|---|---|
 | 1 | Install and first launch | Install from TestFlight; open | Opening screen, then Welcome; no crash; no white screen over 5 s |
 | 2 | Offline cold start | Airplane mode on; force-quit; open | "You're offline" page within a few seconds; "Read the Bible" opens a book; "Try again" works when back online |
-| 3 | Sign-up and email link | Sign up; open the confirmation email on the phone | The email opens the site (in Safari until universal links exist, O-05); sign in back in the app succeeds |
+| 3 | Sign-up and email link | Sign up; open the confirmation email on the phone | The email opens the site (in Safari until universal links are switched on: built and off, O-05); sign in back in the app succeeds |
 | 4 | Password reset | Profile → sign out → "Forgot password" → email link → new password | Can sign in with the new password |
 | 5 | Onboarding | Complete all questions | The plan summary appears; units are correct |
 | 6 | Onboarding offline | At the last step, airplane mode on, tap "Build my plan" | A message about being offline; answers kept; works when back online (fix B-15) |
@@ -36,7 +36,7 @@ Mark a test passed **only** after doing it on a real device. Use a TestFlight bu
 | 15a | Run journal survives a web-content reset | During a locked run, open 10–15 heavy apps (forces iOS to drop the web content), wait 5 min, return | Page may reload; the run continues and the 5 minutes are in the route (native recorder keeps running; journal merged on recovery) |
 | 15b | Notification tap during a run | During a run, tap a workout reminder or the alarm's "I'm up" | The app opens the target screen without a full reload; the run keeps recording (in-app navigation) |
 | 15c | Location permission | Fresh install; start the first run; choose "Allow While Using"; then later "Allow Once" | Recording works while using; with "Allow Once" the app explains when it stops. Note which prompt iOS shows: the community GPS plugin asks for "Always" on iOS, which we can't change from our code |
-| 16 | Guided interval cues | Start a guided run; lock | A vibration (and voice if on) at each phase change. Locked-screen cues may not work (O-04) |
+| 16 | Guided interval cues | Start a guided run; lock | A vibration (and voice if on) at each phase change. Record whether cues play with the screen locked (iOS may hold back web audio; O-04 wording on the screen is honest about it) |
 | 17 | HealthKit steps | Steps → Connect Apple Health | One permission sheet listing **read** Steps only; steps appear |
 | 18 | HealthKit sleep | Sleep → connect | A sheet listing Sleep, Heart Rate, HRV and Respiratory Rate, **read only**; nights appear; denying everything is handled calmly |
 | 19 | Barcode scanner | Nutrition → scan a packaged food | Camera permission asked; the product is found and logged with the right amount |
@@ -45,9 +45,10 @@ Mark a test passed **only** after doing it on a real device. Use a TestFlight bu
 | 22 | Progress photo | Progress → add a photo with the camera | Saved privately; shown in compare. Then airplane mode on just after tapping Save: "couldn't confirm" message, Save again online saves it once (no duplicate, image intact) |
 | 23 | Body Scan (Pro) | Run a guided scan with the timer | A countdown vibration; photos saved; measurements recorded |
 | 24 | Reminders | Turn on Faith and workout reminders; change the time zone ±8 h; reopen | Rescheduled to local times; none inside quiet hours |
-| 25 | Sleep "alarm" | Set an alarm 2 minutes ahead with Silent on and Sleep Focus on | Note whether it is audible (O-04); test Snooze from the lock screen with the app closed |
+| 25 | Sleep "alarm" | Set an alarm 2 minutes ahead with Silent on and Sleep Focus on | Note whether it is audible: it is a notification, not a system alarm, and the alarm screen says so (O-04). Test Snooze from the lock screen with the app closed |
 | 25a | Alarm follow-up and snooze share one slot | Set an alarm 2 minutes ahead; don't answer; wait the snooze time | One follow-up ring; tap Snooze on it: exactly one ring after the snooze time (not two); tap "I'm up": no further ring that morning, and tomorrow's alarm still scheduled |
 | 26 | Sign-out cleanup | With reminders and a running rest timer, sign out | No notifications arrive afterwards |
+| 26b | Discarding removes the route; Continue keeps it | Start a run, end the app (test 15), reopen Run and tap Continue at once; finish and check the route includes the minutes while the app was ended. Then repeat and tap Discard | Continue: the full route, nothing missing. Discard: the run is not offered again after reopening the app |
 | 26a | Sign-out removes recorded routes | Start a run, end the app (test 15), relaunch, sign out without reopening the run; sign in as another member | The other member is not offered the first member's run; the blue location indicator is gone |
 | 27 | Bible offline | Open a chapter, airplane mode, open another | The bundled Bible reads offline |
 | 28 | Prayer journal | Write an entry; force-quit mid-typing; reopen | The draft is kept; the saved entry is private |

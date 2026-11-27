@@ -72,8 +72,10 @@ These apply when a database built from an older branch is upgraded (from the ind
 3. **082:** unpublishes one retired exercise and removes it from curated programs.
 4. **Validated constraints and plain `create index` statements** (041, 049, 069, 081, 087 and others) lock their table
    briefly. On a large database, build those indexes beforehand with `create index concurrently`.
-5. **086 and 088:** create triggers on `storage.objects`. **Check on a hosted staging project first** (O-16): if hosted
-   Supabase refuses them, keep the policy layer and move the counting into an RPC.
+5. **086 and 088:** create triggers on `storage.objects`; if a hosted project refuses them, the migration only warns
+   (O-16). That is no longer a risk to the limits: since migration 097 every photo upload needs a reservation taken
+   under the member's lock (the RPC approach), and 099 makes the byte check exact where the triggers exist.
+   `npm run db:verify` reports both.
 
 No hosted database exists yet, so today none of these can affect real members.
 

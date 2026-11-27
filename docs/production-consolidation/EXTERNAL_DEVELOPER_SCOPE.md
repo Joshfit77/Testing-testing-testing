@@ -1,7 +1,7 @@
 # External developer handoff and scope
 
 For a contractor or agency picking up the remaining engineering work. Read MASTER_ENGINEERING_REPORT.md first, then
-BUG_FIX_REGISTER.md (open items O-01..O-20 with files, repro steps and hours).
+BUG_FIX_REGISTER.md (every item resolved so far, B-, O- and T-; what remains is R-01..R-07, which needs people, devices or accounts).
 
 ## Architecture
 
@@ -74,14 +74,18 @@ test enforces it).
 
 ## Scoped work and estimates
 
-All code work in the original scope (O-01 to O-20) and the third round (T-01 to T-26: native GPS persistence in Swift
+All code work in the original scope (O-01 to O-20) and the third round (T-01 to T-31: native GPS persistence in Swift
 and Java, billing at volume, trigger-free photo limits) is done, with tests (BUG_FIX_REGISTER.md). What remains needs a
 phone, an account or a hosted service. It is run as an AI-assisted engagement: Claude implements, the consultants
 direct, verify on real hardware and accounts, and review.
 
 - **Agenda, parallel tracks and hours:** `docs/engagement/ENGAGEMENT_AGENDA.md`:
-  - iOS launch with paid subscriptions: **25.5–41.5 h** ($9,818–$15,978 at $385/h);
-  - with Android: 29–47 h ($11,165–$18,095).
+  - iOS launch with paid subscriptions: **7.5–12 h** ($2,888–$4,620 at $385/h): the independent review (R-05), a
+    review of Claude's fixes for defects the founders find, and a short orientation;
+  - an escalation reserve of up to 4 h, used only if needed;
+  - with Android: 8–13 h.
+- **The founders** do the device, account, sandbox, staging and TestFlight steps, guided by Claude:
+  `docs/engagement/FOUNDER_TASKS.md`.
 - **Ready-to-paste prompts** for every remaining item: `docs/engagement/ISSUE_PROMPTS.md`.
 - **Specialist agents:** `.claude/agents/`: native-mobile, security, backend, database, payments, qa-testing.
 - **Repository rules for Claude:** `CLAUDE.md`.

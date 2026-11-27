@@ -19,7 +19,7 @@ console); **Device** = needs a physical phone; **Open** = engineering work remai
 | Privacy | Usage-description strings (camera, photos, location always/when in use, motion, HealthKit, notifications) | Done | `Info.plist`; wording reviewed by the mobile review |
 | HealthKit | Read-only types; no writes; health data never used for advertising | Done (code) / Device | Device tests 17–18 |
 | Guideline 2.1 | Demo account for App Review | Owner | `docs/DEMO_ACCESS_OPTIONS.md`; create a reviewer account on production |
-| Guideline 2.5.4 | Background location justified (run recording) | Open / Device | O-01, O-02: the "not yet verified on a phone" wording must change after device test 14 passes |
+| Guideline 2.5.4 | Background location justified (run recording) | Code done / Device | O-01 resolved (web journal, then the native Swift/Java recorder, T-01). O-02: the "not yet verified on a phone" wording changes once device test 14 passes (prompt P-01) |
 | Guideline 3.1.1 | Digital subscription sold only through In-App Purchase on iOS; no web checkout links | Done (code) / Device | `56717544` adds the native notice instead of any Stripe path; device test 31 |
 | Guideline 3.1.2 | Subscription terms, price, renewal and cancellation shown before purchase; Restore button | Done (code) / Device | Paywall screen; device tests 29–30 |
 | Guideline 3.1.2 | Products in App Store Connect: $17.99 monthly, $119.99 yearly | Owner | Prices must match the approved pricing; RevenueCat offering ids per `docs/MOBILE_BILLING.md` |
@@ -40,12 +40,12 @@ console); **Device** = needs a physical phone; **Open** = engineering work remai
 | Policy | Background location declaration and video | Owner / Device | Android device test 6 |
 | Policy | Foreground service type (location) declaration | Owner | Play Console form |
 | Billing | Play Billing products via RevenueCat at the approved prices | Owner | Google may localise prices |
-| Quality | Android 15 edge-to-edge, back button | Open | O-06, O-07 |
+| Quality | Android 15 edge-to-edge, back button | Code done / Device | O-06, O-07 resolved in code; Android device tests 3–4 |
 
 ## Blocks before submission (summary)
 
 1. Production deployment and final `CAP_SERVER_URL` (owner approval).
 2. Device tests in IPHONE_DEVICE_TESTING.md, especially GPS (14–15), purchases (29–31), HealthKit (17–18).
-3. O-02 wording change after those tests pass; O-01 recommended before relying on long locked-screen runs.
+3. O-02 wording change after those tests pass (O-01 is resolved in code; device tests 14–15c confirm it).
 4. Final privacy policy and terms published at public URLs.
 5. Store records, products at $17.99 / $119.99, reviewer account, screenshots.

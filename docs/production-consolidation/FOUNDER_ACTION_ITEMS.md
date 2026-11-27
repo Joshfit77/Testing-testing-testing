@@ -18,7 +18,8 @@ EXTERNAL_DEVELOPER_SCOPE.md. Ordered by what unblocks the most.
 1. **Apple Developer Program** membership and App Store Connect app record (`com.narrowgatefitness.app`).
 2. **Google Play Console** account (if launching on Android).
 3. **Production Supabase** project (Pro plan recommended; see REMAINING_COST_ESTIMATE.md), then let an engineer run
-   `supabase db push` against **staging first** (O-16).
+   `supabase db push` against **staging first**, then `npm run db:verify` (Claude prepares both; see the engagement
+   agenda).
 4. **Hosting** for the Next.js app (e.g. Vercel Pro) with the environment variables listed in `.env.example`.
 5. **RevenueCat** project; App Store and Play products at $17.99 monthly / $119.99 yearly.
 6. **Stripe** account for web subscriptions — keep in test mode until you approve live billing.

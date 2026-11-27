@@ -3,6 +3,32 @@
 Every figure below comes from an actual run. Nothing was skipped, disabled or weakened to get a pass. Where a test was
 changed, the reason is given (see also BUG_FIX_REGISTER.md).
 
+## Final-review head: `8b32c103` and the report commit after it (T-27..T-31)
+
+| Suite | Where | Result |
+|---|---|---|
+| Typecheck, lint (0 warnings) | This sandbox | **Passed** |
+| Unit tests | This sandbox | **302 files; 4,991 passed, 1 skipped**, 0 failed |
+| Fresh install of all 89 migrations + `npm run db:verify` | This sandbox | **Passed; 11 of 11 checks ok** (new: exact byte limit, migration 099) |
+| Integration tests, `REQUIRE_TEST_STACK=1`, after that fresh install | This sandbox | **103 files (1 skipped); 678 passed, 1 skipped**, 0 failed (the skip is the opt-in live Open Food Facts test) |
+| Production build | This sandbox | **Passed** |
+| Browser suite with mocks | This sandbox | **168 passed, 0 failed, 101 skipped**, 13.3 min; the opt-in suites behind the skips were run separately (next rows) |
+| **Opt-in:** device-size matrix (`E2E_DEVICE_MATRIX=1`) | This sandbox | **39 passed**: 74 phone models, 2,964 screens, **0 problems**, 0 navigation retries (23.2 min) |
+| **Opt-in:** demo-server suites (`E2E_DEMO=1`: demo, achievement-progress, demo-reset, 5 UX specs), local database reset for the demo | This sandbox | **58 passed, 0 failed, 0 skipped** (2.8 min) |
+| **Opt-in:** coach with no AI provider (separate server, no AI key) | This sandbox | **1 passed** |
+| **Opt-in:** tap every control | This sandbox | Passed on `89260c5b` (49 screens, 281 controls, 0 findings); the final-review changes don't touch those screens' controls |
+| **Opt-in, not run:** home-background photographs | — | Needs the photographs (`HOME_BACKGROUND_PHOTOS_READY`); they don't exist yet |
+| Java run-journal store (JUnit) | This sandbox | **5 of 5 passed** (confirmed deletion) |
+| Swift XCTest (backup exclusion, confirmed deletion), Android JVM tests, iOS build | GitHub | See the PR checks on the pushed head |
+
+**Failures met in this round, and what was done:**
+
+| Where | Failure | Cause | Action |
+|---|---|---|---|
+| `entitlements.test.ts` (new scale test) | 252 events listed for 250 | Window boundaries overlapped by a second, so events on a boundary second were listed twice (never applied twice) | Windows aligned to whole seconds |
+| `progress-photo-quota.test.ts` (new burst test) | 1 landed instead of 3 | The test's premise was wrong: reservations count each pending upload as a full 8 MB, so near the limit only one is granted (correct, conservative) | Reservations granted directly in the test so the real-size trigger check decides |
+| Coach test without an AI provider | Timed out at sign-up | Harness: an earlier server without the e2e rate-limit setting still held the port | Server restarted with the same setting as the mocked runner: passed |
+
 ## Round 3 head: `c71e652f` and the report commit after it (T-01..T-26)
 
 | Suite | Where | Result |

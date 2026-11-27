@@ -7,8 +7,9 @@ before buying. Nothing has been purchased.
 
 | Item | Low | High | Notes |
 |---|---|---|---|
-| Consultant engagement, iOS launch with paid subscriptions: 25.5–41.5 h (docs/engagement/ENGAGEMENT_AGENDA.md) | $9,818 | $15,978 | at $385/h, AI-assisted: Claude implements, consultants verify on devices and accounts, and review |
-| Consultant engagement including Android: 29–47 h | $11,165 | $18,095 | at $385/h |
+| Consultant engagement, iOS launch with paid subscriptions: 7.5–12 h (docs/engagement/ENGAGEMENT_AGENDA.md) | $2,888 | $4,620 | at $385/h: independent review, review of fixes, orientation. Founders do the device, account, sandbox and staging work with Claude's guidance (FOUNDER_TASKS.md) |
+| Escalation reserve, only if used: up to 4 h more | $0 | $1,540 | hands-on help if Claude and the founders can't resolve something within a day |
+| Consultant engagement including Android: 8–13 h (up to 17 with the reserve) | $3,080 | $6,545 | at $385/h |
 | Legal review of privacy policy and terms | $1,000 | $3,000 | health + faith + AI data |
 | Trademark search / filing (US, one class) | $350 | $1,500 | filing fee plus optional attorney |
 | Test devices (if you don't own them) | $0 | $600 | one used older iPhone; optional Android |
@@ -33,7 +34,8 @@ kill switches; set a monthly limit in the Anthropic console as a second guard.
 
 ## What this work avoided
 
-Everything in this consolidation (fixes B-01..B-22, O-01..O-20 and T-01..T-26, migrations 088–098, the native
+Everything in this consolidation (fixes B-01..B-22, O-01..O-20 and T-01..T-31, migrations 088–098, the native
 Swift/Java recorder, tests, scripts, reports) was done without new dependencies, paid services or recurring costs.
 Doing the O-items by hand at $385/h was estimated at 45–90 hours for the launch minimum ($17,325–$34,650). The
-remaining 25.5–41.5 hours are verification on devices and accounts and independent review, which need a person.
+remaining consultant work is 7.5–12 hours of independent review (up to 16 with the escalation reserve). The device,
+account, sandbox and staging steps are done by the founders, about 17–26 hours of their own time, guided by Claude.

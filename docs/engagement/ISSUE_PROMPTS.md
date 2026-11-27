@@ -41,8 +41,8 @@ Attached: <screen recording>, <Xcode console or `adb logcat` excerpt around the 
 
 ## P-03: Staging database deploy and verification (R-03, O-16)
 
-**Agent:** database · **Needs:** a staging Supabase project (owner creates it; Pro plan) and its database URL in the
-consultant's shell, never in chat.
+**Agent:** database · **Run by:** a founder (F-2) · **Needs:** a staging Supabase project (owner creates it; Pro
+plan) and its database URL in the founder's terminal, never in chat.
 
 ```
 Use the database agent. Deploy the migrations to the STAGING Supabase project only (never production):

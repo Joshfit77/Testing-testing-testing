@@ -46,15 +46,19 @@ The single source is `APPROVED_PRO_PRICE_CENTS` in `src/lib/domain/plans.ts`.
 - **B-02:** account deletion expires open checkout pages.
 - **B-03:** the price guard refuses multi-interval, metered or multi-currency prices.
 
-## Open billing items
+## Billing items found earlier (all resolved in code)
 
-These are in BUG_FIX_REGISTER.md:
+Details in BUG_FIX_REGISTER.md:
 
-- **O-08:** an admin grant ending can hide a paid plan until the next event.
-- **O-09:** reconcile doesn't repair lost refund or transfer events.
-- **O-10:** one store purchase on two accounts. Partly owner configuration in RevenueCat.
+- **O-08 (resolved):** an ended admin grant is recomputed at the next reconciliation, however long ago it ended (T-10).
+- **O-09 (resolved):** reconciliation replays Stripe's event log from a stored cursor (outages up to Stripe's 30 days,
+  paged, busy windows split, a failing event can't stop it) and rotates store members through RevenueCat (T-07,
+  T-08, T-18, T-19, T-21).
+- **O-10 (resolved in code):** one store purchase grants one account; concurrent restores neither deadlock nor
+  double-grant (T-09, T-20). The owner still sets RevenueCat's transfer behaviour (step 4 below).
 
-All block **paid subscriptions**, not TestFlight.
+What remains for paid subscriptions is verification with real accounts (App Store sandbox, Stripe test mode), not
+code.
 
 ## Before taking real money
 
@@ -75,7 +79,7 @@ See also FOUNDER_ACTION_ITEMS.md.
 
 6. Sandbox purchase tests on a real iPhone: buy, restore, cancel, expire, refund, billing issue, delete account.
 7. Stripe test mode on staging: checkout, renewal (test clock), failed payment, refund, dispute.
-8. Fix O-08 and O-09; reconcile dashboards against the app's tables.
+8. Reconcile the Stripe and RevenueCat dashboards against the app's tables after the sandbox tests (O-08 and O-09 are fixed in code).
 
 **Legal:**
 

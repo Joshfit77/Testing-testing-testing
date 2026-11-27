@@ -27,8 +27,8 @@ was delivered to the owner privately.
 |---|---|---|---|
 | Critical | 0 | — | 0 |
 | High | 0 code issues. Operational items: public repository, no backups, GitHub protections not yet switched on | — | 3 (owner / infrastructure) |
-| Medium | 7 | 6 (N-1, N-2, consent F2, F3, F1 indexes, S-12) | Bot protection keys; no member two-step sign-in; storage-trigger deploy check (O-16) |
-| Low | 8+ | 5 | See BUG_FIX_REGISTER.md (O-18 etc.) |
+| Medium | 7 | 6 (N-1, N-2, consent F2, F3, F1 indexes, S-12) | Bot protection keys; no member two-step sign-in. (The storage-trigger deploy risk, O-16, is resolved: photo limits hold without the triggers, T-11, T-24, migration 099) |
+| Low | 8+ | 5 + O-18 | None open in code (BUG_FIX_REGISTER.md) |
 
 ## Fixed in this branch (verified, with regression tests)
 
@@ -78,6 +78,6 @@ was delivered to the owner privately.
 | GitHub ruleset and `testflight` environment not switched on | High until done | Owner (`docs/security/GITHUB_PROTECTION.md`) |
 | Bot protection (Turnstile) keys not set | Medium | Owner, before external testers |
 | No two-step sign-in for members (admins have it) | Medium | Engineer; recommended for accounts holding health data |
-| Storage triggers may need a different approach on hosted Supabase (O-16) | Medium (deploy) | Engineer with staging access |
+| ~~Storage triggers may need a different approach on hosted Supabase (O-16)~~ Resolved: upload reservations enforce the photo limits without triggers (097, 099); the triggers add exact byte checks where installed | — | Confirmed by `npm run db:verify` on staging (founder runs it) |
 | Independent penetration test | Recommended before payments | External |
 | Session cookies readable by page scripts (`@supabase/ssr` default; mitigated by the CSP) | Medium (accepted) | Engineer review |

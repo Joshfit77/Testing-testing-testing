@@ -3,97 +3,97 @@
 **Model:** Claude is the primary engineer. It has implemented every code change it can make without a phone, an
 account or a hosted service:
 
-- all 20 open items (O-01 to O-20), each with a regression test;
-- a third round (T-01 to T-26 in BUG_FIX_REGISTER.md), including:
+- all 20 items that were open (O-01 to O-20), each with a regression test;
+- a third round (T-01 to T-31 in BUG_FIX_REGISTER.md), including:
   - native Swift and Java GPS persistence;
   - route clean-up on sign-out and deletion;
   - billing at volume;
   - photo limits that hold without storage triggers;
   - the fixes from five independent reviews.
 
-The consultants:
+**Who does what (restructured to minimise consultant hours):**
 
-- **direct** Claude with the prompts in `ISSUE_PROMPTS.md`;
-- **bring back the evidence** only a person with devices and accounts can produce;
-- **review** Claude's diffs.
+- **The founders** do the operational work, guided step by step by Claude: device testing, account and store
+  configuration, sandbox payments, the staging commands and the TestFlight workflow (FOUNDER_TASKS.md).
+- **Claude** keeps doing all the engineering: it prepares every step, reads every result, finds the root cause of
+  every failure, writes the fix with a test, and updates the checklists.
+- **Consultants** only do what needs independent engineering judgement: the independent review before merge, and a
+  review of the fixes that come out of the founders' tests. A small reserve covers problems Claude and the founders
+  can't solve within a day.
 
-Consultants write code only where review shows Claude can't.
-
-**Rate:** $385/hour. **Before the first session:** the consultant runs `npm run setup` and `npm run verify` (about 20
-minutes, mostly unattended) and reads CLAUDE.md and `docs/production-consolidation/MASTER_ENGINEERING_REPORT.md`.
-
-## What the consultants are for
-
-| Needs a person because… | Work |
-|---|---|
-| Only hardware shows it | Locked-screen GPS, HealthKit permission sheets, notification sound under Silent/Focus, keyboard and safe areas, Android edge-to-edge |
-| Only real accounts can do it | Signing, TestFlight upload, App Store Connect products and privacy label, sandbox purchases, Stripe test mode, RevenueCat settings |
-| Only a hosted service can confirm it | `supabase db push` to staging (storage-trigger privilege), cron jobs, load with real network latency |
-| Independent judgement | A second pair of eyes on security- and money-critical diffs before merge |
+**Rate:** $385/hour. **Before the first session:** the consultant reads CLAUDE.md,
+`docs/production-consolidation/MASTER_ENGINEERING_REPORT.md` and this agenda, and runs `npm run setup` and
+`npm run verify` (about 20 minutes, mostly unattended).
 
 ## Agenda (prioritised; tracks run in parallel)
 
-| Order | Item | Track | Depends on | Consultant role | Claude role | Hours | Blocks |
-|---|---|---|---|---|---|---|---|
-| 0 | Kickoff: walk the baseline, accounts and access, agree the order | all | setup done | Lead | Answers questions about the code from the repo | 1–1.5 | — |
-| 1 | **R-05** independent review of the consolidation PR (prompt P-09): security, payments, and the new native code (about 600 lines of Swift and Java) | A (no device) | — | Security + payments reviewer: read the findings, accept or reject each, review the native recorder | Runs the specialist agents, writes findings with traced paths, implements accepted fixes with tests | 5–7 | Merge |
-| 2 | **R-03** staging database deploy (085 → 098), `db:verify`, cron jobs, staging load test including writes (P-03, P-04) | A | Owner: staging Supabase + hosting | Runs the commands Claude prepares in their shell; reads dashboards | Prepares and interprets everything; extends the load test; fixes anything found | 2.5–4 | Launch |
-| 3 | **R-04** release engineering: signing, TestFlight build, App Store Connect record, privacy label (P-08) | B (accounts) | Owner: Apple Developer access | Operates Xcode / App Store Connect | Checks configuration, writes the checklists, fixes build issues | 3–5 | TestFlight |
-| 4 | **R-01** iPhone device pass, IPHONE_DEVICE_TESTING.md (41 tests, including the native journal, notification taps mid-run, alarm slot and sign-out clean-up), then the O-02 wording (P-01, P-02) | B | Item 3 | Runs or supervises the tests (one includes a 30-minute outdoor run) and records evidence | Triages every failure to a root cause, fixes it with a test, updates the checklist | 7–11 | Launch, paid |
-| 5 | **R-02** payments: App Store sandbox purchase, restore, transfer; Stripe test mode on staging (P-05, P-06) | C (accounts) | Items 2 and 3 | Performs purchases, refunds and portal changes | Gives the expected database state after each step, compares, fixes differences with tests | 3–5 | Paid |
-| 6 | Universal links activation (P-07) | B | Owner: Team ID, Associated Domains, domain | Confirms the Apple capability, checks on a phone | Runs the script, verifies `.well-known` responses, updates device test 3 | inside item 4 | — |
-| 7 | **R-06** Android device pass and Play Console (P-10), including permission-first and the native journal | D (optional) | APK workflow | Runs ANDROID_DEVICE_TESTING.md | Triage and fixes | 3.5–5.5 | Android launch |
-| 8 | **R-07** contingency for defects the above find | — | — | Reviews Claude's fixes, re-runs the device test | Implements | 4–8 | — |
+| Order | Item | Who | Depends on | Claude's role | Consultant hours | Blocks |
+|---|---|---|---|---|---|---|
+| F-1 | Accounts and settings (Apple, App Store Connect, RevenueCat, Stripe test mode, staging Supabase, hosting, GitHub protections, Turnstile) | Founders | — | Exact checklist; checks every setting from screenshots | 0 | Everything below |
+| F-2 | **R-03** staging deploy (085 → 099), `db:verify`, cron jobs, staging load test | Founders run the commands | F-1 | Prepares and interprets everything; fixes anything found with tests | 0 | Launch |
+| F-3 | **R-04** TestFlight build through the iOS workflow, install | Founders | F-1 | Walks through the guide, reads the logs, fixes build issues | 0 | TestFlight |
+| F-4 | **R-01** iPhone device pass (42 tests), then the O-02 wording | Founders | F-3 | Triages each failure to a root cause, fixes it with a test, says what to re-test | 0 | Launch, paid |
+| F-5 | **R-02** App Store sandbox and Stripe test-mode payments | Founders | F-1, F-3 | Gives the expected database state for each step, compares, fixes differences | 0 | Paid |
+| F-6 | Universal links activation | Founders | F-1 | Runs the script, checks `.well-known` | 0 | — |
+| F-7 | **R-06** Android device pass (optional) | Founders | APK workflow | As F-4 | 0 | Android launch |
+| C-1 | Orientation: read the reports, run setup and verify | Consultant | — | Answers questions from the repo | 0.5–1 | — |
+| C-2 | **R-05** independent review of the consolidation PR (P-09): security, payments, and the native code (about 600 lines of Swift and Java) | Consultant (security/payments, with native experience) | — | Runs the specialist agents, writes findings with traced paths, implements accepted fixes with tests | 5–7 | Merge |
+| C-3 | **R-07** review of Claude's fixes for defects the founders find (device, sandbox, staging) | Consultant | F-2..F-5 | Implements every fix with a test | 2–4 | Merge of those fixes |
+| C-4 | Escalation reserve: hands-on help only if Claude and the founders can't resolve something within one working day (Xcode signing, a device behaviour Claude can't reproduce, an App Review rejection) | Consultant | as needed | Prepares the facts and a proposed fix | 0–4 (only if used) | — |
 
-**Parallel from day 1:** track A (items 1, 2) needs no device. Track B starts once the owner grants Apple access.
-Track C starts when staging and a TestFlight build exist. Track D is independent. With two consultants (one
-security/payments, one mobile), the calendar time is about one week, limited mainly by Apple processing and device
-testing.
+**Parallel from day 1:** C-1 and C-2 need no device or account and start at once. F-1 starts at once too. F-2, F-3
+and F-6 follow F-1; F-4 and F-5 follow F-3. C-3 runs as fixes arrive. Calendar time is about one week, limited by
+Apple's processing and the device tests.
 
-### Why each item needs a person
+### Why each consultant item needs a consultant
 
-| Item | Why Claude can't do it |
+| Item | Why Claude or the founders can't do it |
 |---|---|
-| 0 Kickoff | Granting account access and choosing priorities are the owner's decisions |
-| 1 R-05 review | The reviews so far were Claude's own agents reviewing Claude's code. Money- and security-critical code needs an accountable human reviewer before merge |
-| 2 R-03 staging | Needs the staging project's credentials and the owner's approval to change a hosted database. Claude prepares every command and reads the results |
-| 3 R-04 release | Signing certificates, the Apple Developer account, Xcode with the owner's Apple ID, and App Store Connect are not available to Claude |
-| 4 R-01 iPhone | Locked-screen GPS, permission sheets, notification sound, keyboard and safe areas only show on a real iPhone. The native recorder compiles and its store is unit-tested; its behaviour with iOS suspending the app can't be simulated |
-| 5 R-02 payments | Sandbox purchases need a sandbox Apple ID on a device; Stripe test mode needs the owner's test keys on staging |
-| 7 R-06 Android | A physical Android device and the Play Console account |
-| 8 R-07 | Depends on what the device and account passes find; Claude writes the fixes, a person re-runs them on the device |
+| C-2 independent review | So far Claude's own agents have reviewed Claude's code. Security- and money-critical code needs an accountable human engineer before merge, and the founders aren't engineers |
+| C-3 review of fixes | Fixes for device-only defects change native and payment code; the same independence applies |
+| C-4 reserve | A few problems (certificates, a platform behaviour seen only on one device) go faster with someone who has solved them before at a Mac. Kept small and used only when needed |
+
+The founders' tasks need hands, accounts and phones rather than engineering judgement. Each one has exact expected
+results written from the code, and Claude handles every failure, so a consultant adds little there.
 
 ## Hours and cost (remaining work only)
 
 | Scope | Consultant hours | At $385/h |
 |---|---|---|
-| **iOS launch with paid subscriptions** (items 0–6 and 8) | **25.5–41.5** | **$9,818–$15,978** |
-| Plus Android (item 7) | 29–47 | $11,165–$18,095 |
+| **iOS launch with paid subscriptions** (C-1 to C-3) | **7.5–12** | **$2,888–$4,620** |
+| Including the escalation reserve, if fully used (C-4) | up to 16 | up to $6,160 |
+| Plus Android (more fixes for C-3 to review) | 8–13, up to 17 with the reserve | $3,080–$5,005, up to $6,545 |
+
+**Founder time (not billed):** about 17–26 hours for the iOS launch with paid subscriptions, plus 3–5 for Android.
+It is spread over about a week (FOUNDER_TASKS.md).
 
 ### How this was recalculated
 
-- **The original 45–90 hours** (launch minimum, with consultants writing the fixes) are no longer needed: that code
-  is written and tested, now including the native Swift/Java recorder, billing at volume and trigger-free quotas.
-- **The previous estimate (24–41 h)** was for verification and review only. It changes by item:
-  - **R-05:** up 1 hour (4–6 → 5–7): there is more to review (native code, migrations 096–098).
-  - **R-01:** up 1 hour (6–10 → 7–11): 5 more device tests for the native behaviour.
-  - **R-06:** up 0.5 hours (3–5 → 3.5–5.5): 2 more Android tests.
-  - **R-03:** down 0.5–1 hour (3–5 → 2.5–4): the storage-trigger question can no longer block a deploy.
-  - **Every other item:** unchanged.
-- **Net: the remaining hours rise slightly.** This round added code that a person must check on a device and review,
-  and none of it can be verified without them. The estimate was not lowered to look better.
+- **The original 45–90 hours** assumed consultants would write the fixes. That code is written and tested.
+- **The previous 25.5–41.5 hours** assumed consultants would also run the device, account, sandbox and staging work.
+  Those items move to the founders, guided by Claude:
+  - R-01: 7–11 h;
+  - R-02: 3–5 h;
+  - R-03: 2.5–4 h;
+  - R-04: 3–5 h;
+  - R-06: 3.5–5.5 h.
+- **Kickoff** becomes a short orientation (1–1.5 → 0.5–1 h).
+- **Contingency** becomes a review of Claude's fixes (R-07: 4–8 → 2–4 h), plus a reserve that is only used if needed
+  (0–4 h).
+- **R-05 stays at 5–7 hours.** The independent review is the one item where a consultant's judgement is the
+  point, so it is not reduced.
 
-### Why they aren't lower
+### Why the hours aren't lower
 
-- Device testing takes real time: a 30-minute outdoor run, permission flows on fresh installs, overnight alarm and
-  reminder checks.
-- App Store Connect and TestFlight processing involve waiting.
-- Sandbox purchase flows run step by step.
-- The range's upper end assumes a few device-only defects (item 8), which is normal for a first native build.
+- **The review:** an independent review of security-, payment- and native-critical code can't responsibly be done
+  in less time.
+- **Device defects:** a first native build usually produces a few device-only defects, and each fix needs review.
+- **Founder time:** the founders' hours are real time, even though they aren't billed. If they can't give about 17–26
+  hours over a week, move F-4 (device pass) back to a consultant at 7–11 hours.
 
 **Not included:**
 
-- the founder's own time (accounts, legal review, beta testers);
+- legal review;
 - Apple review time;
 - an optional external penetration test.
 

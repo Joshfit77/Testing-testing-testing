@@ -70,7 +70,7 @@ then run in the full suite. "Device" means the code is done but its behaviour on
 | O-19 | Low: integration suites skipped silently | `REQUIRE_TEST_STACK=1` (CI, `npm run verify`) fails instead | `13d7db30` | Verified both ways | — |
 | O-20 | Low: sleep test across midnight UTC | Tests that would start within 4 minutes of midnight wait until after it | `13d7db30` | — | — |
 
-## Third round (2026-11-26): native persistence, billing at volume, trigger-free quotas, review fixes (T-01..T-26)
+## Third round (2026-11-26): native persistence, billing at volume, trigger-free quotas, review fixes (T-01..T-31)
 
 Each item was verified in the code first. "Fails on old code" means the new test was run against the previous version
 of the file and failed.
@@ -110,6 +110,16 @@ reproduced or traced before fixing:
 | T-25 | Medium | A retry after a lost upload reply got "already exists" forever | The screens treat that answer for their own random name as uploaded | `c71e652f` | Integration test with the real storage answer; unit tests |
 | T-26 | Low | A refusal after a granted reservation showed the photo-limit message (inviting deletions); the deploy-order note was wrong | Retry message instead; note corrected | `c71e652f` | `storage-reservation.test.ts` |
 
+**Final review concerns (independent GitHub review after round 3), each investigated in the code first:**
+
+| # | Severity | Concern | Finding and fix | Commit | Proof |
+|---|---|---|---|---|---|
+| T-27 | Medium | Native GPS recovery racing "Continue recording" | Real: the native read merged into the offer, which Continue had already cleared, so the native fixes were dropped and then deleted on save. Continue now waits for the read (5 s at most), merges first, ignores a second tap | `8b32c103` | `gps-recorder-native-race.test.tsx`, fails on the previous code |
+| T-28 | Medium (privacy) | Native journal files in device backups | Real on iOS: Application Support is backed up by default; the journal folder is now excluded from iCloud and computer backups. Android was already excluded (no-backup folder, backups off), now guarded by a test | `8b32c103` | XCTest `testJournalFolderIsExcludedFromBackups`; `native-run-journal.test.ts` |
+| T-29 | Medium (privacy) | GPS deletion completion on sign-out, account deletion and discard | Real: deletion was requested and assumed (Swift ignored failures; Java relied on `deleteOnExit`; the web side didn't wait). Both stores now confirm the file is gone; each request is recorded before it is sent and removed only on confirmation; unconfirmed ones are finished at the next app start | `8b32c103` | XCTest and JUnit (confirmed clear); unit tests for confirmed, refused, unanswered and cut-short deletions |
+| T-30 | Low | Stripe reconciliation pagination, limits, outages, scale | Verified with a paging stand-in: 250 events over 20 days across pages and windows, each applied once; a time-limited run keeps its place; an outage longer than 30 days. Found and fixed: boundary seconds were listed in two windows (no double processing, but double listing) | `8b32c103` | `entitlements.test.ts` (3 new tests) |
+| T-31 | Low (cost) | Storage byte limit at boundaries and under concurrency | The limit allowed up to one file (8 MB) over. Measured that the row the storage service writes carries the real size: the triggers now refuse a file that would pass the limit by even one byte (migration 099). Sized reservations make the app exact without triggers; a lying client is bounded to one file over, once (documented) | `8b32c103` | Boundary tests (exactly at, one byte over, simultaneous, declared vs real); the declared-vs-real test fails on the previous trigger |
+
 **Platform limits, documented rather than fixed:**
 
 - After a **force-quit** iOS stops all location updates for the app: nothing after that moment can be recorded by
@@ -120,12 +130,12 @@ reproduced or traced before fixing:
 
 ## What remains (each needs a phone, an account or a hosted service)
 
-| # | Severity | Description | Who | Hours (with Claude) | TF | Launch | Paid |
+| # | Severity | Description | Who | Consultant hours (founder time) | TF | Launch | Paid |
 |---|---|---|---|---|---|---|---|
-| R-01 | High | Physical iPhone run of IPHONE_DEVICE_TESTING.md, especially GPS (14–16), purchases (29–31), HealthKit (17–18), alarm (25); then O-02 wording | Founder + mobile consultant; Claude fixes findings | 6–10 | No | Yes | Yes |
-| R-02 | High | App Store sandbox purchase, restore, transfer; Stripe test-mode checkout, portal, refund on staging | Payments consultant + founder accounts | 3–5 | No | No | Yes |
-| R-03 | Medium | Staging: `supabase db push` (085 → 098), `npm run db:verify`, cron jobs (billing reconcile now drains backlogs over several runs), staging load test including writes. The storage-trigger question no longer blocks: limits hold without triggers (T-11) | Backend/DevOps consultant | 2.5–4 | No | Yes | No |
-| R-04 | Medium | Release engineering: signing, TestFlight upload, App Store Connect record, Associated Domains, privacy label | iOS consultant + founder | 3–5 | Yes | Yes | No |
-| R-05 | Medium | Independent review of the consolidation PR (security and payments focus) | Security + payments consultants | 4–6 | No | Yes | Yes |
-| R-06 | Low | Android device pass, Play Console, Health Connect declaration | Mobile consultant | 3–5 | n/a | Android only | Android only |
-| R-07 | — | Contingency: defects found by R-01..R-06 (Claude implements, consultant reviews) | Claude + consultant | 4–8 | — | — | — |
+| R-01 | High | Physical iPhone run of IPHONE_DEVICE_TESTING.md (42 tests), especially GPS (14–15c), purchases (29–31), HealthKit (17–18), alarm (25, 25a); then O-02 wording | Founders (F-4); Claude triages and fixes findings | 0 consultant (7–10 founder) | No | Yes | Yes |
+| R-02 | High | App Store sandbox purchase, restore, transfer; Stripe test-mode checkout, portal, refund on staging | Founders (F-5); Claude gives expected states and fixes differences | 0 consultant (2–3 founder) | No | No | Yes |
+| R-03 | Medium | Staging: `supabase db push` (085 → 098), `npm run db:verify`, cron jobs (billing reconcile now drains backlogs over several runs), staging load test including writes. The storage-trigger question no longer blocks: limits hold without triggers (T-11) | Founders run Claude's commands (F-2) | 0 consultant (1.5–2.5 founder) | No | Yes | No |
+| R-04 | Medium | Release engineering: signing, TestFlight upload through the iOS workflow, App Store Connect record, Associated Domains, privacy label | Founders (F-1, F-3, F-6); consultant only if escalated (C-4) | 0 consultant (2–4 founder) | Yes | Yes | No |
+| R-05 | Medium | Independent review of the consolidation PR (security, payments and the native recorder) | Consultant (C-2) | 5–7 | No | Yes | Yes |
+| R-06 | Low | Android device pass, Play Console, Health Connect declaration | Founders (F-7) | 0 consultant (3–5 founder) | n/a | Android only | Android only |
+| R-07 | — | Defects found by R-01..R-06: Claude implements with tests, consultant reviews (C-3); escalation reserve (C-4) only if needed | Claude + consultant | 2–4 (+0–4 reserve) | — | — | — |

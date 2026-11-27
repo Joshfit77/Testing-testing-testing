@@ -21,7 +21,7 @@
   - 61 server-action calls no longer send a network blip to the error page;
   - migrations 094–095 make row security cheaper and index the new billing lookups.
 
-- **A third round (2026-11-26) closed the gaps that round left (T-01..T-26):**
+- **A third round (2026-11-26) closed the gaps that round left (T-01..T-31):**
   - **GPS:** a native recorder in Swift and Java keeps writing fixes while iOS suspends the web view or ends the
     app, and recovery merges them without double counting.
   - **Privacy:** recorded routes are removed on sign-out and account deletion.
@@ -35,11 +35,20 @@
 
   Two independent reviews of this round's own changes found 9 more defects (one a regression the round had
   introduced). All 9 are fixed, each with a test that fails without the fix.
-- **What remains needs a phone, an account or a hosted service** (R-01..R-07). It is planned as an AI-assisted
-  engagement of **25.5–41.5 consultant hours** ($9,818–$15,978; docs/engagement/ENGAGEMENT_AGENDA.md). That is
-  slightly more than before: there is now more native code to check on a device and review.
-- **The database upgrades from `main` with all synthetic data preserved** (round 1), and a fresh install of all 88
-  migration files succeeds with every post-deploy check ok (round 3).
+- **Final review concerns (T-27..T-31), all resolved with tests:**
+  - **GPS recovery:** "Continue recording" can no longer race the native journal's read.
+  - **Backups:** recorded routes are excluded from iCloud, computer and Android backups.
+  - **Deletion:** the phone confirms every route deletion; one cut short (for example by signing out) is finished at
+    the next app start.
+  - **Photo storage:** the byte limit is now exact.
+  - **Billing at scale:** Stripe reconciliation is verified with pagination, time limits and outages longer than 30
+    days.
+- **What remains needs a phone, an account or a hosted service** (R-01..R-07):
+  - **The founders** do it, guided by Claude (docs/engagement/FOUNDER_TASKS.md; about 17–26 hours of their time).
+  - **Consultants** keep only the independent review and the review of resulting fixes: **7.5–12 consultant hours**
+    ($2,888–$4,620; up to 16 h with an escalation reserve used only if needed; docs/engagement/ENGAGEMENT_AGENDA.md).
+- **The database upgrades from `main` with all synthetic data preserved** (round 1), and a fresh install of all 89
+  migration files succeeds with every post-deploy check ok.
 - **Pricing is unchanged at the approved $17.99 / $119.99.** `main` still has older prices ($30 Pro / $9.99 Plus), so
   merging the pull request changes `main`'s pricing to the approved prices (PAYMENT_VERIFICATION.md). Real billing
   stays off.
@@ -51,10 +60,11 @@
 
 | Check | Result |
 |---|---|
-| Unit tests (local, round 3 head) | 4,982 passed, 1 skipped, 0 failed |
-| Integration tests (real database, local, after a fresh install of 88 migrations) | 670 passed, 1 skipped (opt-in live food test), 0 failed |
-| Database checks (`npm run db:verify`) | 10 of 10 ok |
-| Browser suite at phone size (production build, mocks) | 168 passed, 0 failed, 101 skipped (opt-in suites) |
+| Unit tests (local, final-review head) | 4,991 passed, 1 skipped, 0 failed |
+| Integration tests (real database, local, after a fresh install of 89 migrations) | 678 passed, 1 skipped (opt-in live food test), 0 failed |
+| Database checks (`npm run db:verify`) | 11 of 11 ok |
+| Browser suite at phone size (production build, mocks) | 168 passed, 0 failed, 101 skipped (opt-in suites, run separately below) |
+| Opt-in browser suites | Device matrix 39/39 (74 phone models, 2,964 screens, 0 problems); demo server 58/58; coach without AI 1/1; only the home-background photo checks not run (no photographs yet) |
 | Tap every safe control on every main screen | 49 screens, 281 controls, 0 problems |
 | Native run-journal stores | Java JUnit 5/5 locally and in the Android workflow; Swift XCTest in the iOS workflow: passed on `ed3c4169` |
 | GitHub CI, iOS build/archive/Simulator/WebKit, Android APK | Passed on `ed3c4169` |
@@ -96,7 +106,7 @@ Scores measure engineering readiness, not market readiness.
 
 | Category | What |
 |---|---|
-| **Implemented and verified (automated)** | O-01, O-03, O-05–O-20 code; T-01..T-26 code: billing replay, lost-subscription sweep, ownership/transfer rules, concurrent restores, store rotation, reservation-based photo limits, no overwrite, route clean-up on sign-out/deletion, chunked GPS journal, workout summary, photo save retries; migrations 088–098 (fresh install + checks); native store logic (JUnit locally; XCTest in CI) |
+| **Implemented and verified (automated)** | O-01, O-03, O-05–O-20 code; T-01..T-31 code: billing replay, lost-subscription sweep, ownership/transfer rules, concurrent restores, store rotation, reservation-based photo limits, no overwrite, route clean-up on sign-out/deletion, chunked GPS journal, workout summary, photo save retries; migrations 088–098 (fresh install + checks); native store logic (JUnit locally; XCTest in CI) |
 | **Awaiting a physical device** | Locked-screen and app-ended GPS with the native recorder (iPhone 14–15c, Android 6–6b), alarm and snooze slot (25, 25a), sign-out route clean-up (26a), HealthKit/Health Connect, notification sound under Silent/Focus, keyboard and safe areas, haptics, Android edge-to-edge and Back. Then the O-02 wording |
 | **Needs founder credentials or accounts** | Apple Developer Team ID, signing and App Store Connect (R-04); sandbox Apple ID and RevenueCat transfer setting (R-02); Stripe test keys on staging; staging Supabase and hosting with `CRON_SECRET` (R-03); `APPLE_TEAM_ID` / `ANDROID_APP_CERT_SHA256` for app links; final privacy policy and terms |
 | **Needs genuine external expertise** | An accountable human review of the security- and money-critical diffs, including the native recorder (R-05); App Review judgement on guideline 4.2; legal review of health, faith and AI data terms |
@@ -115,7 +125,7 @@ Scores measure engineering readiness, not market readiness.
 | File | Contents |
 |---|---|
 | BRANCH_CONSOLIDATION_REPORT.md | Branch and PR inventory, pricing by branch, migration clashes, lost-feature check |
-| BUG_FIX_REGISTER.md | Fixed B-01..B-22, O-01..O-20 and T-01..T-26; what remains (R-01..R-07) with hours and blockers |
+| BUG_FIX_REGISTER.md | Fixed B-01..B-22, O-01..O-20 and T-01..T-31; what remains (R-01..R-07) with hours and blockers |
 | SECURITY_AUDIT.md | OWASP-mapped review (public-safe; confidential detail kept private) |
 | TEST_RESULTS.md | Every suite run, with counts and failures |
 | DATABASE_MIGRATION_REPORT.md | Fresh install, upgrade from `main`, migrations 079/080 and 088–093 |
@@ -128,7 +138,8 @@ Scores measure engineering readiness, not market readiness.
 | EXTERNAL_DEVELOPER_SCOPE.md | Architecture diagram, setup, test commands, scoped hours |
 | REMAINING_COST_ESTIMATE.md | One-time and recurring costs |
 | SESSION_PROGRESS.md | Progress log for continuing in a new session |
-| ../engagement/ENGAGEMENT_AGENDA.md | The AI-assisted consultant engagement: order, parallel tracks, hours at $385/h |
+| ../engagement/ENGAGEMENT_AGENDA.md | The engagement: founders' tasks, consultant review, parallel tracks, hours at $385/h |
+| ../engagement/FOUNDER_TASKS.md | The operational tasks the founders do with Claude's guidance (devices, accounts, sandbox, staging, TestFlight) |
 | ../engagement/ISSUE_PROMPTS.md | Ready-to-paste Claude Code prompts for every remaining item |
 | ../engagement/BIBLICAL_AI_BASELINE.md | The verified baseline and rules for the Biblical AI work |
 | ../../CLAUDE.md, ../../.claude/agents/ | Repository instructions and six specialist agents |

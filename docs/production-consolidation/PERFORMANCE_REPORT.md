@@ -57,8 +57,10 @@ used 0.35, the gateway 0.12, auth 0.12 and the Postgres backends a few percent e
 4. **The app talks to Postgres through PostgREST over HTTP.** Serverless app instances therefore don't open database
    connections of their own, which removes the usual connection-pool limit when scaling out.
 5. **Not measured here:**
-   - finishing a workout for members with a long history (O-12: about six full-history reads in sequence);
-   - the global AI-budget lock under many simultaneous AI requests (O-17).
+   - finishing a workout for members with a long history under load. (O-12 resolved: the summary reads now run in
+     one parallel round with an 8-second limit, T-15.)
+   - the global AI-budget lock under real concurrency (O-17: measured locally at 600–690 reservations a second, about
+     100 times the need at 10,000 members, and kept for correctness).
 
 ## Capacity estimates (assumptions stated; verify with a staging load test)
 
@@ -73,7 +75,7 @@ used 0.35, the gateway 0.12, auth 0.12 and the Postgres backends a few percent e
 |---|---|---|---|---|
 | 100 | 0.1 | 0.3 | 1 | Pro, smallest compute |
 | 1,000 | 1.0 | 3.1 | 1 | Pro, smallest compute; add the indexes from 089 (done) |
-| 5,000 | 5.2 | 15.6 | 1–2 | Pro with a small/medium compute add-on; fix O-12 and O-17 first |
+| 5,000 | 5.2 | 15.6 | 1–2 | Pro with a small/medium compute add-on (O-12 and O-17 already addressed) |
 | 10,000 | 10.4 | 31 | 2–3 | Medium/large compute add-on; read replica optional; production load test required |
 
 Formula: DAU × 0.15 × 25 ÷ 3,600 = peak average req/s; × 3 for bursts.
@@ -85,6 +87,6 @@ At these sizes the cost driver is AI usage (AI_COST_ANALYSIS.md), not hosting or
 | Priority | Item | When |
 |---|---|---|
 | 1 | Repeat this test against **staging** (hosted Supabase + the real hosting provider) before launch, including writes | Before launch |
-| 2 | O-12: parallelise the workout-finish reads | Before about 1,000 actives |
-| 3 | O-17: row-level budget reservation instead of one global lock | Before AI is widely used |
+| 2 | ~~O-12: parallelise the workout-finish reads~~ Done (one parallel round, T-15) | — |
+| 3 | O-17: watch the AI budget lock's wait time in production; switch to per-member reservation only if it shows | If AI use grows far beyond the measured 100× headroom |
 | 4 | Cache or parallelise the reads on `/faith` and `/nutrition` | If p95 above 1 s is seen in production |
