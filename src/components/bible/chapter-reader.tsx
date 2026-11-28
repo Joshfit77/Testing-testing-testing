@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Bookmark, BookmarkCheck, Brain, Copy, Minus, NotebookPen, Plus, Settings2, Share2, Trash2, X } from "lucide-react";
+import Link from "next/link";
+import { Bookmark, BookmarkCheck, Brain, Copy, Languages, Minus, NotebookPen, Plus, Settings2, Share2, Sparkles, Trash2, X } from "lucide-react";
+import { PASSAGE_ACTIONS } from "@/lib/biblical-ai/config";
+import { askHref } from "@/lib/biblical-ai/links";
+import { bookById } from "@/lib/bible/books";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScriptureText } from "@/components/bible/scripture-text";
@@ -68,6 +72,10 @@ export function ChapterReader(props: {
   notes: ReaderNote[];
   fontScale: number;
   focusVerse: number | null;
+  /** Opened from Biblical AI: not recorded as the reading position (the member returns to their study). */
+  peek?: boolean;
+  /** Biblical AI is on: the selection toolbar offers "Study" (passage actions and the original words). */
+  studyActions?: boolean;
 }) {
   const { bookId, chapter, verses } = props;
   const router = useRouter();
@@ -87,10 +95,14 @@ export function ChapterReader(props: {
   const ref = selectionReference(bookId, chapter, selected);
 
   // Remember the chapter (Continue Reading + history) once it has been open a second, not on a rapid tap-through.
+  // A peek from Biblical AI leaves the member's reading position where it was.
+  const peek = Boolean(props.peek);
   useEffect(() => {
+    if (peek) return;
     const t = setTimeout(() => void recordChapterViewAction(bookId, chapter, props.focusVerse), 1000);
     return () => clearTimeout(t);
-  }, [bookId, chapter, props.focusVerse]);
+  }, [bookId, chapter, props.focusVerse, peek]);
+  const [studyOpen, setStudyOpen] = useState(false);
 
   // The member's text size on this device applies at once; the saved one follows them to other devices.
   useEffect(() => {
@@ -383,7 +395,8 @@ export function ChapterReader(props: {
               </Button>
             )}
           </div>
-          <div className="grid grid-cols-5 gap-1">
+          <div className={cn("grid gap-1", props.studyActions ? "grid-cols-6" : "grid-cols-5")}>
+            {props.studyActions && <ToolButton onClick={() => setStudyOpen(true)} label="Study" icon={<Sparkles aria-hidden />} />}
             <ToolButton onClick={bookmark} disabled={pending} label={selected.length === 1 && bookmarks.has(selected[0]!) ? "Unmark" : "Bookmark"} icon={<Bookmark aria-hidden />} />
             <ToolButton onClick={openNote} disabled={pending} label="Note" icon={<NotebookPen aria-hidden />} />
             <ToolButton onClick={() => void copy()} label="Copy" icon={<Copy aria-hidden />} />
@@ -393,6 +406,33 @@ export function ChapterReader(props: {
           </div>,
           document.body,
         )}
+
+      {props.studyActions && (
+        <Dialog open={studyOpen} onOpenChange={setStudyOpen}>
+          <DialogContent side="bottom">
+            <DialogHeader>
+              <DialogTitle>Study {ref} with Biblical AI</DialogTitle>
+              <DialogDescription>Opens Biblical AI with your question ready; nothing is sent until you choose Ask.</DialogDescription>
+            </DialogHeader>
+            <ul className="mt-2 grid gap-1 sm:grid-cols-2" data-testid="study-actions">
+              {PASSAGE_ACTIONS.map((a) => (
+                <li key={a.id}>
+                  <Link href={`${askHref({ passage: ref, category: a.category, depth: a.depth })}&action=${a.id}`} className="flex min-h-11 items-center rounded-lg border border-border px-3 text-sm hover:border-gold-muted" onClick={() => setStudyOpen(false)}>
+                    {a.label}
+                  </Link>
+                </li>
+              ))}
+              {selected.length > 0 && bookById(bookId) && (
+                <li>
+                  <Link href={`/faith/bible/words/${bookById(bookId)!.slug}/${chapter}/${selected[0]}`} className="flex min-h-11 items-center gap-2 rounded-lg border border-gold-muted px-3 text-sm font-semibold text-gold-highlight" onClick={() => setStudyOpen(false)}>
+                    <Languages className="size-4" aria-hidden /> Original words of verse {selected[0]}
+                  </Link>
+                </li>
+              )}
+            </ul>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Dialog open={noteOpen !== null} onOpenChange={(o) => !o && setNoteOpen(null)}>
         <DialogContent side="bottom">

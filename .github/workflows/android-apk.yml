@@ -19,7 +19,8 @@ on:
         type: boolean
         default: false
   push:
-    branches: [main, claude/sharp-cray-8y0uuv]
+    # Publishing on push happens only from main; development branches publish only from a manual run with publish ticked.
+    branches: [main]
     paths:
       - "standalone/**"
       - "android/**"
@@ -84,7 +85,7 @@ jobs:
   publish:
     name: Publish as the android-latest release
     needs: apk
-    # Pushes to the listed branches publish as before; a manual run publishes only when asked.
+    # A push to main publishes as before; a manual run publishes only when asked.
     if: github.event_name == 'push' || inputs.publish == true || inputs.dry_run == true
     runs-on: ubuntu-latest
     timeout-minutes: 10

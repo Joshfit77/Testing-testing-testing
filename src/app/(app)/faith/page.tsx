@@ -31,6 +31,8 @@ import { scriptureParts } from "@/server/bible/text";
 import { ScriptureText } from "@/components/bible/scripture-text";
 import { DEVOTIONALS } from "@/data/devotionals";
 import { hasRedLetter, type TextPart } from "@/lib/bible/red-letter";
+import { BIBLICAL_AI_NAME, BIBLICAL_AI_SUBTITLE } from "@/lib/biblical-ai/config";
+import { biblicalAiFlagOn } from "@/server/services/biblical-ai";
 
 /** Red-letter parts of the 40 devotional verses that contain words of Jesus (the rest are shown plain). */
 function devotionalRedLetter(): Record<number, TextPart[]> {
@@ -63,7 +65,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
   const hidden = new Set<FaithSection>(parseLayoutPrefs(profile.layout_prefs).faith?.hidden ?? []);
   const show = (s: FaithSection) => !hidden.has(s);
 
-  const [journalRes, journalCountRes, practiceData, devotionalsRes, challenge, reminders, journey, goals, reading] = await Promise.all([
+  const [journalRes, journalCountRes, practiceData, devotionalsRes, challenge, reminders, journey, goals, reading, biblicalAi] = await Promise.all([
     supabase.from("faith_journal_entries").select(JOURNAL_SELECT).eq("user_id", user.id).order("entry_date", { ascending: false }).order("created_at", { ascending: false }).limit(3),
     supabase.from("faith_journal_entries").select("id", { count: "exact", head: true }).eq("user_id", user.id),
     loadPractices(supabase, user.id, startOfWeek(addDays(today, -6))),
@@ -73,7 +75,12 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
     loadActiveJourney(supabase, user.id, profile.timezone),
     loadDailyGoals(supabase, user.id, profile.timezone),
     loadReadingState(supabase, user.id),
+    biblicalAiFlagOn(),
   ]);
+  // Biblical AI (when switched on) replaces the "Ask" shortcut, so there aren't two ways to the same thing.
+  const lastStudy = biblicalAi
+    ? ((await supabase.from("biblical_ai_conversations").select("id").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(1).maybeSingle()).data?.id as string | undefined)
+    : undefined;
   const tools = [
     { href: "/faith/bible", label: "Bible", icon: BookOpen },
     { href: "/faith/bible/search", label: "Search", icon: Search },
@@ -82,7 +89,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
     { href: "/faith/journey", label: "Journey", icon: Route },
     { href: "/faith/memory", label: "Memorize", icon: Brain },
     { href: "/faith/studies", label: "Studies", icon: GraduationCap },
-    { href: "/faith/ask", label: "Ask", icon: MessageCircleQuestion },
+    biblicalAi ? { href: "/faith/biblical-ai", label: "Biblical AI", icon: MessageCircleQuestion } : { href: "/faith/ask", label: "Ask", icon: MessageCircleQuestion },
   ];
   const journal = (journalRes.data ?? []) as unknown as JournalRow[];
   const journalCount = journalCountRes.count ?? journal.length;
@@ -126,6 +133,36 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
       </nav>
 
       {show("today") && <TodayCard userId={user.id} journey={journey} goals={goals} />}
+
+      {biblicalAi && (
+        <section aria-labelledby="biblical-ai-title" className="rounded-2xl border border-gold-muted bg-[radial-gradient(120%_120%_at_100%_0%,rgba(212,175,55,0.2),transparent_60%)] bg-black p-4" data-testid="biblical-ai-card">
+          <div className="flex items-start gap-3">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-gold-muted bg-gold/10">
+              <BookOpen className="size-5 text-gold" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <h2 id="biblical-ai-title" className="font-display text-lg font-bold text-white">
+                {BIBLICAL_AI_NAME}
+              </h2>
+              <p className="font-serif text-sm italic text-champagne">{BIBLICAL_AI_SUBTITLE}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/faith/biblical-ai/ask" className="inline-flex h-11 items-center rounded-full bg-gold-gradient px-4 text-sm font-semibold text-black hover:brightness-110">
+              Ask a Biblical Question
+            </Link>
+            {lastStudy ? (
+              <Link href={`/faith/biblical-ai/ask?c=${lastStudy}`} className="inline-flex h-11 items-center rounded-full border border-gold-muted px-4 text-sm font-semibold text-gold-highlight hover:bg-gold/10">
+                Continue previous study
+              </Link>
+            ) : (
+              <Link href="/faith/biblical-ai" className="inline-flex h-11 items-center rounded-full border border-gold-muted px-4 text-sm font-semibold text-gold-highlight hover:bg-gold/10">
+                Explore study areas
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
 
       <nav aria-label="Bible tools" className="grid grid-cols-4 gap-2">
         {tools.map(({ href, label, icon: Icon }) => (

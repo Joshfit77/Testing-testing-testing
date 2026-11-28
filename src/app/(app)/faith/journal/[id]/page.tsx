@@ -14,6 +14,8 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { clearPrayerAnsweredAction, deleteJournalEntryAction, setJournalArchivedAction, setJournalShareAction } from "@/server/actions/faith";
 import { JOURNAL_SELECT, type JournalRow } from "@/server/services/faith";
+import { askHref } from "@/lib/biblical-ai/links";
+import { biblicalAiFlagOn } from "@/server/services/biblical-ai";
 
 export const metadata = { title: "Journal entry" };
 
@@ -27,6 +29,7 @@ export default async function JournalEntryPage({ params, searchParams }: { param
   const e = data as unknown as JournalRow;
   const today = isoDateInTz(new Date(), profile.timezone);
   const editing = sp.edit === "1";
+  const biblicalAi = await biblicalAiFlagOn();
   // The separate journal permission (migration 080): without it no entry reaches the AI Coach, whatever its mark says.
   const canShare = journalSharingAllowed(profile);
   const shared = canShare && e.share_with_coach;
@@ -105,6 +108,16 @@ export default async function JournalEntryPage({ params, searchParams }: { param
               </p>
             )}
           </section>
+
+          {biblicalAi && (
+            <section className="rounded-2xl border border-gold-muted/60 bg-card p-4" aria-labelledby="biblical-ai-share-title">
+              <h2 id="biblical-ai-share-title" className="font-semibold">Find Scripture for this entry</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Opens Biblical AI with this entry attached. You see it before anything is sent, can remove it, and nothing leaves the app until you choose Ask.</p>
+              <Link href={askHref({ category: "personal", share: `journal:${e.id}`, q: e.kind !== "reflection" ? "Which passages of Scripture speak to this prayer, and how can I pray them?" : "What does Scripture say that can help me with what I wrote?" })} className="mt-3 inline-flex min-h-11 items-center rounded-full border border-gold-muted px-4 text-sm font-semibold text-gold-highlight hover:bg-gold/10" data-testid="journal-biblical-ai">
+                Ask Biblical AI
+              </Link>
+            </section>
+          )}
 
           {e.archived_at && <p className="rounded-xl border border-border bg-elevated/50 p-3 text-sm text-muted-foreground">Archived. It&rsquo;s hidden from your journal but kept; restore it any time.</p>}
           <div className="grid grid-cols-3 gap-2">

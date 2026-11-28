@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight, Route, Search } from "lucide-react";
 import { BackLink } from "@/components/platform/back-link";
 import { ChapterReader } from "@/components/bible/chapter-reader";
+import { safeBack } from "@/lib/biblical-ai/links";
+import { biblicalAiFlagOn } from "@/server/services/biblical-ai";
 import { JourneyCheckIn } from "@/components/faith/journey-checkin";
 import { bookBySlug, chapterHref, chapterLabel, nextChapter, previousChapter } from "@/lib/bible/books";
 import { refsIncludeChapter } from "@/lib/faith/today-reading";
@@ -18,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ book: str
   return { title: book ? `${chapterLabel(book, Number(chapter))} (BSB)` : "Bible" };
 }
 
-export default async function ChapterPage({ params, searchParams }: { params: Promise<{ book: string; chapter: string }>; searchParams: Promise<{ v?: string }> }) {
+export default async function ChapterPage({ params, searchParams }: { params: Promise<{ book: string; chapter: string }>; searchParams: Promise<{ v?: string; from?: string; back?: string }> }) {
   const [{ book: slug, chapter: ch }, sp] = await Promise.all([params, searchParams]);
   const book = bookBySlug(slug);
   const chapter = /^\d{1,3}$/.test(ch) ? Number(ch) : NaN;
@@ -26,11 +28,15 @@ export default async function ChapterPage({ params, searchParams }: { params: Pr
   if (!book || !verses) notFound();
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const [notes, state, journey] = await Promise.all([
+  const [notes, state, journey, biblicalAi] = await Promise.all([
     loadChapterAnnotations(supabase, user.id, book.id, chapter),
     loadReadingState(supabase, user.id),
     loadActiveJourney(supabase, user.id, profile.timezone ?? "UTC"),
+    biblicalAiFlagOn(),
   ]);
+  // Opened from Biblical AI: a peek that doesn't move the reading position, with the way back to the study.
+  const peek = biblicalAi && sp.from === "ai";
+  const back = peek ? safeBack(sp.back) : null;
   // This chapter is part of today's journey reading: offer the same check-in as the journey, at the end of the chapter.
   const today = journey?.day && journey.todayPlan && refsIncludeChapter(journey.todayPlan.refs, book.id, chapter) ? { journey, day: journey.day, plan: journey.todayPlan } : null;
   const v = Number(sp.v);
@@ -42,7 +48,7 @@ export default async function ChapterPage({ params, searchParams }: { params: Pr
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <BackLink href="/faith/bible">Bible</BackLink>
+        {peek ? <BackLink href={back ?? "/faith/biblical-ai"}>Back to your study</BackLink> : <BackLink href="/faith/bible">Bible</BackLink>}
         <Link href="/faith/bible/search" className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground" aria-label="Search the Bible">
           <Search className="size-5" aria-hidden />
         </Link>
@@ -90,6 +96,8 @@ export default async function ChapterPage({ params, searchParams }: { params: Pr
         notes={notes.notes}
         fontScale={state?.fontScale ?? 1}
         focusVerse={focusVerse}
+        peek={peek}
+        studyActions={biblicalAi}
       />
 
       {today && (
