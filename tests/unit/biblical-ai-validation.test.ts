@@ -62,6 +62,11 @@ describe("validateAnswer", () => {
     expect(r.failures.some((f) => /does not match the BSB wording/.test(f))).toBe(true);
   });
 
+  it("removing a quotation and an attribution keeps the rest of the answer (regression: the sentences merged and all was removed)", () => {
+    const r = validateAnswer(answer({ answer: 'John MacArthur teaches that "God helps those who help themselves." See John 3:16 and Hezekiah 3:5.', scripture: [{ reference: "John 3:16" }] }), deps(), "standard");
+    expect(r.answer.answer).toBe("See John 3:16 and Hezekiah 3:5 [reference not found in the BSB].");
+  });
+
   it("keeps a quotation in prose when it is the wording of a cited or retrieved passage", () => {
     const r = validateAnswer(answer({ answer: 'Paul writes, "we know that God works all things together for the good of those who love Him" (Romans 8:28).', scripture: [{ reference: "Romans 8:28" }] }), deps(), "standard");
     expect(r.failures).toEqual([]);

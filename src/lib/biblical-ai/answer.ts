@@ -224,7 +224,9 @@ function checkProse(text: string, deps: ValidationDeps, allowedQuotes: string[],
     const inner = span.slice(1, -1);
     if (allowedQuotes.some((t) => quoteMatches(inner, t))) continue;
     failures.push(`The quotation ${span} does not match the BSB wording of any passage provided.`);
-    out = out.split(span).join("[quotation removed: its wording could not be verified]");
+    // Keep the sentence's own ending, so removing the quotation never merges two sentences.
+    const end = inner.trim().match(/[.!?]$/)?.[0] ?? "";
+    out = out.split(span).join(`[quotation removed: its wording could not be verified]${end}`);
     limitations.add("A quotation whose wording couldn't be verified was removed.");
   }
   if (!hasCommentary) {
