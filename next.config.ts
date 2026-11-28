@@ -40,8 +40,9 @@ const nextConfig: NextConfig = {
   // Server code reads the Bible from public/bible/bsb with fs (src/server/bible/text.ts): ship those files with the
   // server functions that use them on hosts that trace dependencies (Vercel and other serverless builds).
   outputFileTracingIncludes: {
-    "/faith/**": ["./public/bible/bsb/**/*"],
-    "/api/**": ["./public/bible/bsb/**/*"],
+    // Biblical AI also reads the original-language layer and the cross references (server-only data, never public).
+    "/faith/**": ["./public/bible/bsb/**/*", "./data/original-languages/**/*", "./data/cross-references/**/*"],
+    "/api/**": ["./public/bible/bsb/**/*", "./data/original-languages/**/*", "./data/cross-references/**/*"],
     // The verse of the day (Home) and rank verses (badges) show the words of Jesus in red from the same files.
     "/home": ["./public/bible/bsb/**/*"],
     "/progress/**": ["./public/bible/bsb/**/*"],

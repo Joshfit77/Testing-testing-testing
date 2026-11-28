@@ -64,6 +64,8 @@ export function linkReferences(text: string, exists: (reference: string) => bool
     if (!exists(reference)) continue;
     const i = rest.indexOf(raw);
     if (i < 0) continue;
+    // Marked by the server's check as not in the BSB: stays plain text.
+    if (rest.slice(i + raw.length).startsWith(" [reference not found")) continue;
     if (i > 0) out.push({ text: rest.slice(0, i) });
     out.push({ text: raw, href: readerHref(ref, back), reference });
     rest = rest.slice(i + raw.length);
