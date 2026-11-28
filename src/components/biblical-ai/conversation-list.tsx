@@ -49,7 +49,7 @@ export function ConversationList({ conversations }: { conversations: Conversatio
                 }}
               >
                 <label htmlFor={`rename-${c.id}`} className="sr-only">
-                  Title
+                  New title for {c.title}
                 </label>
                 <Input id={`rename-${c.id}`} value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} autoFocus />
                 <Button type="submit" size="icon-sm" variant="ghost" aria-label="Save title" disabled={pending}>

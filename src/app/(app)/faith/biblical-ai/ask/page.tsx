@@ -35,6 +35,9 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
     if (!data) notFound();
     conversation = { id: data.id as string, title: data.title as string, category: data.category as CategoryId, passage: (data.passage as string | null) ?? null };
     const { data: rows } = await supabase.from("biblical_ai_messages").select("id, role, content, answer").eq("conversation_id", sp.c).order("created_at").limit(60);
+    const ids = (rows ?? []).filter((r) => r.role === "assistant").map((r) => r.id as string);
+    const { data: savedRows } = ids.length ? await supabase.from("biblical_ai_saved_studies").select("message_id").in("message_id", ids) : { data: [] };
+    const savedIds = new Set((savedRows ?? []).map((s) => s.message_id as string));
     messages = (rows ?? []).map((r) => {
       const answer = (r.answer as ValidatedAnswer | null) ?? null;
       return {
@@ -42,6 +45,7 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
         role: r.role as "user" | "assistant",
         content: r.content as string,
         answer,
+        saved: savedIds.has(r.id as string),
         passages: answer ? answer.scripture.map((s) => citedPassage(s.reference)).filter((p): p is NonNullable<typeof p> => Boolean(p)) : [],
       };
     });

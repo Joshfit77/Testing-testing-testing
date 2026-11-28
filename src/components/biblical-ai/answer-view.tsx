@@ -62,8 +62,9 @@ function safeExternal(url: string): string | null {
   }
 }
 
-export function AnswerView({ answer, passages, back, messageId, question }: { answer: ValidatedAnswer; passages: ShownPassage[]; back: string; messageId?: string; question?: string }) {
-  const [saved, setSaved] = useState(false);
+export function AnswerView({ answer, passages, back, messageId, question, saved: initiallySaved = false }: { answer: ValidatedAnswer; passages: ShownPassage[]; back: string; messageId?: string; question?: string; saved?: boolean }) {
+  // From the server (whether a saved copy exists), so it stays right after a refresh or a reload.
+  const [saved, setSaved] = useState(initiallySaved);
   const [report, setReport] = useState(false);
   const [pending, start] = useTransition();
   const byRef = new Map(passages.map((p) => [p.reference, p]));

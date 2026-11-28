@@ -17,6 +17,8 @@ export interface ChatMessage {
   content: string;
   answer?: ValidatedAnswer | null;
   passages?: ShownPassage[];
+  /** A saved copy of this answer exists. */
+  saved?: boolean;
 }
 
 const STATUS_TEXT: Record<string, string> = {
@@ -149,7 +151,7 @@ export function BiblicalAiChat(props: {
             <li key={m.id} className={m.role === "user" ? "ml-8 rounded-2xl bg-gold/10 p-3" : "rounded-2xl border border-border bg-card p-3"}>
               <p className="mb-1 text-xs font-semibold text-muted-foreground">{m.role === "user" ? "You" : "Narrow Gate Biblical AI"}</p>
               {m.role === "assistant" && m.answer ? (
-                <AnswerView answer={m.answer} passages={m.passages ?? []} back={back} messageId={m.id} question={messages[messages.indexOf(m) - 1]?.content} />
+                <AnswerView answer={m.answer} passages={m.passages ?? []} back={back} messageId={m.id} question={messages[messages.indexOf(m) - 1]?.content} saved={m.saved} />
               ) : (
                 <p className="whitespace-pre-wrap text-body">{m.content}</p>
               )}
