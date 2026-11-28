@@ -64,6 +64,7 @@ const PUBLIC_TABLES_WITHOUT_MEMBER_FK: Record<string, string> = {
   ai_budget_day_alerts: "service-wide daily AI spend alerts (day, amounts; migration 081)",
   ai_budget_days: "service-wide daily AI spend totals (migration 081)",
   ai_budget_months: "service-wide monthly AI spend totals",
+  biblical_ai_source_documents: "approved commentary passages for retrieval (author, title, URL, text of a published source); no account reference",
   billing_reconcile_state: "one row: how far the billing check has replayed Stripe events (a timestamp; migration 096)",
   content_items: "editorial catalog",
   exercise_alternatives: "exercise catalog",
@@ -228,6 +229,14 @@ describe.skipIf(!available)("account deletion closure: nothing that names the me
     await seed("bible_study_progress", { user_id: u, study_slug: "the-gospel", lesson_slug: "1", notes: "Private study note" });
     await seed("bible_ai_messages", { user_id: u, thread_id: crypto.randomUUID(), role: "user", content: "Private Bible question" });
     await seed("bible_ai_usage", { user_id: u });
+    // Biblical AI (migration 100).
+    const baiConvo = await seed("biblical_ai_conversations", { user_id: u, title: "Private Bible study", category: "scripture" });
+    const baiMsg = await seed("biblical_ai_messages", { conversation_id: baiConvo.id, user_id: u, role: "assistant", content: "Private Biblical AI answer", answer: { title: "t" } });
+    await seed("biblical_ai_saved_studies", { user_id: u, kind: "answer", title: "Private saved study", content: { answer: {} }, message_id: baiMsg.id });
+    await seed("biblical_ai_feedback", { user_id: u, message_id: baiMsg.id, kind: "inaccurate", note: "Private report" });
+    // Staff-side Biblical AI columns (the member is an administrator here): nulled, not deleted, with the account.
+    await seed("biblical_ai_sources", { slug: "closure-test-source", kind: "history", name: "Closure test source", updated_by: u });
+    await seed("biblical_ai_source_audit", { source_slug: "closure-test-source", new_status: "disabled", reason: "closure test", changed_by: u });
     await seed("faith_daily_goals", { user_id: u, goal_date: todayUtc, kind: "fitness" });
     // Started today: the every-15-minutes settle job (faith-journeys-settle) has nothing to settle, so it can't add an
     // attempt between this test's before/after row counts (a journey with missed days got a second attempt mid-test).
@@ -339,6 +348,8 @@ describe.skipIf(!available)("account deletion closure: nothing that names the me
 
   afterAll(async () => {
     if (auditIds.length) await svc.from("admin_audit_logs").delete().in("id", auditIds);
+    await svc.from("biblical_ai_source_audit").delete().eq("source_slug", "closure-test-source");
+    await svc.from("biblical_ai_sources").delete().eq("slug", "closure-test-source");
     await svc.from("rate_limit_counters").delete().eq("key", ipOnlyKey);
     for (const u of [member, otherAdmin, partner, lowerPartner]) if (u) await removeUserStorage(svc, u.id).catch(() => null);
     await Promise.all([member, otherAdmin, partner, lowerPartner].map((u) => (u ? svc.auth.admin.deleteUser(u.id).catch(() => null) : null)));
@@ -351,7 +362,9 @@ describe.skipIf(!available)("account deletion closure: nothing that names the me
     expect(publicFks.filter((f) => !covered.has(f.table)).map((f) => `${f.table}.${f.column}`)).toEqual([]);
     expect(publicFks.filter((f) => f.onDelete !== "cascade" && f.onDelete !== "set null").map((f) => `${f.table}.${f.column} ${f.onDelete}`)).toEqual([]);
     // Only the staff-side columns are nulled; everything else cascades.
-    expect(publicFks.filter((f) => f.onDelete === "set null").map((f) => `${f.table}.${f.column}`)).toEqual(["admin_audit_logs.actor_id", "sandbox_testers.added_by"]);
+    expect(publicFks.filter((f) => f.onDelete === "set null").map((f) => `${f.table}.${f.column}`).sort()).toEqual(
+      ["admin_audit_logs.actor_id", "biblical_ai_source_audit.changed_by", "biblical_ai_sources.updated_by", "sandbox_testers.added_by"].sort(),
+    );
     const withFk = new Set(publicFks.map((f) => f.table));
     const without = sql(`select c.relname from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'p') order by 1`)
       .map(([t]) => t!)

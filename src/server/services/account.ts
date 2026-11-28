@@ -134,6 +134,10 @@ export const NOT_EXPORTED: Record<string, string> = {
   billing_state_versions: "Internal counter used to order billing updates (a number only); the subscriptions it counts are exported.",
   store_sync_state: "Internal timestamp of the last App Store / Google Play sync; the store subscriptions themselves are exported.",
   storage_upload_reservations: "Short-lived (15-minute) permission to upload one named photo, used only to enforce photo limits; the photos themselves are exported.",
+  biblical_ai_sources:
+    "Biblical AI source inventory (licences and approval status); updated_by names the administrator who last changed a source and is set to null when that admin is deleted. Not data the member provided.",
+  biblical_ai_source_audit:
+    "Administrators' audit trail of source approvals; changed_by is set to null when that admin is deleted. Not data the member provided.",
   sandbox_testers:
     "Staff allow-list that lets an account's free App Store / Google Play sandbox (test) purchases count: an administrator's note and an optional end date, not data the member provided. Not readable by members; deleted with the account.",
 };

@@ -178,6 +178,11 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
     await seed("bible_study_progress", { user_id: u, study_slug: "the-gospel", lesson_slug: "1", notes: "Private study note" });
     await seed("bible_ai_messages", { user_id: u, thread_id: crypto.randomUUID(), role: "user", content: "Private Bible question" });
     await seed("bible_ai_usage", { user_id: u });
+    // Biblical AI (migration 100).
+    const baiConvo = await seed("biblical_ai_conversations", { user_id: u, title: "Private Bible study", category: "scripture" });
+    const baiMsg = await seed("biblical_ai_messages", { conversation_id: baiConvo.id, user_id: u, role: "assistant", content: "Private Biblical AI answer", answer: { title: "t" } });
+    await seed("biblical_ai_saved_studies", { user_id: u, kind: "answer", title: "Private saved study", content: { answer: {} }, message_id: baiMsg.id });
+    await seed("biblical_ai_feedback", { user_id: u, message_id: baiMsg.id, kind: "inaccurate", note: "Private report" });
     await seed("faith_daily_goals", { user_id: u, goal_date: todayUtc, kind: "fitness" });
     const journey = await seed("faith_journeys", { user_id: u, plan_kind: "gospels", duration_days: 30, start_on: "2026-10-01" });
     parents.faith_journeys = journey.id!;

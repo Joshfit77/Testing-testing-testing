@@ -49,6 +49,8 @@ const MEMBER_CALLABLE = [
   "admin_ai_cost_report",
   "admin_usage_metrics",
   "admin_user_reports",
+  // Migration 100: aggregate Biblical AI figures; refuses anyone but an administrator (is_admin, with aal2) inside.
+  "biblical_ai_admin_metrics",
   "block_user",
   "can_add_body_scan",
   // Migration 088: used by the body-scans storage rule (which runs as the member); no arguments, answers only whether
@@ -179,5 +181,9 @@ describe.skipIf(!available)("database functions reachable through the public API
     const report = await member.client.rpc("admin_ai_cost_report", { p_from: new Date(Date.now() - 86_400_000).toISOString(), p_to: new Date().toISOString() });
     expect(report.error?.code).toBe("42501");
     expect(report.data).toBeNull();
+    // Biblical AI's aggregate figures (migration 100): refused to a member inside the function too.
+    const bai = await member.client.rpc("biblical_ai_admin_metrics", { p_days: 30 });
+    expect(bai.error?.code).toBe("42501");
+    expect(bai.data).toBeNull();
   });
 });

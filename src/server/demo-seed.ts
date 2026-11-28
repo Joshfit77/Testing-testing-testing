@@ -195,15 +195,17 @@ async function seedTraining(userId: string) {
   const foundations = await idsBySlug("training_programs", ["dumbbell-home-strength", "5k-training"]);
   await insert("user_programs", [...foundations.values()].map((program_id) => ({ user_id: userId, program_id, status: "saved" })));
 
-  // Mon/Tue/Thu/Sat, eight weeks back up to yesterday, a few missed days long ago so consistency looks real. This
-  // week's sessions before today are logged too: leaving them out made the program report them as missed.
+  // Mon/Tue/Thu/Fri (the four-day program's default training days in src/lib/domain/training-schedule.ts), eight weeks
+  // back up to yesterday, a few missed days long ago so consistency looks real. This week's sessions before today are
+  // logged too: leaving them out made the program report them as missed. (Training on Saturday instead left Friday's
+  // session unlogged, so on a Saturday the program reported it as missed.)
   const skip = new Set(["7-3", "4-1", "2-4"]);
   let doneThisWeek = 0;
   const best = new Map<string, { exerciseId: string; e1rm: number; weight: number; reps: number; sessionId: string; at: string }>();
   let sessions = 0;
   for (let week = 8; week >= 0; week--) {
     const progress = 8 - week;
-    for (const [i, offset] of [0, 1, 3, 5].entries()) {
+    for (const [i, offset] of [0, 1, 3, 4].entries()) {
       const day = days[i]!;
       if (skip.has(`${week}-${day.dayNumber}`)) continue;
       // The Monday `week` weeks ago, plus the day's offset.
@@ -815,7 +817,7 @@ async function seedDiscipleship(userId: string): Promise<string> {
 
 /** Reminders the member turned on (shown on Profile → Notifications and its 24-hour preview; delivery needs the phone app). */
 async function seedReminders(userId: string) {
-  const weekdays = [1, 2, 4, 6]; // training days (JavaScript weekdays: 0 = Sunday)
+  const weekdays = [1, 2, 4, 5]; // training days, Mon/Tue/Thu/Fri (JavaScript weekdays: 0 = Sunday)
   const everyDay = [0, 1, 2, 3, 4, 5, 6];
   const { error: fErr } = await db.from("faith_reminders").upsert(
     [
