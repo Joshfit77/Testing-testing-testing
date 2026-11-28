@@ -78,7 +78,7 @@ describe.skipIf(!available)("Narrow Gate Biblical AI (server path)", () => {
     queue = [GOOD];
   });
 
-  const ask = (user: TestUser, plan: "free" | "pro", over: Partial<Parameters<typeof svcMod.askBiblicalAi>[0]> = {}) =>
+  const ask = (user: TestUser, plan: "free" | "plus" | "pro", over: Partial<Parameters<typeof svcMod.askBiblicalAi>[0]> = {}) =>
     svcMod.askBiblicalAi({ userId: user.id, plan, question: "What does John 3:16 mean?", depth: "standard", category: "scripture", requestId: crypto.randomUUID(), ...over });
 
   it("is off by default: the flag row exists and is false, and nothing is sent", async () => {
