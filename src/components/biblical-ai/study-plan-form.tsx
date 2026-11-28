@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ export function StudyPlanForm({ topics, durations, passage, initialTopic }: { to
   const [topic, setTopic] = useState(initialTopic || topics[0]!);
   const [custom, setCustom] = useState("");
   const [days, setDays] = useState(7);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const requestId = useRef<string | null>(null);
   const chosen = topic === "__custom" ? custom.trim() : topic;
   return (

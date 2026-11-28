@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bookmark, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ export function SavedStudyControls({ id, note: initialNote, bookmarked: initialB
   const router = useRouter();
   const [note, setNote] = useState(initialNote);
   const [bookmarked, setBookmarked] = useState(initialBookmarked);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <section aria-label="Your notes" className="space-y-2 rounded-2xl border border-border bg-card p-3">
       <label htmlFor="study-note" className="text-sm font-semibold">

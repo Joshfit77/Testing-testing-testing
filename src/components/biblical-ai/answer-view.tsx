@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
+import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, BookOpen, Bookmark, Check, Copy, ExternalLink, Flag, Languages, Save, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -66,7 +67,7 @@ export function AnswerView({ answer, passages, back, messageId, question, saved:
   // From the server (whether a saved copy exists), so it stays right after a refresh or a reload.
   const [saved, setSaved] = useState(initiallySaved);
   const [report, setReport] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const byRef = new Map(passages.map((p) => [p.reference, p]));
 
   function plainText(): string {
@@ -294,7 +295,7 @@ export function AnswerView({ answer, passages, back, messageId, question, saved:
 function ReportDialog({ open, onClose, messageId }: { open: boolean; onClose: () => void; messageId: string }) {
   const [kind, setKind] = useState<"inaccurate" | "helpful" | "unhelpful">("inaccurate");
   const [note, setNote] = useState("");
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent side="bottom">

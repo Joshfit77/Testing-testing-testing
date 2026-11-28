@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
+import { useState } from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toaster";
@@ -8,7 +9,7 @@ import { setStudyDayDoneAction } from "@/server/actions/biblical-ai";
 
 export function StudyDayToggle({ studyId, day, done: initial }: { studyId: string; day: number; done: boolean }) {
   const [done, setDone] = useState(initial);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Button
       type="button"

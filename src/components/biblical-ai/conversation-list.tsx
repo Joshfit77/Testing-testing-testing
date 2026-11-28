@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, Trash2, X } from "lucide-react";
@@ -26,7 +27,7 @@ export function ConversationList({ conversations }: { conversations: Conversatio
   const [rows, setRows] = useState(conversations);
   const [editing, setEditing] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   if (!rows.length) return <p className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">Your studies will appear here.</p>;
 
