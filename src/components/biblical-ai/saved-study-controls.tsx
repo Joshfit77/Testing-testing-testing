@@ -41,7 +41,6 @@ export function SavedStudyControls({ id, note: initialNote, bookmarked: initialB
           type="button"
           size="sm"
           variant="secondary"
-          aria-pressed={bookmarked}
           disabled={pending}
           onClick={() =>
             start(async () => {

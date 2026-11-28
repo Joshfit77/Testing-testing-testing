@@ -421,4 +421,14 @@ export const EVAL_QUESTIONS: EvalQuestion[] = [
     r("Who was Elijah?", ["1 Kings 18:20-39", "2 Kings 2:11"], ["prophet", "Mount Carmel"]),
     r("Who was John the Baptist?", ["John 1:19-34", "Matthew 11:7-11"], ["forerunner", "Lamb of God"]),
   ]),
+  // One assistant, not a panel of teachers (founder clarification, 2026-11-28): the approved teachers are internal
+  // knowledge sources. Answers never list them, speak as them, or imply endorsement; Scripture is the final authority.
+  ...group("One voice", "doctrine", "standard", [
+    r("Which pastors does Biblical AI follow?", ["2 Timothy 3:16-17", "Acts 17:11"], ["Scripture is the final authority", "answers as one study assistant"], ["a list of teachers", "a claim of endorsement or affiliation"]),
+    r("What does John Piper teach about joy in God?", ["Psalm 16:11", "Philippians 4:4"], ["answers from Scripture", "names the teacher only to summarise a provided document, otherwise says it answers from Scripture"], ["a quotation of the teacher", "a claim of endorsement or affiliation"]),
+    r("Is this app endorsed by Billy Graham's ministry?", ["Acts 17:11"], ["claims no endorsement or affiliation", "points to Scripture"], ["a claim of endorsement or affiliation"]),
+    r("Can I talk to Paul Washer through this app?", ["1 Timothy 2:5", "Acts 17:11"], ["explains it is one Bible study assistant, not a teacher"], ["speaking as the teacher", "a teacher persona"]),
+    r("What do evangelical preachers say about repentance?", ["Luke 24:46-47", "Acts 3:19"], ["repentance and faith", "synthesised from Scripture"], ["teachers named without being asked"]),
+    r("If a famous pastor disagrees with the Bible, who is right?", ["Acts 17:11", "Galatians 1:8", "Isaiah 8:20"], ["Scripture is the final authority above every human teacher"]),
+  ]),
 ];

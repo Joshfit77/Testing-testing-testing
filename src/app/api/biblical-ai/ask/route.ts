@@ -21,7 +21,26 @@ const bodySchema = z.object({
   memberShared: z.string().max(2000).nullish(),
 });
 
-const STATUS: Record<string, number> = { unavailable: 503, consent_required: 403, not_entitled: 403, rate_limited: 429, quota: 429, invalid: 400, refused: 422, not_found: 404, cancelled: 499, error: 500 };
+/** The body as text, or null once it passes `max` bytes (read in chunks, so a chunked body without a length can't be large). */
+async function readCapped(request: Request, max: number): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
+const STATUS: Record<string, number> = { unavailable: 503, consent_required: 403, not_entitled: 403, rate_limited: 429, quota: 429, invalid: 400, refused: 422, not_found: 404, cancelled: 499, timeout: 504, error: 500 };
 
 /**
  * POST /api/biblical-ai/ask: one Biblical AI question (Narrow Gate Biblical AI; off unless the `biblical_ai` flag is on).
@@ -38,8 +57,8 @@ export async function POST(request: NextRequest) {
   if (length > MAX_BODY_BYTES) return NextResponse.json({ error: "too_large" }, { status: 413 });
   let body: unknown;
   try {
-    const raw = await request.text();
-    if (raw.length > MAX_BODY_BYTES) return NextResponse.json({ error: "too_large" }, { status: 413 });
+    const raw = await readCapped(request, MAX_BODY_BYTES);
+    if (raw === null) return NextResponse.json({ error: "too_large" }, { status: 413 });
     body = JSON.parse(raw);
   } catch {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
@@ -49,7 +68,7 @@ export async function POST(request: NextRequest) {
   const plan = await planForAuth(auth).catch(() => null);
   if (!plan) return NextResponse.json({ error: "server_error", message: "Something went wrong. Please try again." }, { status: 500 });
 
-  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(BIBLICAL_AI_TIMEOUT_MS + 30_000)]);
+  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(BIBLICAL_AI_TIMEOUT_MS)]);
   const input = { userId: auth.user.id, plan, ...parsed.data, signal };
   const wantsStream = (request.headers.get("accept") ?? "").includes("application/x-ndjson");
   const respond = (r: AskResult) => (r.ok ? NextResponse.json(r) : NextResponse.json(r, { status: STATUS[r.code] ?? 500, headers: r.retryAfter ? { "Retry-After": String(r.retryAfter) } : undefined }));
@@ -75,6 +94,8 @@ export async function POST(request: NextRequest) {
           open = false;
         }
       };
+      // A line every 15 s while the provider works, so idle proxies don't drop the connection.
+      const heartbeat = setInterval(() => send({ type: "ping" }), 15_000);
       try {
         const result = await askBiblicalAi({ ...input, onStatus: (status) => send({ type: "status", status }) });
         send(result.ok ? { type: "done", result } : { type: "error", ...result });
@@ -82,6 +103,7 @@ export async function POST(request: NextRequest) {
         logError("biblical_ai.stream", err);
         send({ type: "error", ok: false, code: "error", error: "Something went wrong. Please try again." });
       } finally {
+        clearInterval(heartbeat);
         open = false;
         try {
           controller.close();

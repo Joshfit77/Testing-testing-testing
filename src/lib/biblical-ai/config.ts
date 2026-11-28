@@ -122,28 +122,10 @@ export const PASSAGE_ACTIONS: { id: string; label: string; prompt: string; depth
   { id: "languages", label: "Original-language meaning", prompt: "What do the key Hebrew, Aramaic or Greek words in {ref} mean in context?", depth: "deep", category: "languages" },
   { id: "related", label: "Related Scripture", prompt: "Which other passages relate to {ref}, and how do they help explain it?", depth: "standard", category: "scripture" },
   { id: "study", label: "Generate a Bible study", prompt: "Create a short Bible study on {ref} with questions for reflection.", depth: "deep", category: "personal" },
-  { id: "commentary", label: "Theological commentary", prompt: "What do faithful interpreters teach about {ref}?", depth: "deep", category: "doctrine" },
+  { id: "commentary", label: "Interpretation and doctrine", prompt: "How should {ref} be interpreted in its context, and what does it teach? Include approved commentary only where it is provided.", depth: "deep", category: "doctrine" },
   { id: "reflect", label: "Reflection questions", prompt: "Give me reflection questions on {ref}.", depth: "quick", category: "personal" },
   { id: "apply", label: "Practical application", prompt: "How can I apply {ref} faithfully in everyday life?", depth: "standard", category: "personal" },
 ];
-
-/** The eleven approved modern teachers (founder's list, 2026-11-28). Only material from an approved source is used. */
-export const APPROVED_TEACHERS: { slug: string; name: string; ministry: string | null }[] = [
-  { slug: "john-macarthur", name: "John MacArthur", ministry: "Grace to You" },
-  { slug: "ray-comfort", name: "Ray Comfort", ministry: "Living Waters" },
-  { slug: "john-piper", name: "John Piper", ministry: "Desiring God" },
-  { slug: "paul-washer", name: "Paul Washer", ministry: "HeartCry Missionary Society" },
-  { slug: "tim-conway", name: "Tim Conway", ministry: "I'll Be Honest" },
-  { slug: "voddie-baucham", name: "Voddie Baucham", ministry: null },
-  { slug: "billy-graham", name: "Billy Graham", ministry: "Billy Graham Evangelistic Association" },
-  { slug: "alistair-begg", name: "Alistair Begg", ministry: "Truth For Life" },
-  { slug: "mark-spence", name: "Mark Spence", ministry: "Living Waters" },
-  { slug: "frank-turk", name: "Frank Turk", ministry: null },
-  { slug: "jeff-durbin", name: "Jeff Durbin", ministry: "Apologia Studios / Apologia Church" },
-];
-
-/** Surnames and full names that mark an attribution to a teacher (checked in every answer). */
-export const TEACHER_NAME_PATTERN = new RegExp(`\\b(${APPROVED_TEACHERS.flatMap((t) => [t.name, t.name.split(" ").at(-1)!]).join("|")})\\b`, "i");
 
 export interface Limits {
   perMinute: number;
@@ -197,3 +179,15 @@ export const STUDY_TOPICS = [
 
 export const BIBLICAL_AI_DISCLAIMER =
   "Biblical AI is an AI study companion, not a pastor, and it can be wrong. Scripture is the authority: read every passage for yourself, and bring important questions to your pastor and local church.";
+
+export const EVIDENCE_KINDS = ["scripture", "primary_source", "archaeology", "scholarly_consensus", "disputed", "tradition"] as const;
+export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
+/** How each historical claim's evidence is labelled for the member. */
+export const EVIDENCE_LABEL: Record<EvidenceKind, string> = {
+  scripture: "Biblical account",
+  primary_source: "Ancient source",
+  archaeology: "Archaeological evidence",
+  scholarly_consensus: "Scholarly consensus",
+  disputed: "Disputed among scholars",
+  tradition: "Christian tradition",
+};

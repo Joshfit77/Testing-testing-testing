@@ -20,7 +20,9 @@ interface BookFile {
 type LexEntry = [string, string, string, string, string];
 
 const books = new Map<string, BookFile>();
-let lexicons: { greek: Record<string, LexEntry>; hebrew: Record<string, LexEntry> } | null = null;
+/** Books kept in memory at once (least recently used dropped first): about 0.5–3 MB each once parsed. */
+const MAX_BOOKS = 12;
+const lexicons: Partial<Record<"greek" | "hebrew", Record<string, LexEntry>>> = {};
 let morph: { greek: Record<string, string>; hebrew: Record<string, string> } | null = null;
 let concordance: Record<string, [number, string[]]> | null = null;
 let meta: { attribution: string; licence: string; source: string } | null = null;
@@ -30,10 +32,10 @@ const gz = <T>(file: string): T => JSON.parse(gunzipSync(readFileSync(path.join(
 function book(id: string): BookFile | null {
   if (!bookById(id)) return null;
   let b = books.get(id);
-  if (!b) {
-    b = gz<BookFile>(path.join("books", `${id}.json.gz`));
-    books.set(id, b);
-  }
+  if (b) books.delete(id);
+  else b = gz<BookFile>(path.join("books", `${id}.json.gz`));
+  books.set(id, b);
+  while (books.size > MAX_BOOKS) books.delete(books.keys().next().value!);
   return b;
 }
 
@@ -43,8 +45,7 @@ export function originalLanguageMeta(): { attribution: string; licence: string; 
 }
 
 function lexicon(lang: "greek" | "hebrew"): Record<string, LexEntry> {
-  lexicons ??= { greek: gz<Record<string, LexEntry>>("lexicon-greek.json.gz"), hebrew: gz<Record<string, LexEntry>>("lexicon-hebrew.json.gz") };
-  return lexicons[lang];
+  return (lexicons[lang] ??= gz<Record<string, LexEntry>>(`lexicon-${lang}.json.gz`));
 }
 
 function morphology(): { greek: Record<string, string>; hebrew: Record<string, string> } {

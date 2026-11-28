@@ -18,14 +18,16 @@ let queue: Record<string, unknown>[] = [];
 
 const GOOD = { title: "God's love", answer: "God loved the world and gave His Son (John 3:16).", scripture: [{ reference: "John 3:16", quote: "For God so loved the world" }], application: "Trust Him." };
 
-function reply(tool: string, input: Record<string, unknown>) {
+/** A queued input may carry `__stop` (the stop reason to return) and `__delay` (ms before answering). */
+function reply(tool: string, queued: Record<string, unknown>) {
+  const { __stop, __delay: _delay, ...input } = queued;
   return {
     id: `msg_${requests.length}`,
     type: "message",
     role: "assistant",
     model: "claude-haiku-5-5",
     content: [{ type: "tool_use", id: `toolu_${requests.length}`, name: tool, input }],
-    stop_reason: "tool_use",
+    stop_reason: (__stop as string | undefined) ?? "tool_use",
     stop_sequence: null,
     usage: { input_tokens: 1500, output_tokens: 300 },
   };
@@ -50,9 +52,15 @@ describe.skipIf(!available)("Narrow Gate Biblical AI (server path)", () => {
       req.on("end", () => {
         const parsed = JSON.parse(body) as Req;
         requests.push(parsed);
-        const input = queue.length > 1 ? queue.shift()! : (queue[0] ?? GOOD);
-        res.setHeader("content-type", "application/json");
-        res.end(JSON.stringify(reply(parsed.tool_choice?.name ?? "submit_study", input)));
+        const input: Record<string, unknown> = queue.length > 1 ? queue.shift()! : (queue[0] ?? GOOD);
+        const send = () => {
+          if (res.destroyed) return;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify(reply(parsed.tool_choice?.name ?? "submit_study", input)));
+        };
+        const delay = Number(input.__delay ?? 0);
+        if (delay) setTimeout(send, delay);
+        else send();
       });
     });
     await new Promise<void>((r) => mock.listen(0, "127.0.0.1", () => r()));
@@ -174,6 +182,104 @@ describe.skipIf(!available)("Narrow Gate Biblical AI (server path)", () => {
     expect(r.passages.every((p) => p.text.length > 0)).toBe(true);
   });
 
+  it("the passages-only fallback isn't counted against the member's questions", async () => {
+    await setFlag(true);
+    queue = [{ answer: "No idea.", scripture: [{ reference: "Opinions 1:1" }] }];
+    const r = await ask(pro, "pro", { question: "What does the Bible say about patience?" });
+    expect(r.ok).toBe(true);
+    const { data: usage } = await svc.from("bible_ai_usage").select("status").eq("user_id", pro.id).order("created_at", { ascending: false }).limit(1).single();
+    expect(usage!.status).toBe("failed");
+  });
+
+  it("an answer cut off at the output limit is asked again with more room", async () => {
+    await setFlag(true);
+    queue = [{ ...GOOD, __stop: "max_tokens" }, GOOD];
+    const before = requests.length;
+    const r = await ask(pro, "pro");
+    expect(r).toMatchObject({ ok: true });
+    const sent = requests.slice(before) as (Req & { max_tokens: number })[];
+    expect(sent).toHaveLength(2);
+    expect(sent[1]!.max_tokens).toBeGreaterThan(sent[0]!.max_tokens);
+    // The cut-off reply isn't sent back as if it were complete.
+    expect(sent[1]!.messages).toHaveLength(sent[0]!.messages.length);
+  });
+
+  it("keeps the first checked answer when the corrective attempt is refused or worse", async () => {
+    await setFlag(true);
+    const oneFailure = { ...GOOD, answer: 'God loved the world (John 3:16). "God helps those who help themselves."' };
+    queue = [oneFailure, { ...GOOD, __stop: "refusal" }];
+    const refused = await ask(pro, "pro");
+    expect(refused).toMatchObject({ ok: true });
+    if (refused.ok) expect(refused.answer.answer).toMatch(/God loved the world/);
+    queue = [oneFailure, { answer: "Read Hezekiah 3:5 and Opinions 2:2.", scripture: [{ reference: "Opinions 2:2" }, { reference: "John 3:16" }] }];
+    const worse = await ask(pro, "pro");
+    expect(worse).toMatchObject({ ok: true });
+    if (worse.ok) {
+      expect(worse.answer.answer).toMatch(/God loved the world/);
+      expect(worse.answer.answer).not.toMatch(/Hezekiah/);
+    }
+  });
+
+  it("cancelling stops the provider call, counts the question, and frees the request id for a retry", async () => {
+    await setFlag(true);
+    queue = [{ ...GOOD, __delay: 1500 }];
+    const requestId = crypto.randomUUID();
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 300);
+    const r = await ask(pro, "pro", { requestId, signal: ctrl.signal });
+    expect(r).toMatchObject({ ok: false, code: "cancelled" });
+    if (!r.ok) expect(r.error).toMatch(/still counts/);
+    const { data: usage } = await svc.from("bible_ai_usage").select("status").eq("user_id", pro.id).order("created_at", { ascending: false }).limit(1).single();
+    expect(usage!.status).toBe("cancelled");
+    const { count } = await svc.from("biblical_ai_messages").select("id", { count: "exact", head: true }).eq("user_id", pro.id).eq("request_id", requestId);
+    expect(count).toBe(0);
+    queue = [GOOD];
+    expect(await ask(pro, "pro", { requestId })).toMatchObject({ ok: true, replayed: false });
+  });
+
+  it("running out of time is reported as a time-out and isn't counted", async () => {
+    await setFlag(true);
+    queue = [{ ...GOOD, __delay: 1500 }];
+    const r = await ask(pro, "pro", { signal: AbortSignal.timeout(300) });
+    expect(r).toMatchObject({ ok: false, code: "timeout" });
+    const { data: usage } = await svc.from("bible_ai_usage").select("status").eq("user_id", pro.id).order("created_at", { ascending: false }).limit(1).single();
+    expect(usage!.status).toBe("failed");
+  });
+
+  it("the same request id sent twice at once is answered (and paid for) once", async () => {
+    await setFlag(true);
+    queue = [{ ...GOOD, __delay: 600 }];
+    const requestId = crypto.randomUUID();
+    const before = requests.length;
+    const [a, b] = await Promise.all([ask(pro, "pro", { requestId }), ask(pro, "pro", { requestId })]);
+    expect(requests.length - before).toBe(1);
+    const results = [a, b];
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    expect(results.find((r) => !r.ok)).toMatchObject({ code: "rate_limited", error: expect.stringMatching(/already being answered/) });
+    expect(await ask(pro, "pro", { requestId })).toMatchObject({ ok: true, replayed: true });
+  });
+
+  it("a question about suicide or harm always gets the fixed crisis guidance", async () => {
+    await setFlag(true);
+    queue = [GOOD];
+    const r = await ask(pro, "pro", { question: "I want to end my life. Does God still love me?" });
+    expect(r).toMatchObject({ ok: true });
+    if (r.ok) expect(r.answer.safety).toMatch(/988/);
+  });
+
+  it("a reservation left behind by a request that died stops counting after ten minutes", async () => {
+    await setFlag(true);
+    const stale = await createTestUser("bai-stale");
+    try {
+      await svc.from("profiles").update({ ai_data_consent_at: new Date().toISOString() }).eq("id", stale.id);
+      const old = new Date(Date.now() - 15 * 60_000).toISOString();
+      await svc.from("bible_ai_usage").insert([0, 1, 2].map(() => ({ user_id: stale.id, status: "reserved", created_at: old })));
+      expect(await ask(stale, "free")).toMatchObject({ ok: true });
+    } finally {
+      await deleteTestUser(stale);
+    }
+  });
+
   it("continues a conversation with its history; another member's conversation can't be continued", async () => {
     await setFlag(true);
     const first = await ask(pro, "pro");
@@ -232,6 +338,13 @@ describe.skipIf(!available)("Narrow Gate Biblical AI (server path)", () => {
     expect(r.study.days).toHaveLength(7);
     expect(JSON.stringify(requests.at(-1)!.messages.at(-1)!.content)).toMatch(/has 5 days; it must have exactly 7/);
     expect(await svcMod.generateStudyPlan({ userId: pro.id, plan: "pro", topic: "Understanding the Gospel", days: 7, requestId })).toMatchObject({ ok: true, replayed: true, studyId: r.studyId });
+    const { data: savedPlan } = await svc.from("biblical_ai_saved_studies").select("request_id, kind").eq("id", r.studyId).single();
+    expect(savedPlan).toEqual({ request_id: requestId, kind: "plan" });
+    // Plan prose gets the answer checks: an invented book in an explanation is marked.
+    queue = [{ title: "Grace", objective: "Understand grace.", days: days.map((d) => ({ ...d, explanation: "Compare Hezekiah 3:5." })) }];
+    const marked = await svcMod.generateStudyPlan({ userId: pro.id, plan: "pro", topic: "Grace again", days: 7, requestId: crypto.randomUUID() });
+    expect(marked).toMatchObject({ ok: true });
+    if (marked.ok) expect(marked.study.days[0]!.explanation).toContain("[reference not found in the BSB]");
     expect(await svcMod.generateStudyPlan({ userId: free.id, plan: "free", topic: "Prayer", days: 7, requestId: crypto.randomUUID() })).toMatchObject({ ok: false, code: "not_entitled" });
     expect(await svcMod.generateStudyPlan({ userId: pro.id, plan: "pro", topic: "Prayer", days: 8, requestId: crypto.randomUUID() })).toMatchObject({ ok: false, code: "invalid" });
   });
@@ -294,6 +407,50 @@ describe.skipIf(!available)("Narrow Gate Biblical AI (server path)", () => {
     expect(data!.every((s) => s.status === "pending_review")).toBe(true);
     const { count } = await svc.from("biblical_ai_source_documents").select("id", { count: "exact", head: true });
     expect(count).toBe(0);
+  });
+
+  it("members can't read the source inventory, documents or audit trail (teachers are internal to the admin backend)", async () => {
+    for (const table of ["biblical_ai_sources", "biblical_ai_source_documents", "biblical_ai_source_audit"]) {
+      const { data } = await pro.client.from(table).select("*").limit(5);
+      expect(data ?? [], table).toEqual([]);
+    }
+  });
+
+  it("an approved teacher's material informs the answer without the teacher being named; a required credit is shown", async () => {
+    await setFlag(true);
+    const admin = await createTestUser("bai-admin2");
+    try {
+      await makeAdmin(admin);
+      // A licence that requires a credit can't be approved until the credit text is recorded.
+      await svc.from("biblical_ai_sources").update({ attribution_required: true, attribution: null }).eq("slug", "alistair-begg");
+      const missing = await svc.rpc("biblical_ai_set_source_status", { p_slug: "alistair-begg", p_status: "approved", p_reason: "test", p_founder: true, p_actor: admin.id });
+      expect(missing.error?.message).toMatch(/attribution text required/);
+      await svc.from("biblical_ai_sources").update({ attribution: "Some material used with permission of Truth For Life." }).eq("slug", "alistair-begg");
+      expect((await svc.rpc("biblical_ai_set_source_status", { p_slug: "alistair-begg", p_status: "approved", p_reason: "test", p_founder: true, p_actor: admin.id })).error).toBeNull();
+      const { data: doc } = await svc
+        .from("biblical_ai_source_documents")
+        .insert({ source_slug: "alistair-begg", author: "Alistair Begg", title: "Forgiveness and the cross", url: "https://www.truthforlife.org/test", body: "Forgiveness flows from the cross, where God forgave our debts in Christ." })
+        .select("id")
+        .single();
+      queue = [{ ...GOOD, answer: "Alistair Begg teaches that forgiveness flows from the cross. God loved the world (John 3:16).", knowledge_used: [doc!.id] }];
+      const before = requests.length;
+      const r = await ask(pro, "pro", { question: "Why should I forgive others?" });
+      expect(r).toMatchObject({ ok: true });
+      if (!r.ok) return;
+      // The model received the material as knowledge; naming the teacher was sent back for correction.
+      const sent = JSON.stringify(requests[before]!.messages.at(-1)!.content);
+      expect(JSON.stringify(requests.at(-1)!.messages.at(-1)!.content)).toMatch(/names a teacher/);
+      expect(sent).toContain("<knowledge>");
+      expect(sent).toContain("Forgiveness flows from the cross");
+      // The member sees no teacher's name, only the credit the licence requires.
+      expect(r.answer.answer).not.toMatch(/Begg/);
+      expect(r.answer.sources).toEqual([{ attribution: "Some material used with permission of Truth For Life.", url: "https://www.truthforlife.org/test" }]);
+      expect(JSON.stringify(r.answer)).not.toMatch(/Alistair|Forgiveness and the cross/);
+    } finally {
+      await svc.from("biblical_ai_source_documents").delete().eq("source_slug", "alistair-begg");
+      await svc.from("biblical_ai_sources").update({ status: "pending_review", attribution_required: false, attribution: null }).eq("slug", "alistair-begg");
+      await deleteTestUser(admin);
+    }
   });
 
   it("deleting the account deletes every Biblical AI row", async () => {

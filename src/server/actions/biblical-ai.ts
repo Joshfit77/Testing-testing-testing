@@ -60,6 +60,9 @@ export async function deleteAllConversationsAction(): Promise<Result> {
   const supabase = await getServerSupabase();
   const { error } = await supabase.from("biblical_ai_conversations").delete().eq("user_id", user.id);
   if (error) return { ok: false, error: "Couldn't delete your history. Please try again." };
+  // Reports keep only their kind and note: the copies of questions and answers go with the history.
+  const reports = await getServiceSupabase().from("biblical_ai_feedback").update({ question: null, answer: null }).eq("user_id", user.id);
+  if (reports.error) logError("biblical_ai.delete_all_reports", reports.error);
   revalidatePath("/faith/biblical-ai");
   return { ok: true };
 }
@@ -178,7 +181,8 @@ export async function generateStudyAction(input: { topic: string; days: number; 
     .object({ topic: z.string().trim().min(3).max(160), days: z.number().refine((d) => (STUDY_DURATIONS as readonly number[]).includes(d)), passage: z.string().max(60).nullish(), requestId: z.string().uuid() })
     .safeParse(input);
   if (!parsed.success) return { ok: false, code: "invalid", error: "Choose a topic and a length." };
-  const result = await generateStudyPlan({ userId: user.id, plan: await getUserPlan(user.id), ...parsed.data });
+  // Bounded below the page's 180 s limit, so the provider call stops (and isn't counted) before the request is cut off.
+  const result = await generateStudyPlan({ userId: user.id, plan: await getUserPlan(user.id), ...parsed.data, signal: AbortSignal.timeout(170_000) });
   if (result.ok) revalidatePath("/faith/biblical-ai/saved");
   return result;
 }

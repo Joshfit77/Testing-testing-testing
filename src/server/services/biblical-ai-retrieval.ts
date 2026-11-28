@@ -11,7 +11,7 @@ import { crossReferences, originalVerse } from "@/server/bible/original-language
 /*
  * Retrieval for Biblical AI: the BSB passages a question names (or the passage being studied), the most relevant
  * cross references of those passages, verses found by the question's distinctive words, the original-language words
- * of the key verses, and approved commentary documents. Everything comes from the app's own verified data; nothing
+ * of the key verses, and approved knowledge documents. Everything comes from the app's own verified data; nothing
  * is fetched from the web. Sizes are capped per depth so the cost of a question stays bounded.
  */
 
@@ -36,7 +36,7 @@ function firstVerses(ref: ScriptureRef, n: number): { bookId: string; chapter: n
     .map((v) => ({ bookId: ref.bookId, chapter: v.chapter, verse: v.verse }));
 }
 
-/** Retrieval without commentary documents (those need the database; see biblical-ai.ts). Pure over the app's data. */
+/** Retrieval without knowledge documents (those need the database; see biblical-ai.ts). Pure over the app's data. */
 export function retrieveScripture(question: string, opts: { depth: Depth; category: CategoryId; passage?: string | null }): Omit<Retrieved, "documents"> {
   const lim = RETRIEVAL_LIMITS[opts.depth];
   const passages: PromptPassage[] = [];
@@ -45,9 +45,15 @@ export function retrieveScripture(question: string, opts: { depth: Depth; catego
   const focus: ScriptureRef[] = [];
 
   const add = (ref: ScriptureRef, cap: number, list: PromptPassage[]): boolean => {
-    const vs = getPassage(ref).slice(0, cap);
+    const all = getPassage(ref);
+    const vs = all.slice(0, cap);
     if (!vs.length || verses + vs.length > lim.verses) return false;
-    const reference = formatReference(ref);
+    // A passage cut to the cap is labelled with the verses actually sent, so the model never cites text it didn't see.
+    const last = vs[vs.length - 1]!;
+    const reference =
+      vs.length < all.length
+        ? formatReference({ bookId: ref.bookId, chapter: vs[0]!.chapter, verseStart: vs[0]!.verse, ...(last.chapter !== vs[0]!.chapter ? { chapterEnd: last.chapter } : {}), verseEnd: last.verse })
+        : formatReference(ref);
     if (seen.has(reference)) return false;
     seen.add(reference);
     verses += vs.length;
@@ -117,6 +123,15 @@ export function verseHasStrong(ref: ScriptureRef, strong: string): boolean {
     if (ov?.words.some((w) => strongsIn(w.strongs).includes(strong) || strongsIn(w.strong).includes(strong))) return true;
   }
   return false;
+}
+
+/** The word as written in the verse for a lexical entry (shown in answers instead of the model's spelling). */
+export function wordFor(ref: ScriptureRef, strong: string): string | null {
+  for (const v of firstVerses(ref, 20)) {
+    const w = originalVerse(v.bookId, v.chapter, v.verse)?.words.find((x) => strongsIn(x.strongs).includes(strong) || strongsIn(x.strong).includes(strong));
+    if (w) return `${w.surface.replace(/\//g, "")} (${w.transliteration.replace(/\//g, "")})`;
+  }
+  return null;
 }
 
 export { passageText };

@@ -77,23 +77,26 @@ export default async function WordsPage({ params, searchParams }: { params: Prom
           <ol className="space-y-2" data-testid="words-list">
             {ov.words.map((w, i) => {
               const occ = occurrences(w.strong);
+              // Per word: Daniel and Ezra move between Hebrew and Aramaic within a verse.
+              const wordLang = w.language === "greek" ? "grc" : w.language === "aramaic" ? "arc" : "he";
               return (
                 <li key={i}>
                   <details className="group rounded-2xl border border-border bg-card">
                     <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-2 [&::-webkit-details-marker]:hidden">
-                      <span lang={lang} dir={rtl ? "rtl" : "ltr"} className="min-w-[5rem] font-serif text-xl">
+                      <span lang={wordLang} dir={rtl ? "rtl" : "ltr"} className="min-w-[5rem] font-serif text-xl">
                         {w.surface.replace(/\//g, "")}
                       </span>
                       <span className="min-w-0 flex-1 text-sm">
                         <span className="block font-semibold">{w.gloss.replace(/\//g, " ")}</span>
                         <span className="block truncate text-xs text-muted-foreground">
                           {w.transliteration} · {w.strong}
+                          {w.language === "aramaic" && ov.language !== "aramaic" ? " · Aramaic" : ""}
                         </span>
                       </span>
                     </summary>
                     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 px-4 pb-4 text-sm">
                       <dt className="text-muted-foreground">Dictionary form</dt>
-                      <dd lang={lang} dir={rtl ? "rtl" : "ltr"} className="text-left font-serif">{w.lemma || "—"}</dd>
+                      <dd lang={wordLang} dir={rtl ? "rtl" : "ltr"} className="text-left font-serif">{w.lemma || "—"}</dd>
                       <dt className="text-muted-foreground">Parsing</dt>
                       <dd>{w.parsing || w.morphology}</dd>
                       <dt className="text-muted-foreground">Strong&apos;s</dt>

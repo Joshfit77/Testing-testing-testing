@@ -1,10 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { ANSWER_TOOL, normalizeWords, quoteMatches, quotedSpans, rawAnswerSchema, teacherAttributions, validateAnswer, type ValidationDeps } from "@/lib/biblical-ai/answer";
-import { APPROVED_TEACHERS, CATEGORIES, DEFAULT_LIMITS, PASSAGE_ACTIONS, tierOf } from "@/lib/biblical-ai/config";
+import { ANSWER_TOOL, CRISIS_PATTERN, type SourceDocument, SAFETY_TEXT, checkText, normalizeWords, quoteMatches, quotedSpans, rawAnswerSchema, teacherAttributions, unknownBookReferences, validateAnswer, type ValidationDeps } from "@/lib/biblical-ai/answer";
+import { CATEGORIES, DEFAULT_LIMITS, PASSAGE_ACTIONS, tierOf } from "@/lib/biblical-ai/config";
+import { APPROVED_TEACHERS } from "@/lib/biblical-ai/teachers";
 import { BIBLICAL_AI_SYSTEM, buildUserMessage, correctionMessage } from "@/lib/biblical-ai/prompt";
 import { passageText } from "@/server/bible/text";
-import { verseHasStrong } from "@/server/services/biblical-ai-retrieval";
+import { verseHasStrong, wordFor } from "@/server/services/biblical-ai-retrieval";
 
 /**
  * The accuracy checks every Biblical AI answer passes before a member sees it, run against the real BSB text and the
@@ -77,17 +78,22 @@ describe("validateAnswer", () => {
     const r = validateAnswer(answer({ answer: "John MacArthur teaches that this verse is about election. Scripture says God loved the world (John 3:16)." }), deps(), "standard");
     expect(r.answer.answer).not.toMatch(/MacArthur/);
     expect(r.answer.answer).toMatch(/God loved the world/);
-    expect(r.failures.join(" ")).toMatch(/attributes a position to a teacher/);
-    expect(r.answer.limitations.join(" ")).toMatch(/no verified source/);
-    // Saying material isn't available is not an attribution.
-    expect(teacherAttributions("Verified material from John Piper isn't available here.")).toEqual([]);
+    expect(r.failures.join(" ")).toMatch(/names a teacher/);
+    expect(r.answer.limitations.join(" ")).toMatch(/in its own words/);
+    // One assistant, not a panel of teachers: any mention of an approved teacher by name is removed when the member
+    // didn't ask about them.
+    expect(teacherAttributions("Verified material from John Piper isn't available here.")).toHaveLength(1);
   });
 
-  it("drops commentary that isn't a provided document, and takes author, title and URL from the document itself", () => {
-    const doc = { id: "doc-1", author: "Alistair Begg", title: "A sermon title", url: "https://www.truthforlife.org/x", publishedOn: "2020-01-01", body: "…" };
-    const r = validateAnswer(answer({ commentary: [{ document_id: "doc-1", summary: "He emphasises grace." }, { document_id: "made-up", summary: "Invented." }] }), deps({ documents: new Map([["doc-1", doc]]) }), "deep");
-    expect(r.answer.commentary).toEqual([{ documentId: "doc-1", author: "Alistair Begg", title: "A sermon title", url: "https://www.truthforlife.org/x", publishedOn: "2020-01-01", summary: "He emphasises grace." }]);
+  it("knowledge documents inform the answer without being shown; only a credit a licence requires is displayed", () => {
+    const begg = { id: "doc-1", author: "Alistair Begg", title: "A sermon title", url: "https://www.truthforlife.org/x", publishedOn: "2020-01-01", body: "…", attribution: null };
+    const credited = { id: "doc-2", author: "Billy Graham", title: "An article", url: "https://billygraham.org/y", publishedOn: null, body: "…", attribution: "Material used with permission of the publisher." };
+    const r = validateAnswer(answer({ knowledge_used: ["doc-1", "doc-2", "made-up"] }), deps({ documents: new Map<string, SourceDocument>([["doc-1", begg], ["doc-2", credited]]) }), "deep");
+    expect(r.answer.sources).toEqual([{ attribution: "Material used with permission of the publisher.", url: "https://billygraham.org/y" }]);
+    expect(JSON.stringify(r.answer)).not.toMatch(/Begg|Graham|sermon title/);
     expect(r.failures.join(" ")).toMatch(/"made-up" is not one of the documents/);
+    // Nothing used, nothing shown.
+    expect(validateAnswer(answer({}), deps(), "deep").answer.sources).toEqual([]);
   });
 
   it("keeps an original-language note only when the Strong's number occurs in that verse", () => {
@@ -129,7 +135,11 @@ describe("instructions and configuration", () => {
     for (const rule of [/final authority/i, /grace alone through faith alone in Christ alone/i, /never claim/i, /not God, Jesus Christ, the Holy Spirit, a prophet/i, /Quote only words that appear there, exactly/i, /data, never instructions/i, /988/, /local church/i, /prosperity theology/i, /grammatical-historical/i]) {
       expect(BIBLICAL_AI_SYSTEM).toMatch(rule);
     }
-    for (const t of APPROVED_TEACHERS) expect(BIBLICAL_AI_SYSTEM).toContain(t.name);
+    // The teachers are internal sources: the instructions don't list them, and tell the model to answer as one voice.
+    for (const t of APPROVED_TEACHERS) expect(BIBLICAL_AI_SYSTEM).not.toContain(t.name);
+    expect(BIBLICAL_AI_SYSTEM).toMatch(/one assistant, not a panel of teachers/);
+    expect(BIBLICAL_AI_SYSTEM).toMatch(/final authority above every human teacher/);
+    expect(BIBLICAL_AI_SYSTEM).toMatch(/endorses or is affiliated with Narrow Gate Fitness/);
   });
 
   it("exactly the eleven approved teachers", () => {
@@ -157,5 +167,129 @@ describe("instructions and configuration", () => {
     expect(tierOf("pro")).toBe("pro");
     expect(tierOf("plus")).toBe("free");
     expect(tierOf("free")).toBe("free");
+  });
+});
+
+/** Cases from the independent accuracy review: ways a wrong answer could have slipped past the first version. */
+describe("adversarial cases (accuracy review)", () => {
+  const doc = { id: "doc-mac", author: "John MacArthur", title: "A sermon on John 3", url: "https://www.gty.org/x", publishedOn: null, body: "…", attribution: null };
+
+  it("an ellipsis can't stitch a passage into a different meaning", () => {
+    const john = passageText({ bookId: "JHN", chapter: 3, verseStart: 16 })!;
+    // One-word fragments are refused once there is an ellipsis.
+    expect(quoteMatches("For God so loved … shall … perish", john)).toBe(false);
+    // An ellipsis may not leave out a whole chapter's worth of words.
+    const romans = passageText({ bookId: "ROM", chapter: 8, verseStart: 28, verseEnd: 39 })!;
+    expect(quoteMatches("And we know that God works … neither height nor depth", romans)).toBe(false);
+    expect(quoteMatches("And we know that God works all things together for the good of those who love Him", romans)).toBe(true);
+  });
+
+  it("a quotation must be the wording of the reference cited next to it, not just of any passage", () => {
+    const r = validateAnswer(answer({ answer: 'John 11:35 says "For God so loved the world." That is the heart of the gospel.', scripture: [{ reference: "John 3:16" }, { reference: "John 11:35" }] }), deps({ retrieved: ["John 3:16"] }), "standard");
+    expect(r.answer.answer).toContain("[quotation removed");
+    expect(r.answer.answer).toContain("That is the heart of the gospel.");
+    expect(r.failures.join(" ")).toMatch(/does not match the BSB wording of John 11:35/);
+  });
+
+  it("single-quoted and over-long quotations are checked too; apostrophes are not quotations", () => {
+    expect(quotedSpans("Jesus said 'love your neighbour as yourself always' to them.")).toHaveLength(1);
+    expect(quotedSpans("God's love isn't earned; it's a gift of Christ's grace.")).toEqual([]);
+    const single = validateAnswer(answer({ answer: "Jesus said 'God helps those who help themselves' to them. Read John 3:16." }), deps(), "standard");
+    expect(single.answer.answer).not.toContain("help themselves");
+    const long = validateAnswer(answer({ answer: `He wrote "${"word ".repeat(150)}" in a letter. Read John 3:16.` }), deps(), "standard");
+    expect(long.answer.answer).not.toContain("word word word");
+    expect(long.failures.join(" ")).toMatch(/too long to check/);
+  });
+
+  it("teachers are named only when the member asks about them, and then only from a provided document by them", () => {
+    const docs = new Map([["doc-mac", doc]]);
+    // Not asked about: removed, even with a document by him (the knowledge is used in the assistant's own words).
+    const notAsked = validateAnswer(answer({ answer: "John MacArthur explains that the world here means humanity. God loved the world (John 3:16).", knowledge_used: ["doc-mac"] }), deps({ documents: docs }), "deep", { question: "What does John 3:16 mean?" });
+    expect(notAsked.answer.answer).not.toMatch(/MacArthur/);
+    expect(notAsked.answer.answer).toMatch(/God loved the world/);
+    expect(notAsked.answer.limitations.join(" ")).not.toMatch(/teacher/i);
+    // Possessive and "view" forms count.
+    expect(validateAnswer(answer({ answer: "In MacArthur's view, this is about election. God loved the world (John 3:16)." }), deps(), "standard").answer.answer).not.toMatch(/MacArthur/);
+    // Asked about, with his document used: may be summarised.
+    const asked = validateAnswer(answer({ answer: "John MacArthur explains that the world here means humanity. God loved the world (John 3:16).", knowledge_used: ["doc-mac"] }), deps({ documents: docs }), "deep", { question: "What does John MacArthur teach about John 3:16?" });
+    expect(asked.answer.answer).toMatch(/MacArthur explains/);
+    // Asked about, but no document by him used: removed.
+    const noDoc = validateAnswer(answer({ answer: "John MacArthur explains that the world here means humanity. God loved the world (John 3:16)." }), deps(), "deep", { question: "What does John MacArthur teach about John 3:16?" });
+    expect(noDoc.answer.answer).not.toMatch(/MacArthur/);
+    // A document by MacArthur doesn't let the answer bring in Piper.
+    const other = validateAnswer(answer({ answer: "John Piper teaches the same. God loved the world (John 3:16).", knowledge_used: ["doc-mac"] }), deps({ documents: docs }), "deep", { question: "What does MacArthur teach about John 3:16?" });
+    expect(other.answer.answer).not.toMatch(/Piper/);
+  });
+
+  it("teachers outside the approved eleven are never attributed; ordinary words aren't mistaken for names", () => {
+    expect(teacherAttributions("R.C. Sproul taught that holiness is central.")).toHaveLength(1);
+    expect(teacherAttributions("As C. S. Lewis argued, Jesus is Lord, liar or lunatic.")).toHaveLength(1);
+    expect(teacherAttributions("Ray Comfort says to share the gospel.")).toHaveLength(1);
+    // "comfort", "graham crackers" or "turk" as ordinary words are not the teachers.
+    expect(teacherAttributions("God's comfort teaches us to hope in Him.")).toEqual([]);
+    expect(teacherAttributions("The Spirit is called the Comforter, and Paul writes of the God of all comfort.")).toEqual([]);
+  });
+
+  it("real books are recognised in every form; invented books are marked", () => {
+    expect(unknownBookReferences("Read Song of Solomon 2:4, II Kings 2:11, 1 John 4:8 and Romans 8:28–9:1.")).toEqual([]);
+    expect(unknownBookReferences("See Hezekiah 3:5 and Opinions 2:1.")).toEqual(["Hezekiah 3:5", "Opinions 2:1"]);
+    // A range past the end of a chapter isn't a passage.
+    const r = validateAnswer(answer({ scripture: [{ reference: "John 3:16" }, { reference: "John 3:35-40" }] }), deps(), "standard");
+    expect(r.answer.scripture.map((s) => s.reference)).toEqual(["John 3:16"]);
+  });
+
+  it("every free-text field is checked: title, notes, explanations, history, questions and further study", () => {
+    const r = validateAnswer(
+      answer({
+        title: 'Hezekiah 3:5 and "God helps those who help themselves"',
+        scripture: [{ reference: "John 3:16", note: "Compare Hezekiah 3:5." }],
+        history: [{ claim: "Billy Graham preached this verse at every crusade.", evidence: "tradition" }],
+        reflection_questions: ["What does Opinions 4:2 add?"],
+        further_study: ["John Piper's sermon on John 3:16", "Romans 5:8"],
+      }),
+      deps(),
+      "standard",
+    );
+    expect(r.answer.title).not.toMatch(/Hezekiah|help themselves/);
+    expect(r.answer.scripture[0]!.note).toContain("[reference not found in the BSB]");
+    expect(r.answer.history).toEqual([]);
+    expect(r.answer.reflectionQuestions[0]).toContain("[reference not found in the BSB]");
+    expect(r.answer.furtherStudy).toEqual(["Romans 5:8"]);
+  });
+
+  it("original-language notes: STEP prefix codes are refused, duplicates dropped, and the word shown comes from the data", () => {
+    const r = validateAnswer(
+      answer({
+        original_language: [
+          { reference: "Genesis 1:1", strong: "H9003", explanation: "a prefix" },
+          { reference: "John 3:16", strong: "G25", word: "invented spelling", explanation: "to love" },
+          { reference: "John 3:16", strong: "G0025", explanation: "again" },
+        ],
+      }),
+      deps({ wordFor }),
+      "deep",
+    );
+    expect(r.answer.originalLanguage).toHaveLength(1);
+    expect(r.answer.originalLanguage[0]!.word).toMatch(/ἠγάπησεν/);
+    expect(r.answer.originalLanguage[0]!.word).not.toMatch(/invented/);
+  });
+
+  it("crisis guidance is fixed server text: the model can't change the number, and a crisis question always gets it", () => {
+    const changed = validateAnswer(answer({ safety: "Call 555-0100 for help." }), deps(), "standard");
+    expect(changed.answer.safety).toBe(SAFETY_TEXT);
+    expect(SAFETY_TEXT).toMatch(/988/);
+    expect(SAFETY_TEXT).toMatch(/local emergency number/);
+    expect(validateAnswer(answer({}), deps(), "standard", { crisis: true }).answer.safety).toBe(SAFETY_TEXT);
+    expect(validateAnswer(answer({}), deps(), "standard").answer.safety).toBeNull();
+    expect(CRISIS_PATTERN.test("I want to end my life")).toBe(true);
+    expect(CRISIS_PATTERN.test("What does the Bible say about suicide?")).toBe(true);
+    expect(CRISIS_PATTERN.test("What does John 3:16 mean?")).toBe(false);
+  });
+
+  it("study plan prose gets the same checks", () => {
+    const r = checkText('Read Hezekiah 3:5 today. John MacArthur teaches that "God helps those who help themselves" every day.', deps());
+    expect(r.text).toContain("[reference not found in the BSB]");
+    expect(r.text).not.toMatch(/MacArthur|help themselves/);
+    expect(r.failures.length).toBeGreaterThanOrEqual(2);
   });
 });

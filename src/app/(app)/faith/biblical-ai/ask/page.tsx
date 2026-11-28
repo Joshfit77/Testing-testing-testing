@@ -8,7 +8,9 @@ import type { ValidatedAnswer } from "@/lib/biblical-ai/answer";
 import { BIBLICAL_AI_DISCLAIMER, BIBLICAL_AI_NAME, PASSAGE_ACTIONS, categoryById, type CategoryId, type Depth } from "@/lib/biblical-ai/config";
 import { formatReference, parseReference } from "@/lib/bible/reference";
 import { readerHref } from "@/lib/biblical-ai/links";
+import { journalSharingAllowed } from "@/lib/domain/journal";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getProfile, requireUser } from "@/server/auth";
 import { passageText } from "@/server/bible/text";
 import { loadBiblicalAiAccess } from "@/server/biblical-ai-access";
 import { citedPassage } from "@/server/services/biblical-ai";
@@ -59,9 +61,12 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
   const depth = (action?.depth ?? (["quick", "standard", "deep"].includes(sp.depth ?? "") ? sp.depth : "standard")) as Depth;
 
   // A journal entry the member chose to share ("share=journal:<id>"): read through RLS, shown before anything is sent.
+  // Only with the separate journal permission (the same one the AI Coach needs).
   let shared: { label: string; text: string } | null = null;
+  let journalBlocked = false;
   const journalId = sp.share?.startsWith("journal:") ? sp.share.slice(8) : null;
-  if (journalId && uuid.test(journalId)) {
+  if (journalId && uuid.test(journalId) && !journalSharingAllowed(await getProfile((await requireUser()).id))) journalBlocked = true;
+  else if (journalId && uuid.test(journalId)) {
     const { data: entry } = await supabase.from("faith_journal_entries").select("title, body, entry_date").eq("id", journalId).maybeSingle();
     if (entry) shared = { label: (entry.title as string | null) || `Journal entry, ${entry.entry_date as string}`, text: String(entry.body).slice(0, 2000) };
   }
@@ -88,6 +93,15 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
         )}
       </header>
       <p className="text-xs text-muted-foreground">{BIBLICAL_AI_DISCLAIMER}</p>
+      {journalBlocked && (
+        <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm" data-testid="biblical-ai-journal-consent">
+          Your journal entry wasn&apos;t attached. Sharing journal entries with AI is off; turn on &ldquo;Share prayer journal entries with the AI Coach&rdquo; in{" "}
+          <Link href="/profile" className="font-semibold text-gold-highlight underline">
+            Profile
+          </Link>{" "}
+          first. You can still ask without it.
+        </p>
+      )}
       {!access.canAsk ? (
         <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm" data-testid="biblical-ai-unavailable">
           Biblical AI is temporarily unavailable. The Bible is free to read and search.

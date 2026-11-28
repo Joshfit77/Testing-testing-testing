@@ -1,7 +1,7 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
-import { formatReference, parseReference } from "@/lib/bible/reference";
-import { ANSWER_TOOL, answerToText, rawAnswerSchema, validateAnswer, type SourceDocument, type ValidatedAnswer } from "@/lib/biblical-ai/answer";
+import { formatReference, parseReference, type ScriptureRef } from "@/lib/bible/reference";
+import { ANSWER_TOOL, CRISIS_PATTERN, SAFETY_TEXT, answerToText, checkText, rawAnswerSchema, validateAnswer, type SourceDocument, type ValidatedAnswer } from "@/lib/biblical-ai/answer";
 import {
   BIBLICAL_AI_FLAG,
   DEFAULT_LIMITS,
@@ -27,13 +27,13 @@ import { isFlagOn } from "@/server/flags";
 import { logError, logInfo } from "@/server/log";
 import { AiError, withAiRequest, type AllowanceOverride } from "@/server/services/ai-coach";
 import { bibleAiBlocked } from "@/server/services/bible-ai";
-import { retrieveScripture, toPromptDocuments, verseHasStrong } from "@/server/services/biblical-ai-retrieval";
+import { retrieveScripture, toPromptDocuments, verseHasStrong, wordFor } from "@/server/services/biblical-ai-retrieval";
 
 /*
  * Narrow Gate Biblical AI (behind the strict flag `biblical_ai`). One question:
  *   1. checks: flag, AI kill switch and consent (bibleAiBlocked), plan and depth, the question itself;
  *   2. idempotency: a request id already answered returns the saved answer (a retry never asks twice);
- *   3. retrieval from the app's verified data (retrieveScripture) and approved commentary documents;
+ *   3. retrieval from the app's verified data (retrieveScripture) and approved knowledge documents;
  *   4. the provider call through withAiRequest (the member's and the app's money budgets, in-flight limits; Free
  *      members get their own small allowance) and the Bible questions counter (reserve_bible_ai_usage);
  *   5. the answer is a forced tool call, checked by validateAnswer; on failures it is asked once more with the list,
@@ -46,10 +46,15 @@ import { retrieveScripture, toPromptDocuments, verseHasStrong } from "@/server/s
 export const MAX_ATTEMPTS = 2;
 const MAX_TOKENS: Record<Depth, number> = { quick: 900, standard: 1800, deep: 3600 };
 const HISTORY_TURNS = 4;
-/** A request that hasn't finished after this long is abandoned (the member's question is given back). */
-export const BIBLICAL_AI_TIMEOUT_MS = 90_000;
+/**
+ * Time budgets, nested so each layer gives up after the one inside it: one provider attempt (60 s) < the whole
+ * question with its one retry (BIBLICAL_AI_TIMEOUT_MS, 140 s) < the route's maxDuration (180 s) < the screen's own
+ * timer (170 s, it shows Try again). A question that runs out of time is given back and can be retried.
+ */
+export const PROVIDER_ATTEMPT_TIMEOUT_MS = 60_000;
+export const BIBLICAL_AI_TIMEOUT_MS = 140_000;
 
-export type BiblicalAiCode = "unavailable" | "consent_required" | "not_entitled" | "rate_limited" | "quota" | "invalid" | "refused" | "not_found" | "cancelled" | "error";
+export type BiblicalAiCode = "unavailable" | "consent_required" | "not_entitled" | "rate_limited" | "quota" | "invalid" | "refused" | "not_found" | "cancelled" | "timeout" | "error";
 export type Failure = { ok: false; code: BiblicalAiCode; error: string; retryAfter?: number };
 
 export interface CitedPassage {
@@ -119,11 +124,11 @@ export function citedPassage(reference: string): CitedPassage | null {
   return { reference: formatReference(ref), text: (truncated && sameChapter ? passageText(r) : passageText(ref)) ?? "", parts: (truncated && sameChapter ? passageParts(r) : passageParts(ref)) ?? undefined, truncated };
 }
 
-/** Approved commentary documents relevant to the question (empty until a source is approved and loaded). */
+/** Approved knowledge documents relevant to the question (empty until a source is approved and loaded). */
 async function retrieveDocuments(question: string, limit: number): Promise<SourceDocument[]> {
   if (limit <= 0) return [];
   const admin = getServiceSupabase();
-  const { data: sources, error } = await admin.from("biblical_ai_sources").select("slug").eq("status", "approved").in("kind", ["teacher", "history"]);
+  const { data: sources, error } = await admin.from("biblical_ai_sources").select("slug, attribution, attribution_required").eq("status", "approved").in("kind", ["teacher", "history"]);
   if (error) {
     logError("biblical_ai.sources", error);
     return [];
@@ -133,7 +138,7 @@ async function retrieveDocuments(question: string, limit: number): Promise<Sourc
   if (!terms) return [];
   const { data: docs, error: docError } = await admin
     .from("biblical_ai_source_documents")
-    .select("id, author, title, url, published_on, body")
+    .select("id, source_slug, author, title, url, published_on, body")
     .in("source_slug", sources.map((s) => s.slug as string))
     .textSearch("search", terms, { type: "websearch", config: "english" })
     .limit(limit);
@@ -141,7 +146,9 @@ async function retrieveDocuments(question: string, limit: number): Promise<Sourc
     logError("biblical_ai.documents", docError);
     return [];
   }
-  return (docs ?? []).map((d) => ({ id: String(d.id), author: String(d.author), title: String(d.title), url: String(d.url), publishedOn: (d.published_on as string | null) ?? null, body: String(d.body) }));
+  // A credit is shown only where the source's licence requires one (set in the admin backend).
+  const credit = new Map(sources.map((s) => [s.slug as string, s.attribution_required ? ((s.attribution as string | null) ?? null) : null]));
+  return (docs ?? []).map((d) => ({ id: String(d.id), author: String(d.author), title: String(d.title), url: String(d.url), publishedOn: (d.published_on as string | null) ?? null, body: String(d.body), attribution: credit.get(String(d.source_slug)) ?? null }));
 }
 
 function toolInput(msg: Anthropic.Message, name: string): unknown {
@@ -159,6 +166,13 @@ function codeOf(err: AiError): BiblicalAiCode {
 }
 
 const UNAVAILABLE = "Biblical AI is temporarily unavailable. The Bible is free to read and search.";
+
+/** Stopped by the member, or out of time: neither is counted; running out of time can be retried. */
+export function abortedResult(signal: AbortSignal, counted = false): Failure {
+  const reason = signal.reason as { name?: string } | undefined;
+  if (reason?.name === "TimeoutError") return { ok: false, code: "timeout", error: "That took too long, so nothing was counted. Please try again." };
+  return { ok: false, code: "cancelled", error: counted ? "Cancelled. A question already sent to the AI still counts toward your limit." : "Cancelled. Nothing was counted." };
+}
 
 /** Common checks before anything is retrieved, counted or sent. */
 async function preflight(userId: string, plan: Plan, depth: Depth): Promise<Failure | { limits: ReturnType<typeof biblicalAiLimits> }> {
@@ -179,6 +193,9 @@ function allowanceFor(limits: ReturnType<typeof biblicalAiLimits>): AllowanceOve
 /** Reserve one Bible question on the shared counter (per minute, per day, per month). */
 async function reserveQuestion(userId: string, limits: Limits): Promise<number> {
   const service = getServiceSupabase();
+  // A reservation left behind by a request that died (a crashed worker) would count forever; anything still reserved
+  // after 10 minutes can't be running (requests are limited to 3 minutes), so it stops counting.
+  await service.from("bible_ai_usage").update({ status: "failed" }).eq("user_id", userId).eq("status", "reserved").lt("created_at", new Date(Date.now() - 10 * 60_000).toISOString());
   const { data, error } = await service.rpc("reserve_bible_ai_usage", { p_user_id: userId, p_per_minute: limits.perMinute, p_daily: limits.daily, p_monthly: limits.monthly });
   if (error) {
     if (error.message?.includes("bible_ai_rate_limited")) throw new AiError("rate_limited", "That's a lot of questions at once. Please wait a minute.", 60);
@@ -194,6 +211,64 @@ async function replay(userId: string, requestId: string): Promise<AskSuccess | n
   if (!data?.answer) return null;
   const answer = data.answer as ValidatedAnswer;
   return { ok: true, conversationId: data.conversation_id as string, messageId: data.id as string, answer, passages: answer.scripture.map((s) => citedPassage(s.reference)).filter((p): p is CitedPassage => Boolean(p)), depth: (data.depth as Depth) ?? "standard", replayed: true };
+}
+
+interface Claim {
+  conversationId: string;
+  /** The conversation was created for this question (removed again if it fails). */
+  created: boolean;
+  messageId: string;
+  askedAt: number;
+}
+
+/** A claim older than this with no answer belongs to a request that died; it may be taken over. */
+const STALE_CLAIM_MS = 4 * 60_000;
+
+async function claimRequest(input: AskInput, question: string, passage: string | null): Promise<Claim | Failure> {
+  const service = getServiceSupabase();
+  let conversationId = input.conversationId ?? null;
+  let created = false;
+  if (!conversationId) {
+    const { data: convo, error } = await service.from("biblical_ai_conversations").insert({ user_id: input.userId, title: question.slice(0, 120), category: input.category, passage }).select("id").single();
+    if (error || !convo) {
+      logError("biblical_ai.claim_conversation", error);
+      return { ok: false, code: "error", error: "Biblical AI couldn't answer just now. Please try again." };
+    }
+    conversationId = convo.id as string;
+    created = true;
+  }
+  const askedAt = Date.now();
+  const row = { conversation_id: conversationId, user_id: input.userId, role: "user", content: question, depth: input.depth, request_id: input.requestId, created_at: new Date(askedAt).toISOString() };
+  let { data, error } = await service.from("biblical_ai_messages").insert(row).select("id").single();
+  if (error?.code === "23505") {
+    // Already claimed: answered (replay), still running (say so), or left by a request that died (take it over).
+    const earlier = await replay(input.userId, input.requestId);
+    if (earlier) {
+      if (created) await service.from("biblical_ai_conversations").delete().eq("id", conversationId).eq("user_id", input.userId);
+      return earlier as unknown as Failure;
+    }
+    const { data: old } = await service.from("biblical_ai_messages").select("id, created_at").eq("user_id", input.userId).eq("request_id", input.requestId).eq("role", "user").maybeSingle();
+    if (old && Date.now() - new Date(old.created_at as string).getTime() > STALE_CLAIM_MS) {
+      await service.from("biblical_ai_messages").delete().eq("id", old.id).eq("user_id", input.userId);
+      ({ data, error } = await service.from("biblical_ai_messages").insert(row).select("id").single());
+    } else {
+      if (created) await service.from("biblical_ai_conversations").delete().eq("id", conversationId).eq("user_id", input.userId);
+      return { ok: false, code: "rate_limited", error: "This question is already being answered. Please wait a moment.", retryAfter: 10 };
+    }
+  }
+  if (error || !data) {
+    if (created) await service.from("biblical_ai_conversations").delete().eq("id", conversationId).eq("user_id", input.userId);
+    logError("biblical_ai.claim", error);
+    return { ok: false, code: "error", error: "Biblical AI couldn't answer just now. Please try again." };
+  }
+  return { conversationId, created, messageId: data.id as string, askedAt };
+}
+
+/** Undo a claim after a failed question: its question row, and the conversation if it was made for it. */
+async function releaseClaim(userId: string, claim: Claim): Promise<void> {
+  const service = getServiceSupabase();
+  if (claim.created) await service.from("biblical_ai_conversations").delete().eq("id", claim.conversationId).eq("user_id", userId);
+  else await service.from("biblical_ai_messages").delete().eq("id", claim.messageId).eq("user_id", userId);
 }
 
 export interface AskInput {
@@ -234,8 +309,13 @@ export async function askBiblicalAi(input: AskInput): Promise<AskResult> {
     history = (rows ?? []).reverse().map((r) => ({ role: r.role as "user" | "assistant", content: String(r.content).slice(0, r.role === "assistant" ? 1500 : 1200) }));
   }
 
-  input.onStatus?.("retrieving");
+  // Claim the request id before anything is asked: the question is saved now under the unique (member, request id)
+  // index, so a second request with the same id (a double tap, a retry while the first is still running) can't ask
+  // and pay a second time. It is removed again if the question fails.
   const passageFocus = passageRef ? formatReference(passageRef) : null;
+  const claim = await claimRequest(input, question, passageFocus);
+  if ("ok" in claim) return claim;
+  input.onStatus?.("retrieving");
   const scripture = retrieveScripture(question, { depth: input.depth, category: input.category, passage: passageFocus });
   const documents = await retrieveDocuments(question, input.depth === "quick" ? 2 : input.depth === "standard" ? 3 : 5);
   const userMessage = buildUserMessage({
@@ -251,6 +331,7 @@ export async function askBiblicalAi(input: AskInput): Promise<AskResult> {
   });
 
   const started = Date.now();
+  const crisis = CRISIS_PATTERN.test(question);
   let usageId: number | null = null;
   let modelUsed = "";
   let validationFailures = 0;
@@ -266,22 +347,34 @@ export async function askBiblicalAi(input: AskInput): Promise<AskResult> {
         let outputTokens = 0;
         let cost = 0;
         let validated: ReturnType<typeof validateAnswer> | null = null;
+        let budget = MAX_TOKENS[input.depth];
+        const deps = { passageText: (r: ScriptureRef) => passageText(r), verseHasStrong, wordFor, documents: new Map(documents.map((d) => [d.id, d])), retrieved: scripture.references };
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
           const msg = await client.messages.create(
             {
               model,
-              max_tokens: MAX_TOKENS[input.depth],
+              max_tokens: budget,
               system: [{ type: "text", text: BIBLICAL_AI_SYSTEM, cache_control: { type: "ephemeral" } }],
               tools: [ANSWER_TOOL],
               tool_choice: { type: "tool", name: ANSWER_TOOL.name },
               messages,
             },
-            { signal: input.signal, timeout: BIBLICAL_AI_TIMEOUT_MS },
+            { signal: input.signal, timeout: PROVIDER_ATTEMPT_TIMEOUT_MS },
           );
           inputTokens += msg.usage.input_tokens;
           outputTokens += msg.usage.output_tokens;
           cost += costMicros(model, tokenUsage(msg.usage));
-          if (msg.stop_reason === "refusal") throw new AiError("provider", "refused", undefined, cost);
+          // A refusal on the corrective attempt keeps the first attempt's checked answer.
+          if (msg.stop_reason === "refusal") {
+            if (validated) break;
+            throw new AiError("provider", "refused", undefined, cost);
+          }
+          // Cut off at the output limit: the tool input is incomplete, so ask again from the start with more room.
+          if (msg.stop_reason === "max_tokens") {
+            validationFailures++;
+            budget = Math.round(MAX_TOKENS[input.depth] * 1.6);
+            continue;
+          }
           input.onStatus?.("checking");
           const raw = rawAnswerSchema.safeParse(toolInput(msg, ANSWER_TOOL.name));
           const toolUse = msg.content.find((b) => b.type === "tool_use");
@@ -293,19 +386,25 @@ export async function askBiblicalAi(input: AskInput): Promise<AskResult> {
             }
             break;
           }
-          validated = validateAnswer(raw.data, { passageText: (r) => passageText(r), verseHasStrong, documents: new Map(documents.map((d) => [d.id, d])), retrieved: scripture.references }, input.depth);
+          const checked = validateAnswer(raw.data, deps, input.depth, { crisis, question });
+          // The corrective attempt replaces the first only if it is at least as good.
+          if (!validated || checked.failures.length <= validated.failures.length) validated = checked;
           if (!validated.failures.length || attempt === MAX_ATTEMPTS || !toolUse) break;
-          validationFailures += validated.failures.length;
-          messages.push({ role: "assistant", content: msg.content }, { role: "user", content: [{ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: correctionMessage(validated.failures) }] });
+          validationFailures += checked.failures.length;
+          messages.push({ role: "assistant", content: msg.content }, { role: "user", content: [{ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: correctionMessage(checked.failures) }] });
         }
         if (validated?.failures.length) validationFailures += validated.failures.length;
+        // Cancelled (or out of time) while the answer was being checked: nothing is saved or counted for the member;
+        // what the provider billed still goes into the app's spend figures.
+        if (input.signal?.aborted) throw new AiError("provider", "aborted", undefined, cost);
         return { value: validated?.answer ?? null, inputTokens, outputTokens, costMicros: cost };
       },
     );
 
     // Nothing usable even after a retry: a Scripture-centered fallback from the passages found, never an unchecked answer.
+    const usable = Boolean(result && result.answer && result.scripture.length);
     const answer: ValidatedAnswer =
-      result && result.answer && result.scripture.length
+      result && usable
         ? result
         : {
             title: question.slice(0, 60),
@@ -314,39 +413,30 @@ export async function askBiblicalAi(input: AskInput): Promise<AskResult> {
             context: null,
             originalLanguage: [],
             history: [],
-            commentary: [],
+            sources: [],
             application: null,
             reflectionQuestions: [],
             furtherStudy: [],
             uncertainty: null,
-            safety: result?.safety ?? null,
+            safety: result?.safety ?? (crisis ? SAFETY_TEXT : null),
             limitations: ["The answer didn't pass the accuracy checks, so only the passages are shown."],
           };
 
     input.onStatus?.("saving");
-    let conversationId = input.conversationId ?? null;
+    const conversationId = claim.conversationId;
     const now = new Date();
-    if (!conversationId) {
-      const { data: convo, error } = await service
-        .from("biblical_ai_conversations")
-        .insert({ user_id: input.userId, title: answer.title.slice(0, 120) || "Bible study", category: input.category, passage: passageFocus })
-        .select("id")
-        .single();
-      if (error || !convo) throw error ?? new Error("conversation not created");
-      conversationId = convo.id as string;
-    } else {
-      await service.from("biblical_ai_conversations").update({ updated_at: now.toISOString() }).eq("id", conversationId).eq("user_id", input.userId);
-    }
+    await service
+      .from("biblical_ai_conversations")
+      .update({ updated_at: now.toISOString(), ...(claim.created ? { title: answer.title.slice(0, 120) || "Bible study" } : {}) })
+      .eq("id", conversationId)
+      .eq("user_id", input.userId);
     const text = answerToText(answer, (r) => {
       const ref = parseReference(r);
       return ref ? passageText(ref) : null;
     });
     const { data: saved, error: saveError } = await service
       .from("biblical_ai_messages")
-      .insert([
-        { conversation_id: conversationId, user_id: input.userId, role: "user", content: question, depth: input.depth, request_id: input.requestId, created_at: now.toISOString() },
-        { conversation_id: conversationId, user_id: input.userId, role: "assistant", content: text || answer.answer, answer, depth: input.depth, model: modelUsed, request_id: input.requestId, created_at: new Date(now.getTime() + 1).toISOString() },
-      ])
+      .insert({ conversation_id: conversationId, user_id: input.userId, role: "assistant", content: text || answer.answer, answer, depth: input.depth, model: modelUsed, request_id: input.requestId, created_at: new Date(Math.max(now.getTime(), claim.askedAt + 1)).toISOString() })
       .select("id, role");
     if (saveError) {
       // The same request id saved by a parallel attempt: return that one.
@@ -358,15 +448,21 @@ export async function askBiblicalAi(input: AskInput): Promise<AskResult> {
     if (usageId !== null) {
       const { error } = await service
         .from("bible_ai_usage")
-        .update({ status: "done", model: modelUsed, feature: "biblical_ai", depth: input.depth, latency_ms: Date.now() - started, validation_failures: validationFailures })
+        // The passages-only fallback isn't counted against the member's questions.
+        .update({ status: usable ? "done" : "failed", model: modelUsed, feature: "biblical_ai", depth: input.depth, latency_ms: Date.now() - started, validation_failures: validationFailures })
         .eq("id", usageId);
       if (error) logError("biblical_ai.usage", error);
     }
     logInfo("biblical_ai.answered", { depth: input.depth, category: input.category, ms: Date.now() - started, validationFailures, limitations: answer.limitations.length });
     return { ok: true, conversationId, messageId, answer, passages: answer.scripture.map((s) => citedPassage(s.reference)).filter((p): p is CitedPassage => Boolean(p)), depth: input.depth, replayed: false };
   } catch (err) {
-    if (usageId !== null) await service.from("bible_ai_usage").update({ status: "failed", model: modelUsed, feature: "biblical_ai", depth: input.depth, latency_ms: Date.now() - started, validation_failures: validationFailures }).eq("id", usageId);
-    if (input.signal?.aborted) return { ok: false, code: "cancelled", error: "Cancelled. Nothing was counted." };
+    await releaseClaim(input.userId, claim);
+    // A question already sent to the AI and then cancelled or declined still counts toward the member's limits
+    // ('cancelled'), so neither can be used to spend the app's AI budget freely. Provider failures and time-outs don't.
+    const timedOut = (input.signal?.reason as { name?: string } | undefined)?.name === "TimeoutError";
+    const memberStopped = (input.signal?.aborted && !timedOut) || (err instanceof AiError && err.message === "refused");
+    if (usageId !== null) await service.from("bible_ai_usage").update({ status: memberStopped ? "cancelled" : "failed", model: modelUsed, feature: "biblical_ai", depth: input.depth, latency_ms: Date.now() - started, validation_failures: validationFailures }).eq("id", usageId);
+    if (input.signal?.aborted) return abortedResult(input.signal, memberStopped && usageId !== null);
     if (err instanceof AiError) {
       if (err.message === "refused") return { ok: false, code: "refused", error: "Biblical AI can't answer that one. Try asking about a passage, a person, a doctrine or a theme in the Bible." };
       return { ok: false, code: codeOf(err), error: err.message, retryAfter: err.retryAfterSeconds };
@@ -387,7 +483,29 @@ export interface PlanInput {
 }
 export type PlanResult = { ok: true; studyId: string; study: StudyPlan; replayed: boolean } | Failure;
 
-const PLAN_TOKENS: Record<StudyDuration, number> = { 7: 4000, 14: 6500, 30: 11000, 60: 18000, 90: 24000 };
+const PLAN_TOKENS: Record<StudyDuration, number> = { 7: 4000, 14: 6500, 30: 11000, 60: 15000, 90: 20000 };
+/** One plan attempt may take this long; the whole request is limited by the page (180 s). */
+const PLAN_ATTEMPT_TIMEOUT_MS = 150_000;
+
+/** Run the prose checks over every free-text field of a plan; returns the cleaned plan and what was wrong. */
+function checkPlanProse(plan: StudyPlan, retrieved: string[]): { plan: StudyPlan; failures: string[] } {
+  const deps = { passageText: (r: ScriptureRef) => passageText(r), verseHasStrong, documents: new Map<string, SourceDocument>(), retrieved };
+  const failures: string[] = [];
+  const clean = (t: string) => {
+    const r = checkText(t, deps);
+    failures.push(...r.failures);
+    return r.text;
+  };
+  return {
+    plan: {
+      ...plan,
+      title: clean(plan.title) || plan.title.replace(/[^\p{L}\p{N} ,'-]/gu, ""),
+      objective: clean(plan.objective),
+      days: plan.days.map((d) => ({ ...d, title: clean(d.title) || `Day ${d.day}`, explanation: clean(d.explanation), questions: d.questions.map(clean).filter(Boolean), application: d.application ? clean(d.application) || null : null, prayer: d.prayer ? clean(d.prayer) || null : null })),
+    },
+    failures,
+  };
+}
 
 /** Generate a personalized study (Pro), check it, and save it. */
 export async function generateStudyPlan(input: PlanInput): Promise<PlanResult> {
@@ -399,7 +517,7 @@ export async function generateStudyPlan(input: PlanInput): Promise<PlanResult> {
   if ("ok" in pre) return pre;
   if (!pre.limits.studyPlans) return { ok: false, code: "not_entitled", error: "Personalized Bible studies are included with Pro All Access." };
   const service = getServiceSupabase();
-  const { data: existing } = await service.from("biblical_ai_saved_studies").select("id, content").eq("user_id", input.userId).eq("kind", "plan").contains("content", { requestId: input.requestId }).maybeSingle();
+  const { data: existing } = await service.from("biblical_ai_saved_studies").select("id, content").eq("user_id", input.userId).eq("request_id", input.requestId).maybeSingle();
   if (existing) return { ok: true, studyId: existing.id as string, study: (existing.content as { plan: StudyPlan }).plan, replayed: true };
 
   const scripture = retrieveScripture(`${topic} ${input.passage ?? ""}`, { depth: "deep", category: "personal", passage: input.passage ?? null });
@@ -419,7 +537,7 @@ export async function generateStudyPlan(input: PlanInput): Promise<PlanResult> {
       for (let attempt = 1; attempt <= MAX_ATTEMPTS && !out; attempt++) {
         const msg = await client.messages.create(
           { model, max_tokens: PLAN_TOKENS[days], system: [{ type: "text", text: STUDY_PLAN_SYSTEM, cache_control: { type: "ephemeral" } }], tools: [PLAN_TOOL], tool_choice: { type: "tool", name: PLAN_TOOL.name }, messages },
-          { signal: input.signal, timeout: 180_000 },
+          { signal: input.signal, timeout: PLAN_ATTEMPT_TIMEOUT_MS },
         );
         inputTokens += msg.usage.input_tokens;
         outputTokens += msg.usage.output_tokens;
@@ -427,9 +545,16 @@ export async function generateStudyPlan(input: PlanInput): Promise<PlanResult> {
         if (msg.stop_reason === "refusal") throw new AiError("provider", "refused", undefined, cost);
         const raw = rawPlanSchema.safeParse(toolInput(msg, PLAN_TOOL.name));
         const toolUse = msg.content.find((b) => b.type === "tool_use");
-        const failures = raw.success ? validatePlan(raw.data, { days, topic, verseCount: (r) => getPassage(r).filter((v) => v.text).length }) : { plan: null, failures: ["The plan did not match the required structure."] };
-        if (failures.plan) out = failures.plan;
-        else if (attempt < MAX_ATTEMPTS && toolUse) messages.push({ role: "assistant", content: msg.content }, { role: "user", content: [{ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: `The plan failed these checks:\n${failures.failures.slice(0, 15).map((f) => `- ${f}`).join("\n")}\nCall submit_plan again with a corrected plan.` }] });
+        const checked = raw.success ? validatePlan(raw.data, { days, topic, verseCount: (r) => getPassage(r).filter((v) => v.text).length }) : { plan: null, failures: ["The plan did not match the required structure."] };
+        let failures = checked;
+        if (checked.plan) {
+          // Readings are valid; the prose gets the same reference, quotation and attribution checks as answers.
+          const prose = checkPlanProse(checked.plan, scripture.references);
+          if (!prose.failures.length || attempt === MAX_ATTEMPTS || !toolUse) out = prose.plan;
+          else failures = { plan: null, failures: prose.failures };
+        }
+        if (out) break;
+        if (attempt < MAX_ATTEMPTS && toolUse) messages.push({ role: "assistant", content: msg.content }, { role: "user", content: [{ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: `The plan failed these checks:\n${failures.failures.slice(0, 15).map((f) => `- ${f}`).join("\n")}\nCall submit_plan again with a corrected plan.` }] });
       }
       return { value: out, inputTokens, outputTokens, costMicros: cost };
     });
@@ -439,7 +564,7 @@ export async function generateStudyPlan(input: PlanInput): Promise<PlanResult> {
     }
     const { data: row, error } = await service
       .from("biblical_ai_saved_studies")
-      .insert({ user_id: input.userId, kind: "plan", title: study.title.slice(0, 120), content: { plan: study, requestId: input.requestId } })
+      .insert({ user_id: input.userId, kind: "plan", title: study.title.slice(0, 120), content: { plan: study }, request_id: input.requestId })
       .select("id")
       .single();
     if (error || !row) throw error ?? new Error("study not saved");
@@ -447,7 +572,7 @@ export async function generateStudyPlan(input: PlanInput): Promise<PlanResult> {
     return { ok: true, studyId: row.id as string, study, replayed: false };
   } catch (err) {
     if (usageId !== null) await service.from("bible_ai_usage").update({ status: "failed", model: modelUsed, feature: "study_plan", latency_ms: Date.now() - started }).eq("id", usageId);
-    if (input.signal?.aborted) return { ok: false, code: "cancelled", error: "Cancelled. Nothing was counted." };
+    if (input.signal?.aborted) return abortedResult(input.signal);
     if (err instanceof AiError) {
       if (err.message === "refused") return { ok: false, code: "refused", error: "Biblical AI can't create a study on that topic. Try another topic." };
       return { ok: false, code: codeOf(err), error: err.message, retryAfter: err.retryAfterSeconds };

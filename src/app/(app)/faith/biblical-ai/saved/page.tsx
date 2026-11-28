@@ -16,7 +16,7 @@ export default async function SavedStudiesPage({ searchParams }: { searchParams:
   if (sp.filter === "plans") query = query.eq("kind", "plan");
   const { data: rows } = await query;
   const tab = (f: string | undefined, label: string) => (
-    <Link href={f ? `/faith/biblical-ai/saved?filter=${f}` : "/faith/biblical-ai/saved"} aria-current={sp.filter === f ? "page" : undefined} className={`inline-flex min-h-9 items-center rounded-full border px-3 text-sm font-semibold ${sp.filter === f ? "border-gold bg-gold/15 text-gold-highlight" : "border-border text-muted-foreground"}`}>
+    <Link href={f ? `/faith/biblical-ai/saved?filter=${f}` : "/faith/biblical-ai/saved"} aria-current={sp.filter === f ? "page" : undefined} className={`inline-flex min-h-11 items-center rounded-full border px-3 text-sm font-semibold ${sp.filter === f ? "border-gold bg-gold/15 text-gold-highlight" : "border-border text-muted-foreground"}`}>
       {label}
     </Link>
   );

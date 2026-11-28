@@ -15,7 +15,6 @@ export function StudyDayToggle({ studyId, day, done: initial }: { studyId: strin
       type="button"
       size="sm"
       variant={done ? "secondary" : "default"}
-      aria-pressed={done}
       disabled={pending}
       onClick={() =>
         start(async () => {

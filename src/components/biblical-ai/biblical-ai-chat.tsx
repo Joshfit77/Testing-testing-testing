@@ -59,6 +59,14 @@ export function BiblicalAiChat(props: {
   const [left, setLeft] = useState(props.remainingToday);
   const abort = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement | null>(null);
+  const input = useRef<HTMLTextAreaElement | null>(null);
+  const lastAnswer = useRef<HTMLLIElement | null>(null);
+  /** One short line for screen readers (the conversation itself isn't read out in full). */
+  const [announce, setAnnounce] = useState("");
+  /** A cancelled question, kept so sending it again unchanged reuses its id (never counted twice). */
+  const cancelled = useRef<{ question: string; requestId: string } | null>(null);
+  /** Why the request was stopped: the member's Cancel, or the screen's own timer. */
+  const stopReason = useRef<"cancel" | "timeout" | null>(null);
   const back = conversationId ? `/faith/biblical-ai/ask?c=${conversationId}` : "/faith/biblical-ai";
 
   useEffect(() => {
@@ -70,9 +78,15 @@ export function BiblicalAiChat(props: {
     if (pending) return;
     setFailed(null);
     setPending({ question: q, requestId, status: "sending" });
+    setAnnounce("Studying your question…");
     const ctrl = new AbortController();
     abort.current = ctrl;
-    const timer = setTimeout(() => ctrl.abort(), 150_000);
+    stopReason.current = null;
+    // Longer than the server's own limit (140 s), so the server normally answers first with a clear reason.
+    const timer = setTimeout(() => {
+      stopReason.current = "timeout";
+      ctrl.abort();
+    }, 170_000);
     try {
       const res = await fetch("/api/biblical-ai/ask", {
         method: "POST",
@@ -99,10 +113,22 @@ export function BiblicalAiChat(props: {
           const line = buffer.slice(0, nl).trim();
           buffer = buffer.slice(nl + 1);
           if (!line) continue;
-          const ev = JSON.parse(line) as
+          let ev:
+            | { type: "ping" }
             | { type: "status"; status: string }
             | { type: "done"; result: { conversationId: string; messageId: string; answer: ValidatedAnswer; passages: ShownPassage[]; replayed: boolean } }
             | { type: "error"; code: string; error: string };
+          try {
+            ev = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (ev.type === "ping") continue;
+          const unused = null as unknown as
+            | { type: "status"; status: string }
+            | { type: "done"; result: { conversationId: string; messageId: string; answer: ValidatedAnswer; passages: ShownPassage[]; replayed: boolean } }
+            | { type: "error"; code: string; error: string };
+          void unused;
           if (ev.type === "status") setPending((p) => (p ? { ...p, status: ev.status } : p));
           else if (ev.type === "done") {
             finished = true;
@@ -110,6 +136,9 @@ export function BiblicalAiChat(props: {
             setMessages((m) => [...m, { id: `${r.messageId}-q`, role: "user", content: q }, { id: r.messageId, role: "assistant", content: r.answer.answer, answer: r.answer, passages: r.passages }]);
             if (!r.replayed) setLeft((n) => Math.max(0, n - 1));
             setShared(null);
+            cancelled.current = null;
+            setAnnounce("Answer ready.");
+            requestAnimationFrame(() => lastAnswer.current?.focus());
             if (!conversationId) {
               setConversationId(r.conversationId);
               window.history.replaceState(null, "", `/faith/biblical-ai/ask?c=${r.conversationId}`);
@@ -117,15 +146,21 @@ export function BiblicalAiChat(props: {
           } else {
             finished = true;
             if (ev.code === "consent_required" || ev.code === "unavailable") router.refresh();
-            setFailed({ question: q, requestId, error: ev.error, retryable: ev.code === "error" || ev.code === "rate_limited" });
+            setFailed({ question: q, requestId, error: ev.error, retryable: ev.code === "error" || ev.code === "rate_limited" || ev.code === "timeout" });
+            setAnnounce(ev.error);
           }
         }
       }
       if (!finished) setFailed({ question: q, requestId, error: "The connection was interrupted.", retryable: true });
     } catch (err) {
-      if (ctrl.signal.aborted) {
+      if (ctrl.signal.aborted && stopReason.current === "timeout") {
+        setFailed({ question: q, requestId, error: "That took too long. Please try again; you won't be counted twice.", retryable: true });
+      } else if (ctrl.signal.aborted) {
         setQuestion(q);
-        toast.info("Cancelled. Nothing was counted.");
+        cancelled.current = { question: q, requestId };
+        toast.info("Cancelled.");
+        setAnnounce("Cancelled.");
+        requestAnimationFrame(() => input.current?.focus());
       } else {
         setFailed({ question: q, requestId, error: err instanceof Error && /fetch|network/i.test(err.message) ? "Couldn't reach Biblical AI. Check your connection." : "Something went wrong.", retryable: true });
       }
@@ -140,18 +175,39 @@ export function BiblicalAiChat(props: {
     const q = question.trim();
     if (q.length < 3 || pending) return;
     setQuestion("");
-    void send(q, crypto.randomUUID());
+    // Sending a cancelled question again unchanged reuses its id: if the server had already saved it, that answer
+    // comes back instead of a second, counted one.
+    const reuse = cancelled.current?.question === q ? cancelled.current.requestId : null;
+    cancelled.current = null;
+    void send(q, reuse ?? crypto.randomUUID());
+  }
+
+  /** A fresh study on this screen (the page itself isn't reloaded, so its state is reset here). */
+  function newStudy() {
+    abort.current?.abort();
+    setMessages([]);
+    setConversationId(null);
+    setFailed(null);
+    setQuestion("");
+    cancelled.current = null;
+    window.history.replaceState(null, "", "/faith/biblical-ai/ask");
+    requestAnimationFrame(() => input.current?.focus());
   }
 
   return (
     <div className="space-y-4">
       {messages.length > 0 && (
-        <ol className="space-y-4" aria-label="Conversation" aria-live="polite">
-          {messages.map((m) => (
-            <li key={m.id} className={m.role === "user" ? "ml-8 rounded-2xl bg-gold/10 p-3" : "rounded-2xl border border-border bg-card p-3"}>
+        <ol className="space-y-4 [overflow-wrap:anywhere]" aria-label="Conversation">
+          {messages.map((m, i) => (
+            <li
+              key={m.id}
+              ref={i === messages.length - 1 && m.role === "assistant" ? lastAnswer : undefined}
+              tabIndex={i === messages.length - 1 && m.role === "assistant" ? -1 : undefined}
+              className={m.role === "user" ? "ml-8 rounded-2xl bg-gold/10 p-3" : "rounded-2xl border border-border bg-card p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight"}
+            >
               <p className="mb-1 text-xs font-semibold text-muted-foreground">{m.role === "user" ? "You" : "Narrow Gate Biblical AI"}</p>
               {m.role === "assistant" && m.answer ? (
-                <AnswerView answer={m.answer} passages={m.passages ?? []} back={back} messageId={m.id} question={messages[messages.indexOf(m) - 1]?.content} saved={m.saved} />
+                <AnswerView answer={m.answer} passages={m.passages ?? []} back={back} messageId={m.id} question={messages[i - 1]?.content} saved={m.saved} />
               ) : (
                 <p className="whitespace-pre-wrap text-body">{m.content}</p>
               )}
@@ -160,14 +216,25 @@ export function BiblicalAiChat(props: {
         </ol>
       )}
 
+      <p className="sr-only" role="status" aria-live="polite" data-testid="biblical-ai-announce">
+        {announce}
+      </p>
       {pending && (
-        <div className="space-y-2" aria-live="polite">
+        <div className="space-y-2">
           <p className="ml-8 rounded-2xl bg-gold/10 p-3 text-body">{pending.question}</p>
-          <div className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-card p-3" role="status" data-testid="biblical-ai-status">
+          <div className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-card p-3" data-testid="biblical-ai-status">
             <span className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin text-gold" aria-hidden /> {STATUS_TEXT[pending.status] ?? STATUS_TEXT.answering}
             </span>
-            <Button type="button" variant="ghost" size="sm" onClick={() => abort.current?.abort()}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                stopReason.current = "cancel";
+                abort.current?.abort();
+              }}
+            >
               <Square aria-hidden /> Cancel
             </Button>
           </div>
@@ -223,6 +290,7 @@ export function BiblicalAiChat(props: {
           Your question
         </label>
         <Textarea
+          ref={input}
           id="biblical-ai-question"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
@@ -238,7 +306,7 @@ export function BiblicalAiChat(props: {
           {DEPTHS.map((d) => {
             const allowed = props.allowedDepths.includes(d.id);
             return (
-              <label key={d.id} className={cn("inline-flex min-h-9 cursor-pointer items-center rounded-full border px-3 text-xs font-semibold", depth === d.id ? "border-gold bg-gold/15 text-gold-highlight" : "border-border text-muted-foreground", !allowed && "cursor-not-allowed opacity-50")} title={allowed ? d.description : "Included with Pro All Access"}>
+              <label key={d.id} className={cn("inline-flex min-h-11 cursor-pointer items-center rounded-full border px-3 text-xs font-semibold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-gold-highlight", depth === d.id ? "border-gold bg-gold/15 text-gold-highlight" : "border-border text-muted-foreground", !allowed && "cursor-not-allowed opacity-50")} title={allowed ? d.description : "Included with Pro All Access"}>
                 <input type="radio" name="depth" value={d.id} checked={depth === d.id} disabled={!allowed} onChange={() => setDepth(d.id)} className="sr-only" />
                 {d.label}
                 {!allowed && " · Pro"}
@@ -248,11 +316,23 @@ export function BiblicalAiChat(props: {
         </fieldset>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground" data-testid="biblical-ai-remaining">
-            {left} question{left === 1 ? "" : "s"} left today
+            {left > 0 ? (
+              `${left} question${left === 1 ? "" : "s"} left today`
+            ) : (
+              <>
+                No questions left today; they come back over the next 24 hours.{" "}
+                {!props.allowedDepths.includes("deep") && (
+                  <a href="/profile/billing" className="font-semibold text-gold-highlight underline-offset-4 hover:underline">
+                    Pro All Access
+                  </a>
+                )}{" "}
+                includes more. The Bible is always free to read.
+              </>
+            )}
           </span>
           <div className="flex gap-2">
             {messages.length > 0 && (
-              <Button type="button" variant="ghost" size="sm" onClick={() => router.push("/faith/biblical-ai/ask")}>
+              <Button type="button" variant="ghost" size="sm" onClick={newStudy}>
                 <Plus aria-hidden /> New study
               </Button>
             )}

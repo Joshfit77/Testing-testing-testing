@@ -39,7 +39,7 @@ export default async function AdminBiblicalAiPage({ searchParams }: { searchPara
   const [{ data: metricsRaw, error: metricsError }, { data: sources }, { data: reports }, flagOn] = await Promise.all([
     // Through the admin's own session: the database checks the admin role (with two-step sign-in) too.
     supabase.rpc("biblical_ai_admin_metrics", { p_days: days }),
-    service.from("biblical_ai_sources").select("slug, kind, name, author, ministry, official_url, licence, commercial_use, storage_permitted, status, notes, updated_at").order("kind").order("name"),
+    service.from("biblical_ai_sources").select("slug, kind, name, author, ministry, official_url, licence, commercial_use, storage_permitted, attribution, attribution_required, status, notes, updated_at").order("kind").order("name"),
     service.from("biblical_ai_feedback").select("id, kind, note, question, answer, created_at").eq("kind", "inaccurate").eq("status", "open").order("created_at", { ascending: false }).limit(20),
     biblicalAiFlagOn(),
   ]);
@@ -100,7 +100,7 @@ export default async function AdminBiblicalAiPage({ searchParams }: { searchPara
         <h2 id="sources-title" className="font-semibold">
           Sources
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">Only approved sources are used. Approving a teacher&apos;s material needs a founder (FOUNDER_USER_IDS) and confirmed rights; any administrator can disable a source. Every change is recorded.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Only approved sources are used. Teachers are internal knowledge sources: members never see this list, teacher names or profiles; their approved material informs one assistant&apos;s answers, and a credit is shown only where a licence requires it. Approving a teacher&apos;s material needs a founder (FOUNDER_USER_IDS) and confirmed rights; any administrator can disable a source. Every change is recorded.</p>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="text-xs text-muted-foreground">
@@ -125,6 +125,8 @@ export default async function AdminBiblicalAiPage({ searchParams }: { searchPara
                     {(s.licence as string | null) ?? "Not verified"}
                     <br />
                     Commercial use: {s.commercial_use as string}; storage: {s.storage_permitted as string}
+                    <br />
+                    Credit shown to members: {s.attribution_required ? ((s.attribution as string | null) ?? "required, text missing") : "none"}
                   </td>
                   <td className="py-2 pr-3 font-semibold">{(s.status as string).replace("_", " ")}</td>
                   <td className="py-2">

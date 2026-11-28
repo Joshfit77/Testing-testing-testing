@@ -10341,6 +10341,9 @@ grant execute on function public.reserve_storage_upload(text, text, bigint) to a
 --     public.biblical_ai_feedback, public.biblical_ai_saved_studies, public.biblical_ai_messages, public.biblical_ai_conversations;
 --   alter table public.bible_ai_usage drop column if exists feature, drop column if exists depth,
 --     drop column if exists latency_ms, drop column if exists validation_failures;
+--   update public.bible_ai_usage set status = 'failed' where status = 'cancelled';
+--   alter table public.bible_ai_usage drop constraint bible_ai_usage_status_check,
+--     add constraint bible_ai_usage_status_check check (status in ('reserved', 'done', 'failed'));
 --   delete from public.feature_flags where key = 'biblical_ai';
 
 insert into public.feature_flags (key, enabled, description)
@@ -10353,6 +10356,12 @@ alter table public.bible_ai_usage
   add column if not exists depth text check (depth in ('quick', 'standard', 'deep')),
   add column if not exists latency_ms integer check (latency_ms >= 0),
   add column if not exists validation_failures integer not null default 0 check (validation_failures >= 0);
+
+-- 'cancelled': a question already sent to the AI that the member cancelled, or that the AI declined. It counts toward
+-- the member's limits (reserve_bible_ai_usage counts every status but 'failed'), so cancelling or provoking refusals
+-- can't spend the app's AI budget without limit. Provider failures and time-outs stay 'failed' (not counted).
+alter table public.bible_ai_usage drop constraint if exists bible_ai_usage_status_check;
+alter table public.bible_ai_usage add constraint bible_ai_usage_status_check check (status in ('reserved', 'done', 'failed', 'cancelled'));
 
 create table public.biblical_ai_conversations (
   id uuid primary key default gen_random_uuid(),
@@ -10398,10 +10407,13 @@ create table public.biblical_ai_saved_studies (
   bookmarked boolean not null default false,
   -- kind 'plan': the days the member has marked done.
   completed_days integer[] not null default '{}',
+  -- kind 'plan': the client's id for the request, so a retried request returns the saved study instead of a second one.
+  request_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 create index biblical_ai_saved_studies_user_idx on public.biblical_ai_saved_studies (user_id, updated_at desc);
+create unique index biblical_ai_saved_studies_request_idx on public.biblical_ai_saved_studies (user_id, request_id) where request_id is not null;
 
 -- A member's report that an answer was inaccurate (or helpful). The question and answer are copied in only because
 -- the member chose to send them for review; the screen says so.
@@ -10419,8 +10431,11 @@ create table public.biblical_ai_feedback (
 create index biblical_ai_feedback_status_idx on public.biblical_ai_feedback (status, created_at desc);
 create index biblical_ai_feedback_user_idx on public.biblical_ai_feedback (user_id, created_at desc);
 
--- Source inventory: what Biblical AI may draw on, with rights and approval. Teachers' material is used only from
--- documents of an approved source; until then no teacher is quoted or summarised.
+-- Source inventory: what Biblical AI may draw on, with rights and approval. Restricted to the admin backend (no member
+-- access): teachers are internal knowledge sources for one assistant, never shown to members as profiles, a directory
+-- or modes. Their material is used only from documents of an approved source, synthesised into answers in the
+-- assistant's own words. 'attribution_required': the licence requires a credit, so 'attribution' is shown with
+-- answers that used it; otherwise nothing about the source is shown.
 create table public.biblical_ai_sources (
   slug text primary key check (slug ~ '^[a-z0-9-]{2,60}$'),
   kind text not null check (kind in ('scripture', 'original_language', 'lexicon', 'cross_reference', 'teacher', 'history')),
@@ -10432,6 +10447,7 @@ create table public.biblical_ai_sources (
   commercial_use text not null default 'unknown' check (commercial_use in ('permitted', 'not_permitted', 'unknown')),
   storage_permitted text not null default 'unknown' check (storage_permitted in ('permitted', 'not_permitted', 'unknown')),
   attribution text check (char_length(attribution) <= 400),
+  attribution_required boolean not null default false,
   status text not null default 'pending_review' check (status in ('pending_review', 'approved', 'disabled')),
   notes text check (char_length(notes) <= 2000),
   updated_at timestamptz not null default now(),
@@ -10504,6 +10520,9 @@ create policy biblical_ai_feedback_select_own on public.biblical_ai_feedback for
 revoke all on table public.biblical_ai_conversations, public.biblical_ai_messages, public.biblical_ai_saved_studies, public.biblical_ai_feedback from anon;
 revoke insert, update on table public.biblical_ai_conversations, public.biblical_ai_messages, public.biblical_ai_saved_studies, public.biblical_ai_feedback from authenticated;
 revoke all on table public.biblical_ai_sources, public.biblical_ai_source_documents, public.biblical_ai_source_audit from anon, authenticated;
+-- Members only read (and, where a policy allows, delete) their rows; nothing else at table level.
+revoke truncate, trigger, references on table public.biblical_ai_conversations, public.biblical_ai_messages, public.biblical_ai_saved_studies, public.biblical_ai_feedback from authenticated;
+revoke delete on table public.biblical_ai_feedback from authenticated;
 
 -- Aggregate figures for the admin page: counts and timings only, never a question, answer or member.
 create or replace function public.biblical_ai_admin_metrics(p_days integer default 30)
@@ -10552,16 +10571,21 @@ as $$
 declare
   v_old text;
   v_kind text;
+  v_credit_missing boolean;
 begin
   if p_status not in ('pending_review', 'approved', 'disabled') then
     raise exception 'invalid status' using errcode = '22023';
   end if;
-  select s.status, s.kind into v_old, v_kind from public.biblical_ai_sources s where s.slug = p_slug for update;
+  select s.status, s.kind, (s.attribution_required and s.attribution is null) into v_old, v_kind, v_credit_missing from public.biblical_ai_sources s where s.slug = p_slug for update;
   if v_old is null then
     raise exception 'unknown source' using errcode = '22023';
   end if;
   if p_status = 'approved' and v_kind = 'teacher' and not coalesce(p_founder, false) then
     raise exception 'founder approval required' using errcode = '42501';
+  end if;
+  -- A licence that requires a credit can't be approved until the credit text is recorded.
+  if p_status = 'approved' and v_credit_missing then
+    raise exception 'attribution text required' using errcode = '23514';
   end if;
   update public.biblical_ai_sources set status = p_status, updated_at = now(), updated_by = p_actor where slug = p_slug;
   insert into public.biblical_ai_source_audit (source_slug, old_status, new_status, reason, changed_by) values (p_slug, v_old, p_status, left(p_reason, 1000), p_actor);

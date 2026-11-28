@@ -34,6 +34,9 @@ export async function purgeExpiredAiChats(options: { now?: Date; days?: number |
   if (biblical.error) throw biblical.error;
   const biblicalConvos = await admin.from("biblical_ai_conversations").delete({ count: "exact" }).lt("updated_at", cutoff);
   if (biblicalConvos.error) throw biblicalConvos.error;
+  // Inaccuracy reports keep their kind and note; the copies of the question and answer follow the same retention.
+  const reportCopies = await admin.from("biblical_ai_feedback").update({ question: null, answer: null }).lt("created_at", cutoff).or("question.not.is.null,answer.not.is.null");
+  if (reportCopies.error) throw reportCopies.error;
 
   const report = {
     enabled: true as const,

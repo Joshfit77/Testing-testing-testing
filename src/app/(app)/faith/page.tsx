@@ -65,7 +65,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
   const hidden = new Set<FaithSection>(parseLayoutPrefs(profile.layout_prefs).faith?.hidden ?? []);
   const show = (s: FaithSection) => !hidden.has(s);
 
-  const [journalRes, journalCountRes, practiceData, devotionalsRes, challenge, reminders, journey, goals, reading, biblicalAi] = await Promise.all([
+  const [journalRes, journalCountRes, practiceData, devotionalsRes, challenge, reminders, journey, goals, reading, biblicalAi, lastConversation] = await Promise.all([
     supabase.from("faith_journal_entries").select(JOURNAL_SELECT).eq("user_id", user.id).order("entry_date", { ascending: false }).order("created_at", { ascending: false }).limit(3),
     supabase.from("faith_journal_entries").select("id", { count: "exact", head: true }).eq("user_id", user.id),
     loadPractices(supabase, user.id, startOfWeek(addDays(today, -6))),
@@ -76,11 +76,10 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
     loadDailyGoals(supabase, user.id, profile.timezone),
     loadReadingState(supabase, user.id),
     biblicalAiFlagOn(),
+    supabase.from("biblical_ai_conversations").select("id").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   // Biblical AI (when switched on) replaces the "Ask" shortcut, so there aren't two ways to the same thing.
-  const lastStudy = biblicalAi
-    ? ((await supabase.from("biblical_ai_conversations").select("id").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(1).maybeSingle()).data?.id as string | undefined)
-    : undefined;
+  const lastStudy = biblicalAi ? (lastConversation.data?.id as string | undefined) : undefined;
   const tools = [
     { href: "/faith/bible", label: "Bible", icon: BookOpen },
     { href: "/faith/bible/search", label: "Search", icon: Search },

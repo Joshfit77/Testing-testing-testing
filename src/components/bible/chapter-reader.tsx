@@ -395,7 +395,7 @@ export function ChapterReader(props: {
               </Button>
             )}
           </div>
-          <div className={cn("grid gap-1", props.studyActions ? "grid-cols-6" : "grid-cols-5")}>
+          <div className={cn("grid gap-1", props.studyActions ? "grid-cols-3 sm:grid-cols-6" : "grid-cols-5")}>
             {props.studyActions && <ToolButton onClick={() => setStudyOpen(true)} label="Study" icon={<Sparkles aria-hidden />} />}
             <ToolButton onClick={bookmark} disabled={pending} label={selected.length === 1 && bookmarks.has(selected[0]!) ? "Unmark" : "Bookmark"} icon={<Bookmark aria-hidden />} />
             <ToolButton onClick={openNote} disabled={pending} label="Note" icon={<NotebookPen aria-hidden />} />
@@ -417,7 +417,7 @@ export function ChapterReader(props: {
             <ul className="mt-2 grid gap-1 sm:grid-cols-2" data-testid="study-actions">
               {PASSAGE_ACTIONS.map((a) => (
                 <li key={a.id}>
-                  <Link href={`${askHref({ passage: ref, category: a.category, depth: a.depth })}&action=${a.id}`} className="flex min-h-11 items-center rounded-lg border border-border px-3 text-sm hover:border-gold-muted" onClick={() => setStudyOpen(false)}>
+                  <Link href={askHref({ passage: ref, category: a.category, depth: a.depth, action: a.id })} className="flex min-h-11 items-center rounded-lg border border-border px-3 text-sm hover:border-gold-muted" onClick={() => setStudyOpen(false)}>
                     {a.label}
                   </Link>
                 </li>

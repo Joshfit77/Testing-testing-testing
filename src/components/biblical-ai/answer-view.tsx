@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ScriptureText } from "@/components/bible/scripture-text";
-import { EVIDENCE_LABEL, type ValidatedAnswer } from "@/lib/biblical-ai/answer";
+import type { ValidatedAnswer } from "@/lib/biblical-ai/answer";
+import { EVIDENCE_LABEL } from "@/lib/biblical-ai/config";
 import { linkReferences, referenceHref } from "@/lib/biblical-ai/links";
 import { parseReference } from "@/lib/bible/reference";
 import { bookById } from "@/lib/bible/books";
@@ -118,7 +119,7 @@ export function AnswerView({ answer, passages, back, messageId, question, saved:
             return (
               <div key={s.reference} className="space-y-1">
                 {href ? (
-                  <Link href={href} className="inline-flex min-h-8 items-center gap-1 text-sm font-semibold text-gold-highlight hover:underline">
+                  <Link href={href} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-gold-highlight hover:underline">
                     <BookOpen className="size-3.5" aria-hidden /> {s.reference}
                   </Link>
                 ) : (
@@ -162,7 +163,7 @@ export function AnswerView({ answer, passages, back, messageId, question, saved:
                 </p>
                 <LinkedText text={o.explanation} back={back} className="text-sm" />
                 {words && (
-                  <Link href={words} className="inline-flex min-h-8 items-center gap-1 text-xs font-semibold text-gold-highlight hover:underline">
+                  <Link href={words} className="inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-gold-highlight hover:underline">
                     <Languages className="size-3.5" aria-hidden /> See every word of {o.reference}
                   </Link>
                 )}
@@ -183,27 +184,25 @@ export function AnswerView({ answer, passages, back, messageId, question, saved:
           </ul>
         </Section>
       )}
-      {answer.commentary.length > 0 && (
-        <Section title="Verified commentary" testId="section-commentary">
-          {answer.commentary.map((c) => {
-            const url = safeExternal(c.url);
+      {(answer.sources ?? []).length > 0 && (
+        <div className="space-y-1 text-xs text-muted-foreground" data-testid="answer-sources">
+          {answer.sources.map((c) => {
+            const url = c.url ? safeExternal(c.url) : null;
             return (
-              <div key={c.documentId} className="space-y-1 text-sm">
-                <p className="font-semibold">
-                  {c.author}, <span className="italic">{c.title}</span>
-                  {c.publishedOn ? ` (${c.publishedOn.slice(0, 4)})` : ""}
-                </p>
-                <p className="text-muted-foreground">{c.summary}</p>
+              <p key={c.attribution}>
+                {c.attribution}
                 {url && (
-                  <a href={url} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex min-h-8 items-center gap-1 text-xs font-semibold text-gold-highlight hover:underline">
-                    Read the original <ExternalLink className="size-3" aria-hidden />
-                  </a>
+                  <>
+                    {" "}
+                    <a href={url} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex min-h-11 items-center gap-1 font-semibold text-gold-highlight hover:underline">
+                      Source <ExternalLink className="size-3" aria-hidden />
+                    </a>
+                  </>
                 )}
-              </div>
+              </p>
             );
           })}
-          <p className="text-xs text-muted-foreground">A summary of the source, not the teacher&apos;s own words. No teacher or ministry endorses or is affiliated with this app.</p>
-        </Section>
+        </div>
       )}
       {answer.application && (
         <Section title="Practical application" open testId="section-application">

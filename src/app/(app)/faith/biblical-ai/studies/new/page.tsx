@@ -5,6 +5,8 @@ import { STUDY_DURATIONS, STUDY_TOPICS } from "@/lib/biblical-ai/config";
 import { loadBiblicalAiAccess } from "@/server/biblical-ai-access";
 
 export const metadata = { title: "New personalized study · Narrow Gate Biblical AI" };
+// Generating a long study can take up to about three minutes (the server action runs under this page's limit).
+export const maxDuration = 180;
 
 /** Create a personalized Bible study (Pro All Access). */
 export default async function NewStudyPage({ searchParams }: { searchParams: Promise<{ passage?: string; topic?: string }> }) {

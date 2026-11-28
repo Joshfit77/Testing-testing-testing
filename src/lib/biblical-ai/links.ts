@@ -37,7 +37,7 @@ export function referenceHref(reference: string, back?: string | null): string |
   return ref ? readerHref(ref, back) : null;
 }
 
-export function askHref(opts: { category?: CategoryId; q?: string; passage?: string; depth?: Depth; conversation?: string; share?: string }): string {
+export function askHref(opts: { category?: CategoryId; q?: string; passage?: string; depth?: Depth; conversation?: string; share?: string; action?: string }): string {
   const q = new URLSearchParams();
   if (opts.conversation) q.set("c", opts.conversation);
   if (opts.category) q.set("category", opts.category);
@@ -45,6 +45,7 @@ export function askHref(opts: { category?: CategoryId; q?: string; passage?: str
   if (opts.passage) q.set("passage", opts.passage);
   if (opts.q) q.set("q", opts.q.slice(0, 600));
   if (opts.share) q.set("share", opts.share);
+  if (opts.action) q.set("action", opts.action);
   const s = q.toString();
   return `/faith/biblical-ai/ask${s ? `?${s}` : ""}`;
 }

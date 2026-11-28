@@ -10,7 +10,7 @@ import { EVAL_QUESTIONS } from "../biblical-ai-eval/questions";
  * and every expected reference is a real BSB passage (so the set can't reward a fabricated reference). Retrieval is
  * measured on it here, without any model: for a question that names a passage, that passage must be retrieved.
  */
-const TOPICS = ["Gospel", "Salvation", "Repentance", "Saving faith", "Grace", "Faith and works", "Assurance", "Trinity", "Deity of Christ", "Biblical authority", "Sanctification", "Prayer", "Evangelism", "Apologetics", "Marriage", "Sexual ethics", "Suffering", "Spiritual gifts", "Baptism", "Predestination", "Free will", "Eternal security", "Eschatology", "Difficult passages", "Alleged contradictions", "Hebrew", "Aramaic", "Greek", "Historical context", "Archaeology", "Manuscripts", "Theological disagreements"];
+const TOPICS = ["Gospel", "Salvation", "Repentance", "Saving faith", "Grace", "Faith and works", "Assurance", "Trinity", "Deity of Christ", "Biblical authority", "Sanctification", "Prayer", "Evangelism", "Apologetics", "Marriage", "Sexual ethics", "Suffering", "Spiritual gifts", "Baptism", "Predestination", "Free will", "Eternal security", "Eschatology", "Difficult passages", "Alleged contradictions", "Hebrew", "Aramaic", "Greek", "Historical context", "Archaeology", "Manuscripts", "Theological disagreements", "One voice"];
 
 describe("Biblical AI evaluation set", () => {
   it("has at least 250 questions with unique ids, covering every required topic", () => {
