@@ -1,0 +1,21 @@
+{
+ "name": "Cross references",
+ "source": "OpenBible.info cross references, https://www.openbible.info/labs/cross-references/",
+ "copiedFrom": "https://github.com/scrollmapper/bible_databases (sources/extras/cross_references.txt, a copy of the OpenBible.info file)",
+ "licence": "CC BY (OpenBible.info); file header: #www.openbible.info CC-BY 2024-11-04",
+ "attribution": "Cross references: OpenBible.info, CC BY.",
+ "input": {
+  "sha256": "452b263f657d3e721d20341b6b82f1196fc98882d685bd4ef9050ae17f033f82",
+  "bytes": 8293834
+ },
+ "rules": "votes > 0; at most 12 per verse, most votes first; every reference checked against the BSB",
+ "verses": 29323,
+ "counts": {
+  "lines": 344799,
+  "kept": 250316,
+  "droppedNoVotes": 3414,
+  "droppedUnknown": 18,
+  "droppedNotInBsb": 1
+ },
+ "builtAt": "2026-11-28T04:46:35.337Z"
+}

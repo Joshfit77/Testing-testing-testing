@@ -1,0 +1,582 @@
+{
+ "name": "Original-language layer (Hebrew, Aramaic, Greek)",
+ "source": "STEPBible-Data, https://github.com/STEPBible/STEPBible-Data",
+ "licence": "CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)",
+ "attribution": "Original-language data: STEP Bible (www.STEPBible.org), based on work by Tyndale House, Cambridge. CC BY 4.0.",
+ "changes": "Converted to per-book JSON; main-text selection, HTML stripped from lexicon entries and definitions shortened to 1,200 characters. No words, glosses or definitions were altered.",
+ "rules": {
+  "greekMainText": "word type contains uppercase N (NA27/28, SBL, WH or Tregelles)",
+  "hebrewMainText": "word type starts with L (Leningrad) or Q (Qere)",
+  "versification": "English (BSB); Hebrew versification kept in `heb` where it differs"
+ },
+ "builtAt": "2026-11-28T04:52:17.385Z",
+ "inputs": [
+  {
+   "file": "Translators Amalgamated OT+NT/TAGNT Act-Rev - Translators Amalgamated Greek NT - STEPBible.org CC-BY.txt",
+   "sha256": "122040eeeaeba50d6abbf67b39cacaff687211bda69b080e5d53927c830d9968",
+   "bytes": 15938967
+  },
+  {
+   "file": "Translators Amalgamated OT+NT/TAGNT Mat-Jhn - Translators Amalgamated Greek NT - STEPBible.org CC-BY.txt",
+   "sha256": "d4c0c820fdf9f2b450c9f96ce6103d6875028affd2e44094d753f1329ca1fd85",
+   "bytes": 14188364
+  },
+  {
+   "file": "Translators Amalgamated OT+NT/TAHOT Gen-Deu - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+   "sha256": "7763ef367bb0e6e1c1a95fb9b652e1d611b2481827611433e82abbf229216d70",
+   "bytes": 18190495
+  },
+  {
+   "file": "Translators Amalgamated OT+NT/TAHOT Isa-Mal - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+   "sha256": "d5a609f5a4b9f7757a2615e55877b07f9f6931a8afccef012c0b4bf662caf540",
+   "bytes": 17977558
+  },
+  {
+   "file": "Translators Amalgamated OT+NT/TAHOT Job-Sng - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+   "sha256": "e0416880bb78f46715bb17ce526b623c3051da0ef83f7bf83beaad350e6272e8",
+   "bytes": 9540663
+  },
+  {
+   "file": "Translators Amalgamated OT+NT/TAHOT Jos-Est - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+   "sha256": "b79add01a8c95673e31ec3ab8ad86183d2312cd96421ddf21f3d1f74377526a7",
+   "bytes": 24500357
+  },
+  {
+   "file": "Lexicons/TBESG - Translators Brief lexicon of Extended Strongs for Greek - STEPBible.org CC BY.txt",
+   "sha256": "734a5b64a1152f67604bf09d32f15c0ba537151961752fcf168087b41b4d93ea",
+   "bytes": 4736983
+  },
+  {
+   "file": "Lexicons/TBESH - Translators Brief lexicon of Extended Strongs for Hebrew - STEPBible.org CC BY.txt",
+   "sha256": "848eef2ac16753a43694897dbb9e8f266725e7cc9da4809f367ee5b990f05dbb",
+   "bytes": 3288115
+  },
+  {
+   "file": "Morphology codes/TEGMC - Translators Expansion of Greek Morphhology Codes - STEPBible.org CC BY.txt",
+   "sha256": "9e8443fd4759f112253d7a1858c0687a8cf833f4d537e8fda97bfff74ea4c168",
+   "bytes": 467126
+  },
+  {
+   "file": "Morphology codes/TEHMC - Translators Expansion of Hebrew Morphology Codes - STEPBible.org CC BY.txt",
+   "sha256": "fe37e62b97e531410159e5f1b1ac8a69db4512c3e8407c03bae38639bd09f97f",
+   "bytes": 394651
+  }
+ ],
+ "counts": {
+  "greekWords": 137024,
+  "hebrewWords": 300639,
+  "aramaicWords": 4826,
+  "greekVariants": 5071,
+  "hebrewLeftOut": {
+   "X": 152,
+   "V": 4,
+   "R": 27
+  },
+  "verses": 31218,
+  "movedBySplit": 25,
+  "mergedIntoPrevious": [
+   "3JN 1:15 → 1:14",
+   "REV 12:18 → 12:17"
+  ],
+  "disputedVerses": [
+   "JOS 21:36",
+   "JOS 21:37",
+   "MRK 16:9",
+   "MRK 16:10",
+   "MRK 16:11",
+   "MRK 16:12",
+   "MRK 16:13",
+   "MRK 16:14",
+   "MRK 16:15",
+   "MRK 16:16",
+   "MRK 16:17",
+   "MRK 16:18",
+   "MRK 16:19",
+   "MRK 16:20",
+   "JHN 7:53",
+   "JHN 8:1",
+   "JHN 8:2",
+   "JHN 8:3",
+   "JHN 8:4",
+   "JHN 8:5",
+   "JHN 8:6",
+   "JHN 8:7",
+   "JHN 8:8",
+   "JHN 8:9",
+   "JHN 8:10",
+   "JHN 8:11"
+  ]
+ },
+ "lexiconEntries": {
+  "greek": 9657,
+  "hebrew": 13073
+ },
+ "morphologyCodes": {
+  "greek": 1127,
+  "hebrew": 741
+ },
+ "books": [
+  {
+   "id": "GEN",
+   "lang": "hebrew",
+   "chapters": 50,
+   "verses": 1533,
+   "words": 20612
+  },
+  {
+   "id": "EXO",
+   "lang": "hebrew",
+   "chapters": 40,
+   "verses": 1213,
+   "words": 16713
+  },
+  {
+   "id": "LEV",
+   "lang": "hebrew",
+   "chapters": 27,
+   "verses": 859,
+   "words": 11950
+  },
+  {
+   "id": "NUM",
+   "lang": "hebrew",
+   "chapters": 36,
+   "verses": 1288,
+   "words": 16412
+  },
+  {
+   "id": "DEU",
+   "lang": "hebrew",
+   "chapters": 34,
+   "verses": 959,
+   "words": 14294
+  },
+  {
+   "id": "JOS",
+   "lang": "hebrew",
+   "chapters": 24,
+   "verses": 658,
+   "words": 10051
+  },
+  {
+   "id": "JDG",
+   "lang": "hebrew",
+   "chapters": 21,
+   "verses": 618,
+   "words": 9885
+  },
+  {
+   "id": "RUT",
+   "lang": "hebrew",
+   "chapters": 4,
+   "verses": 85,
+   "words": 1294
+  },
+  {
+   "id": "1SA",
+   "lang": "hebrew",
+   "chapters": 31,
+   "verses": 810,
+   "words": 13264
+  },
+  {
+   "id": "2SA",
+   "lang": "hebrew",
+   "chapters": 24,
+   "verses": 695,
+   "words": 11039
+  },
+  {
+   "id": "1KI",
+   "lang": "hebrew",
+   "chapters": 22,
+   "verses": 816,
+   "words": 13140
+  },
+  {
+   "id": "2KI",
+   "lang": "hebrew",
+   "chapters": 25,
+   "verses": 719,
+   "words": 12280
+  },
+  {
+   "id": "1CH",
+   "lang": "hebrew",
+   "chapters": 29,
+   "verses": 942,
+   "words": 10745
+  },
+  {
+   "id": "2CH",
+   "lang": "hebrew",
+   "chapters": 36,
+   "verses": 822,
+   "words": 13312
+  },
+  {
+   "id": "EZR",
+   "lang": "hebrew",
+   "chapters": 10,
+   "verses": 280,
+   "words": 3753
+  },
+  {
+   "id": "NEH",
+   "lang": "hebrew",
+   "chapters": 13,
+   "verses": 406,
+   "words": 5312
+  },
+  {
+   "id": "EST",
+   "lang": "hebrew",
+   "chapters": 10,
+   "verses": 167,
+   "words": 3045
+  },
+  {
+   "id": "JOB",
+   "lang": "hebrew",
+   "chapters": 42,
+   "verses": 1070,
+   "words": 8343
+  },
+  {
+   "id": "PSA",
+   "lang": "hebrew",
+   "chapters": 150,
+   "verses": 2577,
+   "words": 19578
+  },
+  {
+   "id": "PRO",
+   "lang": "hebrew",
+   "chapters": 31,
+   "verses": 915,
+   "words": 6915
+  },
+  {
+   "id": "ECC",
+   "lang": "hebrew",
+   "chapters": 12,
+   "verses": 222,
+   "words": 2987
+  },
+  {
+   "id": "SNG",
+   "lang": "hebrew",
+   "chapters": 8,
+   "verses": 117,
+   "words": 1249
+  },
+  {
+   "id": "ISA",
+   "lang": "hebrew",
+   "chapters": 66,
+   "verses": 1292,
+   "words": 16931
+  },
+  {
+   "id": "JER",
+   "lang": "hebrew",
+   "chapters": 52,
+   "verses": 1364,
+   "words": 21835
+  },
+  {
+   "id": "LAM",
+   "lang": "hebrew",
+   "chapters": 5,
+   "verses": 154,
+   "words": 1542
+  },
+  {
+   "id": "EZK",
+   "lang": "hebrew",
+   "chapters": 48,
+   "verses": 1273,
+   "words": 18730
+  },
+  {
+   "id": "DAN",
+   "lang": "hebrew",
+   "chapters": 12,
+   "verses": 357,
+   "words": 5919
+  },
+  {
+   "id": "HOS",
+   "lang": "hebrew",
+   "chapters": 14,
+   "verses": 197,
+   "words": 2381
+  },
+  {
+   "id": "JOL",
+   "lang": "hebrew",
+   "chapters": 3,
+   "verses": 73,
+   "words": 957
+  },
+  {
+   "id": "AMO",
+   "lang": "hebrew",
+   "chapters": 9,
+   "verses": 146,
+   "words": 2042
+  },
+  {
+   "id": "OBA",
+   "lang": "hebrew",
+   "chapters": 1,
+   "verses": 21,
+   "words": 291
+  },
+  {
+   "id": "JON",
+   "lang": "hebrew",
+   "chapters": 4,
+   "verses": 48,
+   "words": 688
+  },
+  {
+   "id": "MIC",
+   "lang": "hebrew",
+   "chapters": 7,
+   "verses": 105,
+   "words": 1396
+  },
+  {
+   "id": "NAM",
+   "lang": "hebrew",
+   "chapters": 3,
+   "verses": 47,
+   "words": 558
+  },
+  {
+   "id": "HAB",
+   "lang": "hebrew",
+   "chapters": 3,
+   "verses": 56,
+   "words": 671
+  },
+  {
+   "id": "ZEP",
+   "lang": "hebrew",
+   "chapters": 3,
+   "verses": 53,
+   "words": 767
+  },
+  {
+   "id": "HAG",
+   "lang": "hebrew",
+   "chapters": 2,
+   "verses": 38,
+   "words": 600
+  },
+  {
+   "id": "ZEC",
+   "lang": "hebrew",
+   "chapters": 14,
+   "verses": 211,
+   "words": 3128
+  },
+  {
+   "id": "MAL",
+   "lang": "hebrew",
+   "chapters": 4,
+   "verses": 55,
+   "words": 876
+  },
+  {
+   "id": "MAT",
+   "lang": "greek",
+   "chapters": 28,
+   "verses": 1071,
+   "words": 18284
+  },
+  {
+   "id": "MRK",
+   "lang": "greek",
+   "chapters": 16,
+   "verses": 678,
+   "words": 11167
+  },
+  {
+   "id": "LUK",
+   "lang": "greek",
+   "chapters": 24,
+   "verses": 1151,
+   "words": 19370
+  },
+  {
+   "id": "JHN",
+   "lang": "greek",
+   "chapters": 21,
+   "verses": 879,
+   "words": 15595
+  },
+  {
+   "id": "ACT",
+   "lang": "greek",
+   "chapters": 28,
+   "verses": 1007,
+   "words": 18346
+  },
+  {
+   "id": "ROM",
+   "lang": "greek",
+   "chapters": 16,
+   "verses": 433,
+   "words": 7095
+  },
+  {
+   "id": "1CO",
+   "lang": "greek",
+   "chapters": 16,
+   "verses": 437,
+   "words": 6808
+  },
+  {
+   "id": "2CO",
+   "lang": "greek",
+   "chapters": 13,
+   "verses": 257,
+   "words": 4464
+  },
+  {
+   "id": "GAL",
+   "lang": "greek",
+   "chapters": 6,
+   "verses": 149,
+   "words": 2226
+  },
+  {
+   "id": "EPH",
+   "lang": "greek",
+   "chapters": 6,
+   "verses": 155,
+   "words": 2414
+  },
+  {
+   "id": "PHP",
+   "lang": "greek",
+   "chapters": 4,
+   "verses": 104,
+   "words": 1622
+  },
+  {
+   "id": "COL",
+   "lang": "greek",
+   "chapters": 4,
+   "verses": 95,
+   "words": 1580
+  },
+  {
+   "id": "1TH",
+   "lang": "greek",
+   "chapters": 5,
+   "verses": 89,
+   "words": 1473
+  },
+  {
+   "id": "2TH",
+   "lang": "greek",
+   "chapters": 3,
+   "verses": 47,
+   "words": 822
+  },
+  {
+   "id": "1TI",
+   "lang": "greek",
+   "chapters": 6,
+   "verses": 113,
+   "words": 1590
+  },
+  {
+   "id": "2TI",
+   "lang": "greek",
+   "chapters": 4,
+   "verses": 83,
+   "words": 1237
+  },
+  {
+   "id": "TIT",
+   "lang": "greek",
+   "chapters": 3,
+   "verses": 46,
+   "words": 657
+  },
+  {
+   "id": "PHM",
+   "lang": "greek",
+   "chapters": 1,
+   "verses": 25,
+   "words": 334
+  },
+  {
+   "id": "HEB",
+   "lang": "greek",
+   "chapters": 13,
+   "verses": 303,
+   "words": 4939
+  },
+  {
+   "id": "JAS",
+   "lang": "greek",
+   "chapters": 5,
+   "verses": 108,
+   "words": 1735
+  },
+  {
+   "id": "1PE",
+   "lang": "greek",
+   "chapters": 5,
+   "verses": 105,
+   "words": 1680
+  },
+  {
+   "id": "2PE",
+   "lang": "greek",
+   "chapters": 3,
+   "verses": 61,
+   "words": 1096
+  },
+  {
+   "id": "1JN",
+   "lang": "greek",
+   "chapters": 5,
+   "verses": 105,
+   "words": 2134
+  },
+  {
+   "id": "2JN",
+   "lang": "greek",
+   "chapters": 1,
+   "verses": 13,
+   "words": 245
+  },
+  {
+   "id": "3JN",
+   "lang": "greek",
+   "chapters": 1,
+   "verses": 14,
+   "words": 216
+  },
+  {
+   "id": "JUD",
+   "lang": "greek",
+   "chapters": 1,
+   "verses": 25,
+   "words": 459
+  },
+  {
+   "id": "REV",
+   "lang": "greek",
+   "chapters": 22,
+   "verses": 404,
+   "words": 9808
+  }
+ ]
+}

@@ -146,11 +146,23 @@ export async function getAiUsage(userId: string, plan: Plan) {
 }
 
 /** All server-side eligibility checks for an AI request. Throws AiError when not allowed. */
-export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" | "plan") {
+/**
+ * A feature's own allowance in place of the plan's (Biblical AI's Free tier, migration 100): its request limit, its
+ * larger-model share and, optionally, a smaller per-member money budget. Every other rule still applies: the kill
+ * switch, consent, the per-minute limit, the global and daily budgets and the in-flight limits.
+ */
+export interface AllowanceOverride {
+  chatLimit: number;
+  smartLimit: number;
+  memberBudgetMicros?: number;
+}
+
+export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" | "plan", override?: AllowanceOverride) {
   if (!isAiConfigured()) throw new AiError("not_configured", "The AI coach isn't configured on this server.");
   if (!(await isFlagEnabled("ai_coach"))) throw new AiError("disabled", "The AI coach is temporarily unavailable.");
-  const allowance = await getAiAllowance(userId, plan);
+  const allowance = override ? { chatLimit: override.chatLimit, planLimit: 0 } : await getAiAllowance(userId, plan);
   if (allowance.chatLimit <= 0) throw new AiError("not_entitled", "AI coaching is included with Pro All Access.");
+  if (override && mode === "plan") throw new AiError("plan_not_entitled", "Personalized plan generation is included with Pro All Access.");
   if (mode === "plan") {
     if (allowance.planLimit <= 0) throw new AiError("plan_not_entitled", "Personalized plan generation is included with Pro All Access.");
     if (!(await isFlagEnabled("ai_plan_generation"))) throw new AiError("disabled", "Plan generation is temporarily unavailable.");
@@ -160,7 +172,8 @@ export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" |
   const burst = await rateLimit(`ai:${userId}`, aiPerMinute(), 60_000);
   if (!burst.ok) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", burst.retryAfterSeconds);
   // The in-memory limiter is per server instance; reserveUsage enforces the same limit across instances.
-  const usage = await getAiUsage(userId, plan);
+  const counted = await getAiUsage(userId, plan);
+  const usage = override ? { ...counted, chatLimit: override.chatLimit, planLimit: 0, smartLimit: override.smartLimit } : counted;
   if (usage.chatUsed >= usage.chatLimit) throw new AiError("quota", `You've used all ${usage.chatLimit} AI messages for this month.`);
   if (mode === "plan" && (usage.planUsed >= usage.planLimit || usage.smartUsed >= usage.smartLimit)) {
     throw new AiError("quota", `You've used this month's plan generations. They reset on the 1st.`);
@@ -187,6 +200,8 @@ async function reserveUsage(
   usage: { chatLimit: number; planLimit: number; smartLimit: number },
   /** Why this tier was asked for (stored for the cost report): the coach's route reason, or "feature". */
   routeReason: Route["reason"] | "feature",
+  /** A feature's own, smaller per-member money budget (AllowanceOverride). */
+  memberBudgetMicros?: number,
 ): Promise<{ usageId: string; tier: ModelTier; downgradeReason: DowngradeReason | null }> {
   const budget = aiBudgetConfig();
   const { data, error } = await getServiceSupabase().rpc("reserve_ai_usage", {
@@ -199,7 +214,7 @@ async function reserveUsage(
     p_per_minute: aiPerMinute(),
     // The expected cost is held while the request runs; the real cost replaces it afterwards.
     p_estimate_micros: expectedCostMicros(kind, tier),
-    p_user_budget_micros: budget.memberMonthlyMicros,
+    p_user_budget_micros: memberBudgetMicros === undefined ? budget.memberMonthlyMicros : Math.min(memberBudgetMicros, budget.memberMonthlyMicros),
     p_global_budget_micros: budget.globalMonthlyMicros,
     p_max_inflight_user: budget.maxInflightPerMember,
     p_max_inflight_global: budget.maxInflightGlobal,
@@ -699,18 +714,18 @@ export async function coachTurn(params: {
  * is called (given back if the call fails), and token counts recorded afterwards. `run` makes the provider call.
  */
 export async function withAiRequest<T>(
-  params: { supabase: SupabaseClient; userId: string; plan: Plan; kind: Exclude<AiUsageKind, "chat" | "plan">; tier?: ModelTier },
-  run: (ctx: { client: Anthropic; model: string }) => Promise<{ value: T; inputTokens: number; outputTokens: number; costMicros?: number; usage?: ProviderUsage | null }>,
+  params: { supabase: SupabaseClient; userId: string; plan: Plan; kind: Exclude<AiUsageKind, "chat" | "plan">; tier?: ModelTier; allowance?: AllowanceOverride },
+  run: (ctx: { client: Anthropic; model: string; tier: ModelTier }) => Promise<{ value: T; inputTokens: number; outputTokens: number; costMicros?: number; usage?: ProviderUsage | null }>,
 ): Promise<T> {
   // Consent first: a member who hasn't allowed AI use is told so, and their request doesn't count against the rate limit.
   const { data: consent } = await params.supabase.from("profiles").select("ai_data_consent_at").eq("id", params.userId).maybeSingle();
   if (!consent?.ai_data_consent_at) throw new AiError("consent_required", "Allow the AI features to use your data first (on the AI Coach screen).");
-  const usage = await assertAiAllowed(params.userId, params.plan, "chat");
-  const reservation = await reserveUsage(params.userId, params.kind, params.tier ?? "fast", usage, "feature");
+  const usage = await assertAiAllowed(params.userId, params.plan, "chat", params.allowance);
+  const reservation = await reserveUsage(params.userId, params.kind, params.tier ?? "fast", usage, "feature", params.allowance?.memberBudgetMicros);
   const model = coachModelIds(process.env)[reservation.tier];
   let result: { value: T; inputTokens: number; outputTokens: number; costMicros?: number; usage?: ProviderUsage | null };
   try {
-    result = await run({ client: getClient(), model });
+    result = await run({ client: getClient(), model, tier: reservation.tier });
   } catch (err) {
     const cutOff = err instanceof Anthropic.APIConnectionTimeoutError || err instanceof Anthropic.APIUserAbortError;
     // The provider answered (and billed), but the SDK couldn't read the structured output it sent back.
